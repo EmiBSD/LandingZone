@@ -30,6 +30,8 @@ coordinator's `HANDOFF.md` if your prompt names one.
    `subagent_type: "porter"` for delicate work and every `.c` over ~3,000 lines (one each),
    `"porter-mechanical"` for headers, tables and small leaves. At most 2 at a time. Give each
    the six items of the contract's "What the launching prompt must give" and its probe lines.
+   The fan-out (how many, which first, when to review, when to integrate) is your decision,
+   case by case; no script makes it.
 4. While they run, port a small piece yourself instead of idling.
 5. Integrate each branch as it finishes: `git merge`, renumber `ioconf.rs` cfdata, `NCFDATA` and
    the MP `cpu*` index on both archs, one `notes` key per ports.toml row, then `just build`,

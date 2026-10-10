@@ -126,8 +126,8 @@ Details: `.claude/rules/porting-workflow.md` and `docs/PORTING.md`.
 - `.claude/agents/`: the subagent roles (`milestone-coordinator`, `porter`, `porter-mechanical`,
   `integrator`, `debugger`, `reviewer`, `external-bugs`, `openbsd-probe`, `image-worker`); launch
   them by `subagent_type`; their lessons persist in `.claude/agent-memory/<agent>/`. The shared
-  contract is `.claude/rules/subagents.md`. `/port <files>` (`.claude/workflows/port.js`) runs a
-  whole port batch through them; `/progress` (`.claude/skills/progress/`) measures the port.
+  contract is `.claude/rules/subagents.md`; a batch is orchestrated by a coordinator or the main
+  session, never by a script. `/progress` (`.claude/skills/progress/`) measures the port.
 - `docs/STATUS.md` and `reference/PINNED.md` are imported below, so they are always in context.
 
 @docs/STATUS.md

@@ -144,11 +144,11 @@ with the tree so the whole team of agents learns. An agent in a worktree writes 
 the `integrator` keeps both sides on merge. Task state lives in a `HANDOFF.md`, never in memory.
 The `reviewer` has no memory on purpose: every change gets fresh eyes.
 
-`/port <files | milestone>` (`.claude/workflows/port.js`) runs the loop above as one workflow:
-plan the clusters (leaf dependencies folded in, a big file alone), one porter per cluster in its
-own worktree (at most four at once), a reviewer per branch with one fix round, then an integrator
-that merges the approved branches and runs `just ci`. Its result is a branch; `main` moves only
-by hand, after the user's OK. Running it is the user's decision, never the model's.
+How a batch is split, in what order, with how many agents, when a branch is reviewed and when
+the result is integrated is a `milestone-coordinator`'s (or the main session's) decision, taken
+case by case with the roles above. It is not a script: a deterministic workflow over the same
+roles (`/port`, 2026-10-09) was tried and failed, and was removed on 2026-10-10. The result of a
+batch is still a branch; `main` moves only by hand, after the user's OK.
 
 ## Measuring progress
 

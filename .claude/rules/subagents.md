@@ -32,15 +32,14 @@ on its branch and the `integrator` merges them (both sides kept, duplicates drop
 state (branches, hashes, what is left) goes in `HANDOFF.md`, never in memory. The `reviewer`
 has none on purpose: it reads every change with fresh eyes. `agent-memory-local/` is not used.
 
-## Workflows (`.claude/workflows/`)
+## Orchestration
 
-`/port <files | milestone>` (`port.js`) plans clusters, runs one `porter`/`porter-mechanical`
-per cluster in its own worktree (at most 4 at once), has a `reviewer` check each branch with
-one fix round, and ends with an `integrator` that merges the approved branches and runs
-`just ci`. The result is a branch for the main session to fast-forward; the workflow never
-touches `main`. Running a workflow is the user's call (`/port`), never the model's. Inside a
-workflow the lock is `/tmp/emibsd/ci.lock` and each cluster's notes live in
-`/tmp/emibsd/port/<cluster>/` (the scripts cannot see a session's scratchpad).
+How a batch is split, in what order, with how many agents, when a branch is reviewed and when
+the result is integrated is a `milestone-coordinator`'s (or the main session's) decision, taken
+case by case with the roles above. It is not a script: a deterministic workflow over the same
+roles (`/port`, `.claude/workflows/port.js`, 2026-10-09) was tried and failed, and the user
+removed it on 2026-10-10. Orchestration needs judgment; the model supplies it, the definitions
+supply the roles.
 
 ## What the launching prompt must give
 
