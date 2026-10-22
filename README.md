@@ -498,9 +498,8 @@ under one contract, [.claude/rules/subagents.md](.claude/rules/subagents.md). A 
 fan-out of each batch (no script does); `/progress` measures the port per milestone; their lessons
 persist in [.claude/agent-memory/](.claude/agent-memory/).
 
-Feedback is welcome: [GitHub Discussions](https://github.com/enavarre-cl/EmiBSD/discussions) for
-feedback and design questions, [Issues](https://github.com/enavarre-cl/EmiBSD/issues) for concrete
-problems. External pull requests are not accepted, for now.
+Feedback is welcome: [Issues](https://github.com/EmiBSD/LandingZone/issues), for concrete problems
+as well as feedback and design questions. External pull requests are not accepted, for now.
 
 ## Mascot
 
