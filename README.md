@@ -16,7 +16,7 @@
 ## What is this
 
 - A file-by-file port of the OpenBSD kernel, pinned to commit `3ce1f3f79392` of
-  [openbsd/src](https://github.com/openbsd/src) (`reference/PINNED.md`).
+  [EmiBSD/OpenBSD-src](https://github.com/EmiBSD/OpenBSD-src), the organisation's fork of openbsd/src (`reference/PINNED.md`).
 - Not a new kernel design, not a Rust-for-Linux style hybrid, not a wrapper around C.
 - The C sources are the specification. Names, structure and semantics stay OpenBSD's.
   Every deviation is written down, in the file and in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

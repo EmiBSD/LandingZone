@@ -3,7 +3,7 @@
 # Entries are added when a milestone claims them, never by bulk-importing the C tree.
 
 [meta]
-upstream = "https://github.com/openbsd/src"
+upstream = "https://github.com/EmiBSD/OpenBSD-src"
 pinned = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 
 # ---------------------------------------------------------------------------
