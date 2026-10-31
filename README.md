@@ -8,7 +8,13 @@
 
 <p align="center"><strong>The OpenBSD kernel, re-implemented in Rust, one file at a time.</strong></p>
 
-<p align="center">License: ISC · Rust: stable (1.98.1) · Targets: amd64, arm64 · Runs in: QEMU</p>
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-ISC-007ec6" alt="License: ISC"></a>
+  <a href="rust-toolchain.toml"><img src="https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2FEmiBSD%2FLandingZone%2Fmain%2Frust-toolchain.toml&query=%24.toolchain.channel&suffix=%20stable&label=rust&color=b7410e" alt="Rust: stable, the version pinned in rust-toolchain.toml"></a>
+  <a href="#status"><img src="https://img.shields.io/badge/milestone-M16-007ec6" alt="Milestone: M16, the latest met"></a>
+  <a href="#status"><img src="https://img.shields.io/badge/status-experimental-e05d44" alt="Status: experimental"></a>
+  <a href="https://www.emibsd.org"><img src="https://img.shields.io/badge/website-emibsd.org-9f9f9f" alt="Website: www.emibsd.org"></a>
+</p>
 
 > **Not for production.** EmiBSD is an experiment. It runs only in QEMU, and its crypto,
 > network and storage code is unaudited. Do not use it to protect real data or real networks.
@@ -21,6 +27,21 @@
 - The C sources are the specification. Names, structure and semantics stay OpenBSD's.
   Every deviation is written down, in the file and in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - A standalone `#![no_std]` kernel for amd64 and arm64, booted by Limine, run in QEMU.
+
+## Where it sits
+
+```mermaid
+flowchart LR
+    obsd["OpenBSD-src (mirror)"] -- "the C under sys/, read-only:<br/>the specification" --> lz["LandingZone"]
+    lz -- "the tree at lz-origin,<br/>then every commit, synced" --> k["Kernel"]
+    k --> os["OS"]
+```
+
+This repository is the first stage: the faithful port, checkable file by file against the C.
+What grows from it, the redesign in [Kernel](https://github.com/EmiBSD/Kernel) and the
+assembled system in [OS](https://github.com/EmiBSD/OS), reads this tree and never writes to
+it; nothing here adapts to them. The whole picture is in
+[Governance](https://github.com/EmiBSD/Governance) (`docs/architecture.md`).
 
 ## Status
 
