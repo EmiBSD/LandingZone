@@ -1,10 +1,10 @@
 # EmiBSD
 
 <p align="center">
-  <img src="docs/Ferffy.jpg" alt="Ferffy, the EmiBSD mascot: a spiky orange crab in front of a shield, above the EmiBSD name" width="380">
+  <img src="docs/Ferffy.jpg" alt="Ferffy, the EmiBSD mascot: a centolla, the spiky orange crab of the southern seas, in front of a shield, above the EmiBSD name" width="380">
 </p>
 
-<p align="center"><em>Ferffy, the EmiBSD mascot: the child of Ferris (Rust's crab) and Puffy (OpenBSD's pufferfish).</em></p>
+<p align="center"><em>Ferffy, the EmiBSD mascot: a <a href="https://en.wikipedia.org/wiki/Lithodes_santolla">centolla</a>, the child of Ferris (Rust's crab) and Puffy (OpenBSD's pufferfish).</em></p>
 
 <p align="center"><strong>The OpenBSD kernel, re-implemented in Rust, one file at a time.</strong></p>
 
@@ -524,7 +524,8 @@ as well as feedback and design questions. External pull requests are not accepte
 
 ## Mascot
 
-Ferffy is the child of Ferris, Rust's crab, and Puffy, OpenBSD's pufferfish:
+Ferffy is a [centolla](https://en.wikipedia.org/wiki/Lithodes_santolla), the king crab of
+Chile's southern seas, and the child of Ferris, Rust's crab, and Puffy, OpenBSD's pufferfish:
 the claws from one parent, the spikes from the other.
 
 ## License
