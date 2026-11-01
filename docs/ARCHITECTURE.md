@@ -2072,6 +2072,12 @@ user's plan). The shape is one build phase, then one run phase:
   justfile's `smokes` list as `just --no-deps <recipe>`, N at a time, longest first by the
   time each took last. A recipe runs exactly as `just <recipe>` would, with the same
   expectations; `just <recipe>` alone still builds what it needs and runs in `target/`.
+- The recipes run xtask through the justfile's `xtask` variable: `cargo xtask` by hand, and
+  under `smoke-all` the binary `smoke-all` itself runs as (`EMIBSD_XTASK`, 2026-11-01). `cargo
+  run` replaces `target/debug/xtask` on every invocation, fresh or not, and several recipes
+  starting together rewrote it under one that was exec'ing it: SIGKILL, or the hang in dyld
+  of 2026-10-09 (`docs/EXTERNAL_BUGS.md`, EXT-225). The frozen amd64 made it frequent, its
+  recipes taking a second; through the binary, no recipe of a parallel run touches cargo.
 - Every recipe gets a run directory, `target/smoke/<recipe>/` (`EMIBSD_RUN_DIR`, read by
   `boot::run_dir`): its boot images, EDK2 variable stores and persistent disks are there, so
   no two recipes write the same file (QEMU's image locking would refuse the second writer,

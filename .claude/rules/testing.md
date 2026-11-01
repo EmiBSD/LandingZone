@@ -62,7 +62,11 @@ Four tiers. Every change lands with the tier it belongs to.
    machine (`EMIBSD_TIMEOUT_SCALE` scales them under parallel load). `smoke-all` also
    watches each recipe from outside (the user's decision of 2026-10-09, after a recipe's
    xtask hung in macOS's dynamic loader for 2 h 30 min, past every limit, since those live
-   inside it): a recipe over the sum of its boots' limits times the scale plus five minutes,
+   inside it; understood on 2026-11-01: `cargo run` rewrites `target/debug/xtask` on every
+   invocation, and recipes starting together rewrote it under one that was exec'ing it, so
+   `smoke-all` now hands its recipes its own binary through `EMIBSD_XTASK`, the justfile's
+   `xtask` variable, and no recipe of a parallel run goes through cargo; EXTERNAL_BUGS
+   EXT-225): a recipe over the sum of its boots' limits times the scale plus five minutes,
    or whose log has not grown for ten minutes, has its whole process tree killed and is
    reported `TIMEOUT`, a failure; the others go on and `smoke-all` exits non-zero. So a
    waiting boot prints a line a minute (`boot::Heartbeat`), and a recipe step that runs for

@@ -2899,3 +2899,27 @@ for the host shims of `tools/xtask/src/userland/ramdisk.rs`.
 - Port's handling: `tools/xtask/src/distrib.rs` gives `drive_heads` only.
 - Severity: wrong result.
 - Fix: take the size from the image whenever `bsec` is 0.
+
+### EXT-225: `cargo run` rewrites the binary on every invocation; concurrent runs race on macOS
+
+- Where: cargo 1.98.1 and 1.99.1 (rustup's and DevTools'), `cargo run -p xtask` on
+  aarch64-apple-darwin, APFS.
+- What: every `cargo run`, with nothing to build ("Finished ... in 0.03s"), replaces the
+  uplifted binary `target/debug/xtask`: its inode changes on each run (`stat -f %i`), link
+  count 1, mtime kept, so it is unlinked and copied, not hard-linked. With `just smoke`
+  running four recipes at once, each starting `cargo xtask`, one cargo copies the file while
+  another has just exec'd it: the exec'd process dies with SIGKILL (`just` reports exit 137,
+  "terminated by signal 9", nothing in the unified log) or hangs forever at `_dyld_start`
+  (`sample`: the main thread in dyld, 0% CPU, no children), the 2 h 30 min hang of
+  2026-10-09 that brought `smoke-all`'s watchdog.
+- Reach: host, parallel `cargo run` of one binary.
+- Verified: reproduced 2026-11-01 on the four one-second recipes of the frozen amd64
+  (`smoke-tpm smoke-ipmi smoke-iic smoke-dmar`): 2 of 6 and 3 of 8 `smoke-all` runs lost a
+  recipe to signal 9 or a dyld hang; 1 of 120 plain `cargo xtask ...` x4 launches was
+  killed; 0 of 160 launches of the binary itself. The same with rustup's cargo 1.99.1 in
+  place of DevTools', so the toolchain's build is not the cause.
+- Port's handling: `smoke-all` passes its own binary to the recipes (`EMIBSD_XTASK`, the
+  justfile's `xtask` variable), so a parallel run never goes through cargo.
+- Severity: hang / lost process.
+- Fix (cargo): skip the uplift when the artifact is fresh and the destination matches, or
+  copy to a temporary name and rename over the destination.

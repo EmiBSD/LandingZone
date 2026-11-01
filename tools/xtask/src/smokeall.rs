@@ -296,6 +296,7 @@ fn recipe_limit(root: &Path, just_bin: &str, recipe: &str, scale: usize) -> Dura
     let shown = Command::new(just_bin)
         .args(["--no-deps", "--dry-run", recipe])
         .current_dir(root)
+        .env(XTASK_ENV, xtask_exe())
         .stdin(Stdio::null())
         .output();
     let boots = match shown {
@@ -320,7 +321,7 @@ fn boot_limits(commands: &str) -> Option<Duration> {
         let mut words = line.split_whitespace();
         let Some(cmd) = words
             .by_ref()
-            .skip_while(|w| *w != "xtask")
+            .skip_while(|w| Path::new(w).file_name().is_none_or(|n| n != "xtask"))
             .nth(1)
             .filter(|c| *c == "smoke" || *c == "smoke2")
         else {
@@ -373,6 +374,21 @@ fn descendants(table: &[(u32, u32)], root: u32) -> Vec<u32> {
         i += 1;
     }
     found
+}
+
+/// The justfile's `xtask` variable reads this: the recipes run xtask as this file instead of
+/// `cargo xtask`. `cargo run` replaces `target/debug/xtask` (unlink, copy) on every invocation,
+/// fresh or not, so several recipes starting at once rewrite the binary under one that is
+/// exec'ing it; macOS then kills that process (SIGKILL) or leaves it in dyld forever (the
+/// 2 h 30 min hang of 2026-10-09, understood on 2026-11-01 once the frozen amd64 made recipes
+/// of one second; docs/EXTERNAL_BUGS.md EXT-225).
+pub(crate) const XTASK_ENV: &str = "EMIBSD_XTASK";
+
+/// This xtask binary, for [`XTASK_ENV`]; `cargo xtask` when it cannot be found.
+fn xtask_exe() -> std::ffi::OsString {
+    std::env::current_exe()
+        .map(|p| p.into_os_string())
+        .unwrap_or_else(|_| "cargo xtask".into())
 }
 
 /// SIGKILLs `root` and its whole process tree, read from `ps` once, parents first, so none
@@ -459,6 +475,7 @@ fn run_recipe(
     let spawned = Command::new(just_bin)
         .args(["--no-deps", recipe])
         .current_dir(root)
+        .env(XTASK_ENV, xtask_exe())
         .env(boot::RUN_DIR_ENV, &dir)
         .env(boot::TIMEOUT_SCALE_ENV, scale.to_string())
         .stdin(Stdio::null())
@@ -563,6 +580,11 @@ mod tests {
             cargo xtask smoke2 --arch amd64\n";
         // 180 (a smoke's --timeout-like text is not smoke2's flag) + 400 + 180.
         assert_eq!(boot_limits(cmds), Some(Duration::from_secs(760)));
+        // Under smoke-all the recipes name the binary (`EMIBSD_XTASK`), not `cargo xtask`.
+        assert_eq!(
+            boot_limits("/r/target/debug/xtask smoke2 --arch arm64 --timeout 100\n"),
+            Some(Duration::from_secs(100))
+        );
         assert_eq!(boot_limits("cargo xtask smoke-all -j 4 smoke-a\n"), None);
         assert_eq!(boot_limits("echo nothing\n"), None);
     }
