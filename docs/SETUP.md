@@ -30,15 +30,15 @@ still lacks the bare targets. Not recommended.)
    ```sh
    rustup default stable
    ```
-5. In the repository, the first `cargo` command installs the pinned toolchain, both bare-metal
-   targets and the components listed in `rust-toolchain.toml` automatically.
+5. In the repository, `just toolchain` installs the pinned DevTools toolchains and links the Rust
+   one as rustup's `emibsd`, the channel `rust-toolchain.toml` names ("DevTools toolchain" below).
 
 ## Verify
 
 ```sh
 which cargo                        # ~/.cargo/bin/cargo or the rustup keg, NOT /opt/homebrew/bin
-cargo --version                    # the version pinned in rust-toolchain.toml
-rustup target list --installed     # x86_64-unknown-none, aarch64-unknown-none-softfloat
+cargo --version                    # cargo 1.99.1 (EmiBSD DevTools): rust-toolchain.toml's `emibsd`
+rustc --print sysroot              # ~/devel/emibsd/toolchains/rust-1.99.1+emibsd.1-aarch64-apple-darwin
 ls "$(brew --prefix qemu)/share/qemu/"edk2-{x86_64,aarch64}-code.fd
 ls "$(brew --prefix limine)/share/limine/"BOOT{X64,AA64}.EFI
 cargo check && cargo test          # host build of bsd + libkern
@@ -75,11 +75,12 @@ yacc(1), which `pfctl` and `ipsecctl`'s `parse.y` need, and lex(1) for `.l` sour
 | Tool | Default | Override | Use |
 |---|---|---|---|
 | Apple clang 21 (Xcode) | `/usr/bin/clang` | `$EMIBSD_CC` | compiles for `x86_64-unknown-openbsd` and `aarch64-unknown-openbsd` (ELF), and builds `rpcgen` and `yacc` for the Mac |
-| LLD 17 | `~/.swiftly/bin/ld.lld` | `$EMIBSD_LLVM_BIN` (the directory) | links static PIE executables |
-| `llvm-ar`, `llvm-ranlib`, `llvm-objcopy`, `llvm-objdump` | `~/.swiftly/bin/` | `$EMIBSD_LLVM_BIN` | archives, `install -s`, verification |
+| LLD 23.1.4 (DevTools) | `$EMIBSD_LLVM_BIN/ld.lld`, exported by the justfile | `$EMIBSD_LLVM_BIN` (the directory) | links static PIE executables |
+| `llvm-ar`, `llvm-ranlib`, `llvm-objcopy`, `llvm-objdump` | `$EMIBSD_LLVM_BIN/` | `$EMIBSD_LLVM_BIN` | archives, `install -s`, verification |
 
-`~/.swiftly/bin` is the Swift toolchain manager's directory; its LLVM tools are proxies that
-`swiftly` resolves to the selected toolchain. Any LLVM 17 or newer `ld.lld` with OpenBSD
+Since 2026-11-01 `$EMIBSD_LLVM_BIN` is DevTools' LLVM release ("DevTools toolchain" below); the
+justfile exports it, and `cargo xtask userland` run by hand needs it set (M8's `~/.swiftly/bin`
+LLD 17 is no default any more). Any LLVM 17 or newer `ld.lld` with OpenBSD
 support (it must emit `PT_OPENBSD_SYSCALLS`) and matching binutils work through
 `$EMIBSD_LLVM_BIN`. `/bin/sh`, `sed` and `/usr/bin/cpp` (Apple clang's, run by `rpcgen`) are the
 system's.
@@ -153,6 +154,26 @@ to it into one to the Mac's 127.0.0.1, so no port forwarding is configured. `jus
 uses ports 8443 (trusted), 8444 (echo) and 8445 (untrusted); they must be free.
 `cargo test -p xtask -- --ignored servers_answer` checks the three modes against
 `openssl s_client` on the Mac alone.
+
+## DevTools toolchain
+
+`just toolchain` installs the EmiBSD toolchains that DevTools releases
+(github.com/EmiBSD/DevTools; the user's decision of 2026-10-31, taken over from the Kernel
+repository on 2026-11-01): `llvm-23.1.4+emibsd.1` and `rust-1.99.1+emibsd.1`, pinned by tag and
+sha256 in the justfile, fetched with `gh release download` (never "latest"), checked before
+unpacking, and unpacked unmodified into `~/devel/emibsd/toolchains` (`EMIBSD_TOOLCHAINS`
+overrides it). The Rust one becomes rustup's toolchain `emibsd`, the channel
+`rust-toolchain.toml` names, so every `cargo` in the repository uses it; the LLVM one's `bin/`
+(`ld.lld`, the binutils, `llvm-objcopy`, clang) is `EMIBSD_LLVM_BIN`, which the justfile exports
+for the userland table above and for efiboot. Needs `gh`, logged in, and `zstd` (Homebrew). A tag
+already unpacked is left alone; never modify, move or delete anything under that directory, it
+is shared by every repository on the machine. Anything that breaks because of the toolchain is
+reported to EmiBSD/DevTools with the command and the output, never worked around here.
+
+The Rust release carries the arm64 targets only (`aarch64-apple-darwin`, `aarch64-emibsd-emibsd`,
+`aarch64-unknown-none-softfloat`) and no `llvm-tools`, so amd64 is frozen until it carries
+`x86_64-unknown-none` (`docs/ARCHITECTURE.md`, "Frozen amd64"): `just build`, `clippy` and the
+smokes print a notice for amd64 and go on with arm64.
 
 ## e2fsprogs (M10d)
 

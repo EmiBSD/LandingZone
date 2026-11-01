@@ -3872,7 +3872,7 @@ mod tests {
             sys_mount,
             p,
             &[
-                b"ffs\0".as_ptr() as usize,
+                c"ffs".as_ptr() as usize,
                 path(b"/\0"),
                 MNT_UPDATE as usize,
                 ptr::from_mut(&mut ua) as usize,
@@ -3965,7 +3965,7 @@ mod tests {
             true,
         );
         assert_eq!(rd.u(), 0);
-        assert_eq!(rd.wcc().0, true);
+        assert!(rd.wcc().0);
         assert_eq!((rd.u(), rd.u()), (data.len() as u32, NFSV3WRITE_FILESYNC));
         rd.n(2); // the write verifier
         rd.done();

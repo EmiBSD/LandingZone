@@ -232,6 +232,17 @@ impl Status {
     }
 }
 
+/// The frozen arch an `--arch` command names, if any (`Arch::frozen`). `diff-openbsd` is left
+/// alone: its `probe` boots OpenBSD, not our kernel, and its comparison fails on its own.
+fn frozen_arch(argv: &[&str]) -> Option<boot::Arch> {
+    if argv.first() == Some(&"diff-openbsd") {
+        return None;
+    }
+    let name = argv.windows(2).find(|w| w[0] == "--arch").map(|w| w[1])?;
+    let arch = boot::Arch::parse(name).ok()?;
+    arch.frozen().then_some(arch)
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match run(&args) {
@@ -246,6 +257,16 @@ fn main() -> ExitCode {
 fn run(args: &[String]) -> Result<()> {
     let root = workspace_root()?;
     let argv: Vec<&str> = args.iter().map(String::as_str).collect();
+    if let Some(arch) = frozen_arch(&argv) {
+        println!(
+            "xtask: {} is frozen (the toolchain has no {}; docs/ARCHITECTURE.md, \"Frozen \
+             amd64\"): `{}` skipped",
+            arch.name(),
+            arch.target(),
+            argv.first().unwrap_or(&"")
+        );
+        return Ok(());
+    }
     boot::set_smp(smp_flag(&argv)?);
     hwopts::set(&root, &argv)?;
     storage::set(&root, &argv)?;

@@ -40,7 +40,7 @@ Services on the Mac, both started by the user (they need root):
 ```sh
 just build-arm64 "--features multiprocessor"     # the MP kernel; no `qemu` feature on hardware
 just efiboot-arm64
-OC=$(ls ~/.rustup/toolchains/1.98.1-*/lib/rustlib/*/bin/llvm-objcopy | head -1)
+OC=~/devel/emibsd/toolchains/llvm-23.1.4+emibsd.1-aarch64-apple-darwin/bin/llvm-objcopy   # DevTools' LLVM, the justfile's devtools_llvm
 $OC --strip-debug target/aarch64-unknown-none-softfloat/debug/bsd /private/tftpboot/bsd   # 97 MB -> 7.5 MB
 cp target/efiboot/arm64/BOOTAA64.EFI /private/tftpboot/arm64/
 git rev-parse --short HEAD > /private/tftpboot/arm64/VERSION

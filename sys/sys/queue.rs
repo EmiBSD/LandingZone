@@ -1938,13 +1938,13 @@ mod tests {
 
     #[test]
     fn empty_heads_can_be_moved_and_const_initialised() {
-        // A `static` head needs a lock around it (`Cell` is not `Sync`); a `const` is fine.
-        const LIST: ListHead<Li> = ListHead::new();
-        const ENTRY: TailqEntry<Node> = TailqEntry::new();
+        // A `static` head needs a lock around it (`Cell` is not `Sync`); a `const` block is fine.
+        let list = const { ListHead::<Li>::new() };
+        let entry = const { TailqEntry::<Node>::new() };
         let moved = [SimpleqHead::<Sq>::new(), SimpleqHead::<Sq>::default()];
-        assert!(LIST.is_empty());
+        assert!(list.is_empty());
         assert!(moved.iter().all(SimpleqHead::is_empty));
-        assert!(ENTRY.tqe_next.get().is_null());
+        assert!(entry.tqe_next.get().is_null());
     }
 
     #[cfg(feature = "diagnostic")]

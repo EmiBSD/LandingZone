@@ -72,7 +72,8 @@ mod tests {
     #[test]
     fn table() {
         // (initial destination, source, expected return, expected destination bytes)
-        let cases: &[(&[u8], &[u8], usize, &[u8])] = &[
+        type Case<'a> = (&'a [u8], &'a [u8], usize, &'a [u8]);
+        let cases: &[Case] = &[
             (
                 b"ab\0\xff\xff\xff\xff\xff",
                 b"cd\0",

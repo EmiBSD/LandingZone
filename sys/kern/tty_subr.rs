@@ -622,7 +622,7 @@ mod tests {
         assert_eq!(putc(i32::from(b'b') | TTY_QUOTE, q), 0);
         assert_eq!(getc(q), i32::from(b'a'));
         // Wrap: three more fit (one slot was freed).
-        for c in [b'c', b'd', b'e'] {
+        for &c in b"cde" {
             assert_eq!(putc(i32::from(c), q), 0);
         }
         assert_eq!(putc(i32::from(b'f'), q), -1, "full");

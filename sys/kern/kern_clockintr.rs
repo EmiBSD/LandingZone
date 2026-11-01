@@ -750,7 +750,12 @@ mod tests {
         static ONCE: Clockintr = Clockintr::new();
         static AGAIN: Clockintr = Clockintr::new();
         clockintr_bind(&ONCE, ci, count_and_reschedule, ptr::null_mut());
-        clockintr_bind(&AGAIN, ci, count_and_reschedule, 1 as *mut c_void);
+        clockintr_bind(
+            &AGAIN,
+            ci,
+            count_and_reschedule,
+            ptr::without_provenance_mut(1),
+        );
 
         // Both due now: `0` is in the past.
         RUNS.store(0, Ordering::Relaxed);

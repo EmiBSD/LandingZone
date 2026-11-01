@@ -234,8 +234,8 @@ mod tests {
         #[repr(C, align(8))]
         struct Raw([u8; size_of::<Fs>()]);
         let mut raw = Raw([0u8; size_of::<Fs>()]);
-        for frag in [1, 2, 4, 8] {
-            raw.0[56..60].copy_from_slice(&(frag as i32).to_ne_bytes());
+        for frag in [1i32, 2, 4, 8] {
+            raw.0[56..60].copy_from_slice(&frag.to_ne_bytes());
             // SAFETY: `Fs` is `Cell`s of integers and raw pointers, valid for any bytes, and
             // `raw` has its size and alignment; nothing writes `raw` while `fs` lives.
             let fs = unsafe { &*raw.0.as_ptr().cast::<Fs>() };

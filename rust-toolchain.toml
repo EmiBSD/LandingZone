@@ -1,7 +1,12 @@
-# Stable, pinned. Bumping is its own commit ("build: bump toolchain to <version>").
-# With rustup installed (docs/SETUP.md) the first `cargo` invocation installs all of this.
+# DevTools' toolchain (github.com/EmiBSD/DevTools), the one build of rustc every EmiBSD
+# repository shares: `just toolchain` installs the pinned release into ~/devel/emibsd/toolchains
+# and links it as rustup's toolchain `emibsd` (docs/SETUP.md, "DevTools toolchain"). Bumping is
+# its own commit ("build: bump toolchain to <version>"). The release carries rustfmt, clippy,
+# rust-src and the arm64 targets; amd64 (`x86_64-unknown-none`) is frozen until it carries that
+# target too (docs/ARCHITECTURE.md, "Frozen amd64"). `components` and `targets` say what a rustup
+# channel would have to install to stand in for it; rustup ignores them for a linked toolchain.
 [toolchain]
-channel = "1.98.1"
+channel = "emibsd"
 profile = "minimal"
-components = ["rustfmt", "clippy", "rust-src", "llvm-tools"]
+components = ["rustfmt", "clippy", "rust-src"]
 targets = ["x86_64-unknown-none", "aarch64-unknown-none-softfloat"]

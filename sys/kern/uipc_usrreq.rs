@@ -2183,10 +2183,8 @@ pub(crate) mod tests {
         let from = from.expect("an address");
         assert_eq!(from.m_len().get() as usize, SUN_NONAME_LEN);
         // SAFETY: a socket address.
-        assert_eq!(
-            unsafe { mtod::<Sockaddr>(from).read_unaligned() },
-            SUN_NONAME
-        );
+        let sa = unsafe { mtod::<Sockaddr>(from).read_unaligned() };
+        assert_eq!(sa, SUN_NONAME);
         m_freem(Some(from));
 
         // A short read truncates the datagram and drops the rest of it.
@@ -2351,7 +2349,7 @@ pub(crate) mod tests {
 
     /// `sendmsg(s, msg, 0)` of one byte with `fd` in an `SCM_RIGHTS` message.
     fn send_fd(p: &Proc, s: i32, fd: i32) {
-        let byte = [b'x'];
+        let byte = b"x";
         let mut iov = [Iovec {
             iov_base: byte.as_ptr().cast_mut().cast(),
             iov_len: 1,

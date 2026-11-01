@@ -2949,15 +2949,11 @@ mod tests {
         // The interface messages have their own headers.
         let mut info = RtAddrinfo::new();
         // SAFETY: no addresses.
-        assert_eq!(
-            unsafe { rtm_msg2(RTM_IFINFO, RTM_VERSION, &mut info, None, None) },
-            size_of::<IfMsghdr>()
-        );
+        let len = unsafe { rtm_msg2(RTM_IFINFO, RTM_VERSION, &mut info, None, None) };
+        assert_eq!(len, size_of::<IfMsghdr>());
         // SAFETY: no addresses.
-        assert_eq!(
-            unsafe { rtm_msg2(RTM_NEWADDR, RTM_VERSION, &mut info, None, None) },
-            size_of::<IfaMsghdr>()
-        );
+        let len = unsafe { rtm_msg2(RTM_NEWADDR, RTM_VERSION, &mut info, None, None) };
+        assert_eq!(len, size_of::<IfaMsghdr>());
         assert_eq!(info.rti_addrs, 0);
     }
 

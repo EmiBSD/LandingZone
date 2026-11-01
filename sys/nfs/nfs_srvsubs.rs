@@ -934,7 +934,7 @@ mod tests {
             sys_mount,
             p,
             &[
-                b"ffs\0".as_ptr() as usize,
+                c"ffs".as_ptr() as usize,
                 path(b"/\0"),
                 MNT_UPDATE as usize,
                 ptr::from_mut(&mut ua) as usize,

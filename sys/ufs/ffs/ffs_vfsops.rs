@@ -2180,7 +2180,7 @@ pub(crate) mod tests {
                 dotdot.d_name[1] = b'.';
                 dotdot.d_reclen = (DIRBLKSIZ - dirsiz(1)) as u16;
                 dotdot.write_to(&mut self.disk, off + dirsiz(1));
-                let blocks = (fragroundup(self.fs(), DIRBLKSIZ as i64) / DEV_BSIZE as i64) as i64;
+                let blocks = fragroundup(self.fs(), DIRBLKSIZ as i64) / DEV_BSIZE as i64;
                 self.iput(ROOTINO, |d| match d {
                     Din::Ufs1(d) => {
                         d.di_mode = mode as u16;
@@ -2869,7 +2869,7 @@ pub(crate) mod tests {
                 sys_mount,
                 p,
                 &[
-                    b"ffs\0".as_ptr() as usize,
+                    c"ffs".as_ptr() as usize,
                     path(b"/\0"),
                     MNT_UPDATE as usize,
                     ptr::from_mut(args) as usize,

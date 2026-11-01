@@ -12,6 +12,9 @@ Everything in this repository (code, comments, docs, commits) is in English.
 ## Non-negotiables
 
 - Both architectures build on every commit (`just build`). Never land amd64-only or arm64-only work.
+  Exception since 2026-11-01: amd64 is frozen while the pinned toolchain has no
+  `x86_64-unknown-none` (`docs/ARCHITECTURE.md`, "Frozen amd64"): its recipes print a notice and
+  skip, its sources stay untouched, and no amd64 work lands while it cannot be built.
 - Generic code (`kern/`, `uvm/`, `dev/`, `sys/`) reaches arch code ONLY through `crate::machine`.
   `crate::arch::amd64` / `crate::arch::arm64` are never named outside `sys/arch/` and `sys/machine/`.
 - `reference/` is read-only. Never edit it, never copy C verbatim (`.claude/rules/reference-readonly.md`).

@@ -145,6 +145,29 @@ revision 6, with no crate in between (see "Dependencies").
 
 Stable Rust, pinned in `rust-toolchain.toml`.
 
+Since 2026-11-01 the pin is DevTools' build of Rust 1.99.1 (github.com/EmiBSD/DevTools),
+`channel = "emibsd"`: `just toolchain` installs its releases by tag and sha256 into
+`~/devel/emibsd/toolchains` (`docs/SETUP.md`, "DevTools toolchain") and links the Rust one as
+rustup's toolchain `emibsd`; the LLVM release's `ld.lld` and binutils are the userland's linker
+and efiboot's `llvm-objcopy` through `EMIBSD_LLVM_BIN`, which the justfile exports. The Rust
+release ships no `rust-lld`, so the justfile also exports cargo's linker for both bare targets
+(`CARGO_TARGET_<triple>_LINKER`) as that `ld.lld`; `.cargo/config.toml` keeps only the
+rustflags. The same version from rustup differs only in who built it.
+
+### Frozen amd64
+
+DevTools' Rust release carries the arm64 targets only (`aarch64-emibsd-emibsd` with std,
+`aarch64-unknown-none-softfloat` with core and alloc) and no `llvm-tools`. Rather than mix a
+second toolchain in for amd64, amd64 is frozen (the user's decision of 2026-11-01, as the Kernel
+repository's decision 44 of 2026-10-18): while the active toolchain has no
+`lib/rustlib/x86_64-unknown-none`, the justfile's amd64 `cargo` lines print a notice instead of
+running (`amd64_cmd`) and xtask skips every command with `--arch amd64` the same way
+(`Arch::frozen`; `diff-openbsd` excepted, its probe boots OpenBSD). `sys/arch/amd64`, its
+`sys/machine` implementations, `efiboot-amd64`, init's amd64 half, the amd64 smokes and their
+expectations stay in the tree untouched, and no amd64 work lands while it cannot be built. The
+day the release carries the target, `ci` builds, lints and boots amd64 again with no change
+here. CLAUDE.md's "both architectures" rule reads with this exception.
+
 - `x86_64-unknown-none`: kernel code model, no SSE/AVX, no red zone.
 - `aarch64-unknown-none-softfloat`: no NEON/FP. The hardfloat variant lets the compiler use `q`
   registers in `memcpy`; a kernel that does not save FP state on traps must not touch them. This is

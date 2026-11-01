@@ -55,8 +55,8 @@
 //!
 //! Tools (approved by the user on 2026-10-03): Apple clang (`$EMIBSD_CC`, default
 //! `/usr/bin/clang`) and LLVM's `ld.lld`, `llvm-ar`, `llvm-ranlib`, `llvm-objcopy`,
-//! `llvm-objdump` from `$EMIBSD_LLVM_BIN` (default `~/.swiftly/bin`). The OpenBSD sources come
-//! from `$OPENBSD_SRC`, else `reference/openbsd-src` of this checkout, else of the main
+//! `llvm-objdump` from `$EMIBSD_LLVM_BIN`, DevTools' LLVM release since 2026-11-01 (the justfile
+//! exports it; no default). The OpenBSD sources come from `$OPENBSD_SRC`, else `reference/openbsd-src` of this checkout, else of the main
 //! checkout when run from a git worktree. Nothing is ever written there.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -563,13 +563,10 @@ impl Tools {
         let cc = std::env::var_os("EMIBSD_CC")
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("/usr/bin/clang"));
-        let bindir = match std::env::var_os("EMIBSD_LLVM_BIN") {
-            Some(d) => PathBuf::from(d),
-            None => {
-                let home = std::env::var_os("HOME").ok_or("$HOME is not set")?;
-                PathBuf::from(home).join(".swiftly").join("bin")
-            }
-        };
+        let bindir = PathBuf::from(std::env::var_os("EMIBSD_LLVM_BIN").ok_or(
+            "$EMIBSD_LLVM_BIN is not set: run through `just` (it exports DevTools' LLVM bin/) \
+             or set it; docs/SETUP.md (\"DevTools toolchain\")",
+        )?);
         let need = |p: PathBuf, env: &str| -> Result<PathBuf> {
             if p.is_file() {
                 Ok(p)

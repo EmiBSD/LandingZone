@@ -11,6 +11,42 @@ export EMIBSD_BUILD_HOST := `hostname -s 2>/dev/null || echo localhost`
 amd64 := "x86_64-unknown-none"
 arm64 := "aarch64-unknown-none-softfloat"
 
+# The toolchains DevTools releases (github.com/EmiBSD/DevTools; the user's decision of
+# 2026-10-31, taken from the Kernel repository on 2026-11-01): fetched by tag, never "latest",
+# checked against the pinned sha256 before unpacking, and used in place, unmodified, from
+# `toolchain_dir` (outside every repository, so `cargo clean` never removes it). The Rust one is
+# rustup's toolchain `emibsd`, the one rust-toolchain.toml names; the LLVM one's bin/ is
+# `EMIBSD_LLVM_BIN` (ld.lld, llvm-ar, llvm-objcopy: the userland's linker and binutils, and
+# efiboot's objcopy, since the Rust release has no llvm-tools). `just toolchain` installs them
+# (docs/SETUP.md, "DevTools toolchain").
+toolchain_dir := env("EMIBSD_TOOLCHAINS", env("HOME") / "devel/emibsd/toolchains")
+devtools_llvm := "llvm-23.1.4+emibsd.1"
+devtools_llvm_sha256 := "4f6b15c8106ad45eb834f1490c64ddf411a9680ba42b4d7b5bbd2ffcf50ae499"
+devtools_rust := "rust-1.99.1+emibsd.1"
+devtools_rust_sha256 := "c30aa833a2e634ce9a349be9f7581d1a4b55f3403bce21444dacb323d4f1c933"
+export EMIBSD_LLVM_BIN := env("EMIBSD_LLVM_BIN", toolchain_dir / devtools_llvm + "-aarch64-apple-darwin/bin")
+# The Rust release ships no `rust-lld`: the kernels, init and efiboot link with the LLVM release's
+# `ld.lld` (cargo's per-target linker, read from the environment; the host crates keep cc).
+export CARGO_TARGET_AARCH64_UNKNOWN_NONE_SOFTFLOAT_LINKER := EMIBSD_LLVM_BIN / "ld.lld"
+export CARGO_TARGET_X86_64_UNKNOWN_NONE_LINKER := EMIBSD_LLVM_BIN / "ld.lld"
+
+# Frozen amd64 (the user's decision of 2026-11-01; docs/ARCHITECTURE.md, "Frozen amd64"):
+# DevTools' Rust release carries no `x86_64-unknown-none`, so while the active toolchain lacks
+# that target every amd64 build, clippy and boot is skipped with a notice: here the `cargo` lines
+# of the amd64 recipes (`amd64_cmd` becomes an `echo`), in xtask every `--arch amd64` command
+# (`Arch::frozen`). The amd64 sources stay in the tree untouched; the day the release carries the
+# target, amd64 is back in `ci` with no change here.
+sysroot := `rustc --print sysroot`
+export EMIBSD_SYSROOT := sysroot
+amd64_frozen := if path_exists(sysroot / "lib/rustlib" / amd64) == "true" { "false" } else { "true" }
+amd64_cmd := if amd64_frozen == "true" { "echo '[amd64 frozen: the toolchain has no x86_64-unknown-none; skipped]'" } else { "" }
+# The recipes' checks for the userland and comp images follow the freeze: a frozen arch's image
+# is not required (its boots are skipped anyway).
+ramdisks := if amd64_frozen == "true" { "test -f target/userland/arm64/ramdisk.ffs" } else { "test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs" }
+ramdisk_amd64 := if amd64_frozen == "true" { "true" } else { "test -f target/userland/amd64/ramdisk.ffs" }
+comps := if amd64_frozen == "true" { "test -f target/comp/arm64/comp.ffs" } else { "test -f target/comp/amd64/comp.ffs -a -f target/comp/arm64/comp.ffs" }
+comp_amd64 := if amd64_frozen == "true" { "true" } else { "test -f target/comp/amd64/comp.ffs" }
+
 # Every smoke and smoke2 run fails if a VM prints this (kern_clockintr's check under feature
 # `qemu`: an uptime reading behind the previous one).
 reject := "--reject 'uptime went backwards'"
@@ -55,7 +91,7 @@ default:
 
 # `features` lets the image recipes build with `--features qemu` (emulator exit codes).
 build-amd64 features="":
-    cargo build -p bsd --target {{amd64}} {{features}}
+    {{amd64_cmd}} cargo build -p bsd --target {{amd64}} {{features}}
 
 build-arm64 features="":
     cargo build -p bsd --target {{arm64}} {{features}}
@@ -63,7 +99,7 @@ build-arm64 features="":
 # The freestanding init(8) stand-in (init/), a static user ELF the image carries as a Limine
 # module (M6).
 build-init-amd64:
-    cargo build -p init --target {{amd64}}
+    {{amd64_cmd}} cargo build -p init --target {{amd64}}
 
 build-init-arm64:
     cargo build -p init --target {{arm64}}
@@ -81,7 +117,7 @@ build-mp: (build-amd64 "--features multiprocessor") (build-arm64 "--features mul
 # made a PE32+ image with `llvm-objcopy -O binary` (cargo xtask efiboot): target/efiboot/
 # amd64/BOOTX64.EFI. docs/ARCHITECTURE.md, "Boot loaders".
 efiboot-amd64:
-    RUSTFLAGS="-C relocation-model=pie" cargo build -p efiboot-amd64 --target {{amd64}} --target-dir target/efiboot
+    {{amd64_cmd}} RUSTFLAGS="-C relocation-model=pie" cargo build -p efiboot-amd64 --target {{amd64}} --target-dir target/efiboot
     cargo xtask efiboot --arch amd64 --elf target/efiboot/{{amd64}}/debug/bootx64
 
 # M14 track A3: arm64's BOOTAA64.EFI (sys/arch/arm64/stand/efiboot), built as amd64's:
@@ -282,7 +318,7 @@ smoke-boot: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--featu
 # M8: OpenBSD's init(8) and ksh(1) from the ffs ramdisk, driven over the serial console. Needs
 # `just userland` (the ramdisk image); stops once every expected line was seen.
 smoke-shell: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-shell: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --cmdline "-s" --expect-ramdisk --until-seen \
         --send-after "RETURN for sh:" --send '\n' \
@@ -322,7 +358,7 @@ ksh_line := 'echo "#!/bin/ksh" >/tmp/k; echo "(( y = 6 * 7 )); echo ksh-arith-\$
 # $1 its argument; `$((6*7))` keeps the echoed line from matching), then a `#!/bin/ksh` one
 # with `(( ))` arithmetic prints `ksh-arith-42` (`\$y` likewise). Part of `smoke`.
 smoke-login: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-login: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --send-after "login:" --send 'root\n' --send-after "Password:" --send 'emibsd\n' \
@@ -349,7 +385,7 @@ smoke-login: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feat
 # ifconfig(8) (getifaddrs(3): NET_RT_IFLIST, then interface ioctls on an AF_INET socket). The kernel's network self-test configured vio0 (10.0.2.15) and the default route
 # through 10.0.2.2 before init ran. Part of `smoke`.
 smoke-route: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-route: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --send-after "login:" --send 'root\n' --send-after "Password:" --send 'emibsd\n' \
@@ -386,7 +422,7 @@ https_run := "--send-after '# ' --send 'ls -l /etc/ssl\\n' --send-after '# ' --s
 # (`certificate verification failed`), and has a line echoed back over TLS by nc(1) (`-c`,
 # `-R` the CA, `-e` the expected name). Needs `just userland`. Part of `smoke`.
 smoke-https: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-https: no ramdisk image; run just userland first"; exit 1; }
     @mkdir -p target/https-www && echo 'hello from emibsd-host over https' >target/https-www/hello.txt
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen {{https_check}}
@@ -408,7 +444,7 @@ https_check := "--https-server target/https-www:8443:trusted --https-server targ
 # https://www.openbsd.org, resolving the name through QEMU's DNS (10.0.2.3, `/etc/resolv.conf`)
 # and verifying the server with LibreSSL's default bundle, `/etc/ssl/cert.pem`. Needs TCP.
 smoke-internet: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-internet: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen {{internet_check}}
     cargo xtask smoke {{reject}} {{smp}} --arch arm64 --kernel target/{{arm64}}/debug/bsd --expect-ramdisk --until-seen {{internet_check}}
@@ -428,7 +464,7 @@ internet_check := "--send-after login: --send 'root\\n' --send-after Password: -
 # arm64 a vioblk, on amd64 port 0 of q35's AHCI controller since ahci(4), M13; before it the
 # amd64 header read `sd0 rd0`). Part of `smoke`.
 smoke-diag: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-diag: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --send-after "login:" --send 'root\n' --send-after "Password:" --send 'emibsd\n' \
@@ -480,7 +516,7 @@ smoke-diag: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--featu
 # user network and vio1 on a private link between the two (docs/SETUP.md, "Two VMs"). Both log
 # in as root, give vio1 an address on 192.168.77.0/24 and ping each other across the link.
 smoke-link: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-link: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke2 {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd \
         --both-send-after "login:" --both-send 'root\n' --both-send-after "Password:" --both-send 'emibsd\n' \
@@ -507,7 +543,7 @@ smoke-link: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--featu
 # other through the tunnel, then `ifconfig wg0` shows the peer's handshake. Then A loads a pf
 # rule on wg0 (M9d): the tunnel's ping is blocked, and passes again after `pfctl -d`.
 smoke-wg: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-wg: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke2 {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd \
         --both-send-after "login:" --both-send 'root\n' --both-send-after "Password:" --both-send 'emibsd\n' \
@@ -563,7 +599,7 @@ smoke-wg: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feature
 # gateway come from the kernel's boot self-test (`selftest: ping`), so no /etc/hostname.vio0
 # is needed. Part of `smoke`.
 smoke-net: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-net: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --send-after "login:" --send 'root\n' --send-after "Password:" --send 'emibsd\n' \
@@ -586,7 +622,7 @@ smoke-net: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--featur
 # computed markers so that the expected lines are not matched by the typed commands. Not part
 # of `smoke`.
 smoke-pf: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-pf: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --send-after "login:" --send 'root\n' --send-after "Password:" --send 'emibsd\n' \
@@ -624,7 +660,7 @@ smoke-pf: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feature
 # relative to it (an unquoted ipsec.conf word cannot hold a `/`), under umask 077: ipsecctl
 # refuses a configuration file others can read.
 smoke-ipsec: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-ipsec: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --send-after "login:" --send 'root\n' --send-after "Password:" --send 'emibsd\n' \
@@ -659,7 +695,7 @@ smoke-ipsec: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feat
 # moves a decapsulated packet to enc0, so its inner address on lo1 is not "the wrong
 # interface". Each VM ends with `ipsecctl -sa -v` (the SA counters). Part of `smoke`.
 smoke-esp: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-esp: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke2 {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd \
         {{esp_both}} \
@@ -694,7 +730,7 @@ smoke-esp: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--featur
 # The patterns use `?` for the spaces and `<` so that the typed commands do not match the
 # expected lines. Part of `smoke`.
 smoke-pfsync: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-pfsync: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke2 {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --timeout 400 \
         {{pfsync_both}} {{pfsync_a}} {{pfsync_b}} {{pfsync_expect}}
@@ -755,7 +791,7 @@ esp_sa := "--send-after '# ' --send 'a=\"esp tunnel from 192.168.77.1 to 192.168
 # fills them with a byte ramp). Each VM ends with `ipsecctl -sa`, which lists the IPComp SAs.
 # Part of `smoke`.
 smoke-ipcomp: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-ipcomp: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke2 {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd \
         {{esp_both}} {{ipcomp_both}} {{ipcomp_a}} {{ipcomp_b}} \
@@ -799,7 +835,7 @@ ipcomp_sa := "--send-after '# ' --send 'c=\"ipcomp tunnel from 192.168.77.1 to 1
 # B lists a listening TCP socket with fstat(1) (kern.file's tcbtable and tcpcb fields). Part
 # of `smoke`.
 smoke-tcp: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-tcp: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke2 {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --timeout 300 \
         {{esp_both}} {{tcp_a}} {{tcp_b}} {{tcp_expect}}
@@ -847,7 +883,7 @@ tcp_expect := "--b-expect 'internet stream tcp' --b-expect '192.168.77.2:7009' -
 # smr_barrier). The transcripts are printed. Last, one VM per arch boots with `-smp 8` and keeps
 # all eight softnets (`softnets-8`). Part of `smoke`.
 smoke-net-mp: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-net-mp: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke2 {{reject}} {{smp4}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --timeout 300 --show-transcripts \
         {{divert_both}} {{netmp_a}} {{netmp_b}} {{netmp_expect}}
@@ -897,7 +933,7 @@ netmp_expect := "--both-expect 'bsd: 4 processors' --both-expect softnets-4 " + 
 # prints the per-second `Conn:   4 Mbps:` lines and the summary; the echoed markers follow.
 # Part of `smoke`.
 smoke-tcpbench: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-tcpbench: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke2 {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --timeout 300 {{tcpbench_steps}}
     cargo xtask smoke2 {{reject}} {{smp}} --arch arm64 --kernel target/{{arm64}}/debug/bsd --timeout 300 {{tcpbench_steps}}
@@ -922,7 +958,7 @@ tcpbench_steps := "--both-send-after 'login:' --both-send 'root\\n' --both-send-
 # PF_DIVERT and tcp_input finds the listener through in_pcblookup_listen's divert lookup.
 # Part of `smoke`.
 smoke-divert: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-divert: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke2 {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd \
         {{divert_both}} {{divert_a}} {{divert_b}} {{divert_expect}}
@@ -948,7 +984,7 @@ divert_expect := "--b-expect 'proto tcp from any to any port = 80' --b-expect 'd
 # pflog0 -c 1`: the rule number and `block`). tcpdump runs privilege-separated: the
 # unprivileged half is chrooted to /var/empty as _tcpdump. Part of `smoke`.
 smoke-tcpdump: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-tcpdump: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke2 {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --timeout 300 \
         {{tcpdump_both}} {{tcpdump_a}} {{tcpdump_b}} {{tcpdump_expect}}
@@ -977,7 +1013,7 @@ tcpdump_expect := "--b-expect '192.168.77.2.7001: S ' --b-expect 'block in on vi
 # fdisk's MBR template (`-f`) is the blank disk's own first sector: amd64's fdisk otherwise
 # reads boot(8)'s /usr/mdec/mbr, which comes with M14. Part of `smoke`.
 smoke-disk: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-disk: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --disk-fresh {{disk_make}} --expect 'vioblk0 at virtio1'
@@ -1017,7 +1053,7 @@ disk_check := disk_login + " " + \
 # 5,000 entries gets hashed (`vfs.ffs.dirhash_mem` > 0) and every name looks up, and
 # mount_mfs(8) mounts a memory file system on which a file reads back. Part of `smoke`.
 smoke-ufsopts: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-ufsopts: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --disk-fresh {{ufsopts_quota}}
@@ -1071,7 +1107,7 @@ ufsopts_dirhash_mfs := disk_login + " " + \
 # threads of their own, in every later boot (the kthread self-test counts threads). Part of
 # `smoke`.
 smoke-softraid: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-softraid: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp4}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --disks 4 --disk-set softraid --disk-fresh {{softraid_make}}
@@ -1152,7 +1188,7 @@ softraid_degraded := disk_login + " " + sr_cat + \
 # with ping6 (OpenBSD's ping, linked as ping6), B pings A's global one. ndp(8) is not in the
 # reference clone. Part of `smoke`.
 smoke-inet6: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-inet6: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke2 {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd {{inet6_sends}} {{inet6_expects}}
     cargo xtask smoke2 {{reject}} {{smp}} --arch arm64 --kernel target/{{arm64}}/debug/bsd {{inet6_sends}} {{inet6_expects}}
@@ -1181,7 +1217,7 @@ inet6_expects := "--a-expect 'inet6 ::1 prefixlen 128' --b-expect 'inet6 ::1 pre
 # over an empty file on the tmpfs and fsck_msdos(8) -n must pass it. `$((40+2))` keeps the
 # echoed command lines from matching. Part of `smoke`.
 smoke-fs: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-fs: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen {{fs_steps}}
     cargo xtask smoke {{reject}} {{smp}} --arch arm64 --kernel target/{{arm64}}/debug/bsd --expect-ramdisk --until-seen {{fs_steps}}
@@ -1208,7 +1244,7 @@ fs_steps := disk_login + " " + \
 # through cdstart and vioscsi_scsi_cmd) and read the known file back. `$((40+2))` keeps the
 # echoed command line from matching. Part of `smoke`.
 smoke-cd: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-cd: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --scsi-cd target/userland/amd64/ramdisk-root/root/images/cd.iso {{cd_steps}}
@@ -1230,7 +1266,7 @@ cd_steps := disk_login + " " + \
 # match them; the commands are short, since a long line can overflow arm64's pluart input
 # buffer under load. Part of `smoke`.
 smoke-nfs: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-nfs: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke2 {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --timeout 400 \
         {{nfs_both}} {{nfs_a}} {{nfs_b}} {{nfs_expect}}
@@ -1280,7 +1316,7 @@ nfs_expect := "--a-expect 'nfs-up-5' --a-expect 'nfs-udp-8' --a-expect 'nfs-tcp-
 # keg-only formula, docs/SETUP.md): `e2fsck -fn` must exit 0 and debugfs must read both files
 # back (tools/xtask/src/e2fs.rs). Part of `smoke`.
 smoke-ext2fs: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-ext2fs: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --disk-set ext2fs --disk-fresh {{ext2_make}}
@@ -1337,7 +1373,7 @@ ext2_host := "--cat /m10d-ext2.txt=m10d-ext2-42 --cat /d/sub.txt=m10d-ext2-sub-4
 nvme_duid := "4e564d45524f4f54"
 
 smoke-nvme: (build-amd64 "--features qemu,multiprocessor") build-init-amd64 (build-arm64 "--features qemu,multiprocessor") build-init-arm64
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-nvme: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask nvme-root --arch amd64 --duid {{nvme_duid}}
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --ramdisk none --expect-ramdisk \
@@ -1398,7 +1434,7 @@ smoke-nvme: (build-amd64 "--features qemu,multiprocessor") build-init-amd64 (bui
 ahci_duid := "41484349524f4f54"
 
 smoke-ahci: (build-amd64 "--features qemu,multiprocessor") build-init-amd64 (build-arm64 "--features qemu,multiprocessor") build-init-arm64
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-ahci: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask nvme-root --arch amd64 --duid {{ahci_duid}} --out ahci-amd64.img --root-dev sd2a
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --ramdisk none --expect-ramdisk \
@@ -1500,7 +1536,7 @@ smoke-smmu: (build-arm64 "--features qemu,multiprocessor") build-init-arm64 efib
 # FILE probe`: 'vmwpvs0 at pci0 dev 4 function 0 "VMware PVSCSI" rev 0x02: msi', 'vmwpvs0: get
 # configuration failed'). The system then comes up multi-user. Part of `smoke`.
 smoke-vmwpvs: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-vmwpvs: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --pvscsi pvscsi-amd64.img \
@@ -1520,7 +1556,7 @@ smoke-vmwpvs: (build-amd64 "--features qemu,multiprocessor")
 # disk (once the file system is done with), and mounts the ISO with mount_cd9660(8). amd64
 # only: arm64's GENERIC has no siop. Part of `smoke`.
 smoke-siop: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-siop: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --lsi lsi-amd64.img --lsi-cd target/userland/amd64/ramdisk-root/root/images/cd.iso \
@@ -1554,7 +1590,7 @@ smoke-siop: (build-amd64 "--features qemu,multiprocessor")
 # and reads 1 MiB raw with dd(1): bus master DMA through the compatibility IRQ 14. Part of
 # `smoke`.
 smoke-wd: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-wd: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --machine pc --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --ide wd-amd64.img \
@@ -1584,7 +1620,7 @@ smoke-wd: (build-amd64 "--features qemu,multiprocessor")
 # QEMU's fdc sets SEEK END when a read ends a cylinder). Drive 0's probe fails on QEMU, so the
 # drive is drive 1. Part of `smoke`.
 smoke-fd: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-fd: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --floppy fd-amd64.img \
@@ -1611,7 +1647,7 @@ smoke-fd: (build-amd64 "--features qemu,multiprocessor")
 # dd(1). amd64: mpi0 at pci0 dev 4, scsibus1, sd1 (vioblk's disk is sd0); arm64 (`virt`, the
 # virtio-mmio disks attach first): mpi0 at pci0 dev 1, scsibus2, sd2. Part of `smoke`.
 smoke-mpi: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-mpi: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --mptsas mpi-amd64.img \
@@ -1660,7 +1696,7 @@ smoke-mpi: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--featur
 # sdmmc0's thread, after vioblk's sd0 and ahci's sd1, the boot disk); arm64: scsibus2, sd2
 # (`virt`'s virtio-mmio disks attach first). Part of `smoke`.
 smoke-sdmmc: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-sdmmc: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --sdhci sdhc-amd64.img \
@@ -1707,7 +1743,7 @@ smoke-sdmmc: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feat
 # 82540EM (`--nic e1000`: INTx through the I/O APIC, the I/O BAR, 32-bit DMA) and pings
 # through it. QEMU's 82576 (`--nic igb`) is `smoke-igb`'s. Part of `smoke`.
 smoke-em: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-em: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --nic e1000e {{em_session}} {{em_ping}} \
@@ -1730,7 +1766,7 @@ smoke-em: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feature
 # advanced receive descriptors only while em(4) programs legacy ones (SRRCTL's DESCTYPE 0);
 # not checked against QEMU's source. Part of `smoke`.
 smoke-igb: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-igb: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --nic igb {{igb_session}} \
@@ -1764,7 +1800,7 @@ em_ping := "--expect 'PING 10.0.2.2 (10.0.2.2): 56 data bytes' " + \
 # timeout, `status: active`, 100.0% packet loss, Ipkts 0), so the smoke asserts that behaviour
 # (the user's standing rule: faithful, "behaves as OpenBSD 8.0"). Part of `smoke`.
 smoke-dc: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-dc: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --nic tulip {{dc_session}}
@@ -1789,7 +1825,7 @@ dc_session := "--send-after 'login:' --send 'root\\n' --send-after 'Password:' -
 # archs, with INTx (the 8139C+ has no MSI): the I/O APIC on amd64, the GIC through the PCIe
 # node's interrupt-map on arm64 (`irq`). Part of `smoke`.
 smoke-re: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-re: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --nic rtl8139 {{re_session}} {{em_ping}} \
@@ -1808,7 +1844,7 @@ smoke-re: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feature
 # kernel's self-test gives pcn0 10.0.2.15/24; logged in, ifconfig(8) shows its flags, its media
 # and the address, and ping(8) gets the gateway's reply. Part of `smoke`.
 smoke-pcn: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-pcn: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --nic pcnet {{pcn_session}} {{em_ping}}
@@ -1830,7 +1866,7 @@ pcn_session := "--send-after 'login:' --send 'root\\n' --send-after 'Password:' 
 # to low memory". The kernel's self-test gives ne0 10.0.2.15/24; logged in, ifconfig(8) shows its
 # flags, media and address, and ping(8) gets the gateway's reply. Part of `smoke`.
 smoke-ne: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-ne: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --nic ne2k_pci {{ne_session}} {{em_ping}}
@@ -1853,7 +1889,7 @@ ne_session := "--send-after 'login:' --send 'root\\n' --send-after 'Password:' -
 # fxp_load_ucode prints `fxp0: error 2, could not read firmware fxp-d101s` and the chip runs
 # without the receive bundling microcode, as on bsd.rd. Part of `smoke`.
 smoke-fxp: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-fxp: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --nic i82559er {{fxp_session}} {{em_ping}} \
@@ -1877,7 +1913,7 @@ fxp_session := "--send-after 'login:' --send 'root\\n' --send-after 'Password:' 
 # vmstat(8) counts queue 0's vector. Both archs: MSI-X through the local APICs on amd64, through
 # the GICv2m frames (`ampintcmsi`) on arm64. Part of `smoke`.
 smoke-vmx: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-vmx: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp4}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --nic vmxnet3 {{vmx_session}} {{em_ping}}
@@ -2087,7 +2123,7 @@ smoke-gicv3: (build-arm64 "--features qemu,multiprocessor") build-init-arm64 efi
 # PSCI SYSTEM_OFF (powerdownfn = psci_powerdown) and `reboot` is SYSTEM_RESET
 # (cpuresetfn = psci_reset). Part of `smoke`.
 smoke-power: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor") build-init-amd64 build-init-arm64
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-power: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --status 0 \
         {{disk_login}} --send-after '# ' --send 'sysctl machdep.lidaction machdep.pwraction machdep.tscfreq\n' \
@@ -2140,7 +2176,7 @@ smoke-powerbtn: (build-arm64 "--features qemu,multiprocessor") build-init-arm64
 # within 60 s. amd64's time is the mc146818 (`inittodr`, arch/amd64/isa/clock.c); arm64's is
 # efi0's GetTime (EDK2 disables the pl031 node, plrtc(4) does not attach). Part of `smoke`.
 smoke-rtc: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-rtc: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --cmdline "-s" --expect-ramdisk --until-seen {{rtc_steps}}
     cargo xtask smoke {{reject}} {{smp}} --arch arm64 --kernel target/{{arm64}}/debug/bsd --cmdline "-s" --expect-ramdisk --until-seen {{rtc_steps}}
@@ -2166,7 +2202,7 @@ rtc_steps := "--send-after 'RETURN for sh:' --send '\\n' " + \
 # or _PSS, so each keeps the C1 `hlt` fallback, and every CPU's idle loop runs acpicpu_idle
 # (the 45 s sleep is mostly idle time). Part of `smoke`.
 smoke-clock: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-clock: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --cmdline "-s" --expect-ramdisk --until-seen \
         --expect "acpitimer0 at acpi0: 3579545 Hz, 24 bits" --expect "acpihpet0 at acpi0: 100000000 Hz" \
@@ -2192,7 +2228,7 @@ clock_steps := "--send-after 'RETURN for sh:' --send '\\n' " + \
 # sub/deep.txt), ls(1) lists both directories, a write is refused, and after umount(8) the
 # mount is gone. Both archs. Part of `smoke`.
 smoke-fuse: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-fuse: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen {{fuse_steps}}
     cargo xtask smoke {{reject}} {{smp}} --arch arm64 --kernel target/{{arm64}}/debug/bsd --expect-ramdisk --until-seen {{fuse_steps}}
@@ -2214,7 +2250,7 @@ fuse_steps := disk_login + " " + \
 # mount_ntfs(8); ls(1) lists the root, the small file (resident in its MFT record) reads back,
 # and so do the 500 lines of the big one (non-resident, three clusters). Part of `smoke`.
 smoke-ntfs: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-ntfs: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen {{ntfs_steps}}
 
@@ -2294,7 +2330,7 @@ smoke-mp: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feature
 # (it resumed and took the new IPI), and after the second `continue` the shell answers. Needs
 # `just userland`. Part of `smoke`.
 smoke-ddbmp: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor") build-init-amd64 build-init-arm64
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-ddbmp: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --cmdline "-ds" \
         --expect-ramdisk --until-seen \
@@ -2348,11 +2384,11 @@ ddbmp_others := if ncpu == "4" { "--expect '    2: stopped' --expect '    3: sto
 # `target/<arch>/debug/bsd.up`. The MP kernel is rebuilt last, so `target/<arch>/debug/bsd`
 # stays the MP one (cargo keeps both builds; switching back only relinks the file).
 build-up:
-    cargo build -p bsd --target {{amd64}} --features qemu
-    cp target/{{amd64}}/debug/bsd target/{{amd64}}/debug/bsd.up
+    {{amd64_cmd}} cargo build -p bsd --target {{amd64}} --features qemu
+    {{amd64_cmd}} cp target/{{amd64}}/debug/bsd target/{{amd64}}/debug/bsd.up
     cargo build -p bsd --target {{arm64}} --features qemu
     cp target/{{arm64}}/debug/bsd target/{{arm64}}/debug/bsd.up
-    cargo build -p bsd --target {{amd64}} --features qemu,multiprocessor
+    {{amd64_cmd}} cargo build -p bsd --target {{amd64}} --features qemu,multiprocessor
     cargo build -p bsd --target {{arm64}} --features qemu,multiprocessor
 
 # M11e: the one uniprocessor boot `smoke` keeps (the user's decision of 2026-10-03), per arch,
@@ -2382,7 +2418,7 @@ smoke-up: build-up build-init-amd64 build-init-arm64
 # Audio (azalia(4): `intel-hda` with an `hda-output` codec) on both architectures, AC97
 # (auich(4): `AC97`) on amd64, the only GENERIC with auich. Part of `smoke`.
 smoke-audio: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-audio: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --audio hda --expect-tone {{audio_play}} \
@@ -2406,7 +2442,7 @@ smoke-audio: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feat
 # (midi(4)); QEMU's ES1370 has no device behind it, so nothing is played through it. Part of
 # `smoke`.
 smoke-eap: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-eap: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --audio es1370 --expect-tone {{audio_play}} \
@@ -2424,7 +2460,7 @@ smoke-eap: (build-amd64 "--features qemu,multiprocessor")
 # in QEMU's file, as OpenBSD 8.0 writes it on the same machine. Part of `smoke`.
 lpt_session := 'echo lpt-hello-$((40+2)) > /dev/lpt0; echo lpt-rc-$?\n'
 smoke-lpt: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-lpt: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --parallel lpt.txt --expect-parallel 'lpt-hello-42' \
@@ -2444,7 +2480,7 @@ smoke-lpt: (build-amd64 "--features qemu,multiprocessor")
 bell_session := 'for i in 1 2 3 4 5 6 7 8 9 10; do print -n "\\a" > /dev/ttyC0; sleep 0.2; done; sleep 1; echo bell-$((40+2))\n'
 spkr_session := 'echo cdefgab > /dev/speaker; echo spkr-rc-$?; sleep 1; echo spkr-$((40+2))\n'
 smoke-bell: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-bell: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --pcspk --expect-tone {{disk_login}} --send-after '# ' --send '{{bell_session}}' \
@@ -2464,7 +2500,7 @@ audio_play := disk_login + " " + \
 # then auich(4) on amd64. Checked by ear, so not part of `smoke`. Each boot waits a second
 # after aucat(1) so the host's buffer drains before the run stops.
 play-audio: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "play-audio: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --audio hda --speakers {{audio_live}} --expect 'audio0 at azalia0'
@@ -2488,7 +2524,7 @@ audio_live := disk_login + " " + \
 # remounts and compares the copy. xhci interrupts by MSI-X on both archs (amd64 since M13's
 # acpipci enables MSI on its bus). Part of `smoke`.
 smoke-usb: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-usb: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --usb {{disk_login}} {{replace(usb_session, "SD", "sd2")}} {{usb_check}} \
@@ -2531,7 +2567,7 @@ usb_check := "--expect 'usb0 at xhci0: USB revision 3.0' --expect 'uhub0 at usb0
 #   as OpenBSD 8.0 does ("generic_space_write_2() at ehci_pci_attach+0x104"). The smoke
 #   asserts that panic as `smoke-diag`'s trap selftest does (`--status 35`).
 smoke-ehci: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-ehci: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --usb-hc ehci --reject 'umass0' {{disk_login}} \
@@ -2554,7 +2590,7 @@ smoke-ehci: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--featu
 # cmp). OpenBSD 8.0 attaches and mounts the same way on both archs (`cargo xtask diff-openbsd
 # --arch A probe --usb-hc uhci`). Part of `smoke`.
 smoke-uhci: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-uhci: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --usb-hc uhci {{disk_login}} {{replace(usb_session, "SD", "sd2")}} {{uhci_check}} \
@@ -2588,7 +2624,7 @@ uhci_check := "--expect 'usb0 at uhci0: USB revision 1.0' " + \
 # unrecoverable error, controller halted", "ohci0: blocking intrs 0x10"), sd2 and umass0
 # detach and cp fails with EIO. Part of `smoke`.
 smoke-ohci: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-ohci: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --usb-hc ohci {{disk_login}} {{ohci_session}} {{ohci_check}} \
@@ -2621,7 +2657,7 @@ ohci_check := "--expect 'usb0 at ohci0: USB revision 1.0' " + \
 # in and writes a line to it, and `--expect-pci-serial` checks that the line reached the
 # host file. Part of `smoke`.
 smoke-puc: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-puc: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --pci-serial puc-amd64.txt --expect-pci-serial 'm13-puc-42' {{disk_login}} \
@@ -2641,7 +2677,7 @@ smoke-puc: (build-amd64 "--features qemu,multiprocessor")
 fb_check := "--screenshot-after 'selftest: fb text at' --expect-ramdisk --until-seen " + \
     "--expect 'selftest: fb text at' --expect 'selftest: fb drew'"
 smoke-fb: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-fb: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --cmdline "selftest=fb" {{fb_check}} \
         --expect 'bsd: framebuffer 1280x800, 32 bpp' --expect 'efifb0 at mainbus0: 1280x800, 32bpp' \
@@ -2659,7 +2695,7 @@ smoke-fb: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feature
 # the QEMU screendump for that text in the grid's first row. Part of `smoke`.
 wscons_line := 'x=wrote; echo hello wscons > /dev/ttyC0 && echo wscons-$x\n'
 smoke-wscons: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-wscons: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --cmdline "selftest=wscons" \
         --screenshot-after 'wscons-wrote' --screen-text '0:0:hello wscons' --expect-ramdisk --until-seen \
@@ -2683,7 +2719,7 @@ smoke-wscons: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--fea
 # The probe maps the legacy window, which Limine's direct map leaves out (bus_space.rs's
 # isa_hole_mapped); a regression there panics this boot.
 smoke-vga: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-vga: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         --reject 'vga0 at' --reject 'vga1 at' --reject 'wsdisplay at vga' --reject 'unported: vga_post_init' \
@@ -2714,7 +2750,7 @@ kbd_check := "--fb --usb --expect-ramdisk --until-seen " + \
     "--expect 'WSKBD: connecting to wsdisplay0' --expect 'kbd-got-[hi]' " + \
     "--expect 'WSKBD: disconnecting from wsdisplay0' --expect 'ev-bytes-48'"
 smoke-kbd: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-kbd: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd {{replace(kbd_check, "WSKBD", "wskbd1")}} \
         --expect 'wskbd0 at pckbd0 mux 1' --expect 'wsdisplay0 at efifb0 mux 1'
@@ -2752,7 +2788,7 @@ pckbc_check := "--expect-ramdisk --until-seen " + \
     "--expect 'kbd-got-[hi]' --expect 'wskbd0: disconnecting from wsdisplay0' --expect 'ev-bytes-48' " + \
     "--expect 'mouse-bytes-48'"
 smoke-pckbc: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-pckbc: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd {{pckbc_check}}
 
@@ -2791,7 +2827,7 @@ mouse_check := "--usb-mouse --usb-tablet --usb-wacom-tablet --expect-ramdisk --u
 mouse_amd64 := replace(replace(replace(replace(replace(replace(replace(mouse_check, "MOUSE", "3"), "TABLET", "4"), "WACOM", "5"), "MICELIST", "1 2 3"), "WSMN0", "1"), "WSMN1", "2"), "WSMN2", "3")
 mouse_arm64 := replace(replace(replace(replace(replace(replace(replace(mouse_check, "MOUSE", "1"), "TABLET", "2"), "WACOM", "3"), "MICELIST", "0 1 2"), "WSMN0", "0"), "WSMN1", "1"), "WSMN2", "2")
 smoke-mouse: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-mouse: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd {{mouse_amd64}} \
         --expect 'wsmouse0 at pms0 mux 0'
@@ -2814,7 +2850,7 @@ ugen_check := "--usb-ccid --expect-ramdisk --until-seen " + disk_login + " --sen
     "--expect 'addr 02: 08e6:4433 QEMU, QEMU USB CCID' --expect 'driver: ugen0' " + \
     "--expect 'dd: /dev/ugen0.00: Operation not supported by device' --expect 'ccid-10' --expect 'ugen-42'"
 smoke-ugen: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-ugen: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd {{ugen_check}}
     cargo xtask smoke {{reject}} {{smp}} --arch arm64 --kernel target/{{arm64}}/debug/bsd {{ugen_check}}
@@ -2834,7 +2870,7 @@ cdce_check := "--usb-net --expect-ramdisk --until-seen " + disk_login + " " + cd
     "--expect 'cdce0: address 52:54:00:12:34:56' --expect 'cdce0: flags=' " + \
     "--expect 'inet 10.0.2.15 netmask 0xffffff00' " + em_ping
 smoke-cdce: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-cdce: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd {{cdce_check}}
     cargo xtask smoke {{reject}} {{smp}} --arch arm64 --kernel target/{{arm64}}/debug/bsd {{cdce_check}}
@@ -2855,7 +2891,7 @@ ucom_check := "--usb-serial usb-serial.txt --usb-serial-send-after 'ucom-ready-4
     "--expect 'uftdi0 at uhub0 port 5 configuration 1 interface 0 \"QEMU QEMU USB SERIAL\" rev 2.00/4.00 addr 2' --expect 'ucom0 at uftdi0 portno 1: usb0.0.00005.0' " + \
     "--expect 'ucom-got-host-to-guest' --expect 'ucom-42'"
 smoke-ucom: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-ucom: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd {{ucom_check}}
     cargo xtask smoke {{reject}} {{smp}} --arch arm64 --kernel target/{{arm64}}/debug/bsd {{ucom_check}}
@@ -2868,7 +2904,7 @@ smoke-ucom: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--featu
 # aucat(1) playing /root/tone.wav through /dev/audio0, over xhci(4)'s isochronous transfers,
 # with `--expect-tone` checking QEMU's `wav` file holds the tone. Both archs. Part of `smoke`.
 smoke-uaudio: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-uaudio: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd {{uaudio_check}}
     cargo xtask smoke {{reject}} {{smp}} --arch arm64 --kernel target/{{arm64}}/debug/bsd {{uaudio_check}}
@@ -2896,7 +2932,7 @@ ukc_check := "--cmdline '-c' --expect-ramdisk --until-seen " + \
     "--expect 'rc: multi-user' --expect 'ukc-42' --reject 'vio0 at virtio'"
 
 smoke-ukc: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-ukc: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd {{ukc_check}} \
         --expect '  4 vio* at virtio* flags 0x0'
@@ -2921,7 +2957,7 @@ ppb_io_tail := "; do fdisk -iy -f /dev/r${d}c $d >/dev/null && disklabel -w -A $
     "--reject 'not configured by system firmware'"
 
 smoke-ppb: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-ppb: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd \
         {{ppb_io_head}}sd1 sd2{{ppb_io_tail}} \
@@ -2968,7 +3004,7 @@ dmar_check := "--ramdisk none --expect-ramdisk --nvme nvme-amd64.img " + \
     "--reject 'mount -uw / failed'"
 
 smoke-dmar: (build-amd64 "--features qemu,multiprocessor") build-init-amd64
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-dmar: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask nvme-root --arch amd64 --duid {{nvme_duid}}
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --iommu intel {{dmar_check}} \
@@ -2995,7 +3031,7 @@ smoke-dmar: (build-amd64 "--features qemu,multiprocessor") build-init-amd64
 # failed abort of a transfer would print a line (`exec: op`, `abort failed`) and fails the run.
 # Part of `smoke`.
 smoke-iic: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-iic: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
         {{disk_login}} --send-after '# ' --send 'echo iic-$((40+2))\n' \
@@ -3037,7 +3073,7 @@ ipmi_check := "--ipmi --cmdline '-c' --expect-ramdisk --until-seen " + \
     "--reject 'hw.sensors.ipmi0.temp0'"
 
 smoke-ipmi: (build-amd64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-ipmi: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd {{ipmi_check}}
 
@@ -3054,7 +3090,7 @@ tpm_check := "--cmdline 'selftest=tpm' --expect-ramdisk --until-seen " + \
     "--reject 'TPM2_SelfTest failed' --reject 'tpm0: command failed' --reject 'not enabled'"
 
 smoke-tpm: (build-amd64 "--features qemu,multiprocessor") build-init-amd64
-    @test -f target/userland/amd64/ramdisk.ffs || \
+    @{{ramdisk_amd64}} || \
         { echo "smoke-tpm: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --tpm tis {{tpm_check}} \
         --expect 'tpm0 at acpi0 TPM_ 2.0 (TIS) addr 0xfed40000/0x5000, device 0x00011014 rev 0x1'
@@ -3091,7 +3127,7 @@ virtio_check := "--virtio-rng --balloon --expect-ramdisk --until-seen " + disk_l
     "--expect '2+0 records in' --expect 'm16d-done-43'"
 
 smoke-virtio: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-virtio: no ramdisk image; run just userland first"; exit 1; }
     cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd {{virtio_check}} \
         --expect 'viornd0 at virtio2' --expect 'virtio2: msix per-VQ' \
@@ -3133,6 +3169,39 @@ symbolize arch:
 userland:
     cargo xtask userland --arch amd64
     cargo xtask userland --arch arm64
+
+# Installs the DevTools toolchains the variables at the top pin (`toolchain_dir`, `devtools_*`):
+# `gh release download` by tag, sha256 checked, unpacked unmodified, the Rust one linked as
+# rustup's `emibsd`. A tag already unpacked is left as it is. Needs `gh` (logged in) and `zstd`
+# (docs/SETUP.md, "DevTools toolchain").
+toolchain:
+    #!/bin/zsh
+    set -eu
+    dir="{{toolchain_dir}}"
+    mkdir -p "$dir"
+    fetch() {
+        local name="$1-aarch64-apple-darwin" sha="$2"
+        if [ -d "$dir/$name" ]; then echo "toolchain: $name already unpacked"; return; fi
+        local tmp; tmp=$(mktemp -d "$dir/.fetch.XXXXXX")
+        gh release download "$1" --repo EmiBSD/DevTools --pattern "$name.tar.zst" --dir "$tmp"
+        local got; got=$(shasum -a 256 "$tmp/$name.tar.zst" | cut -d' ' -f1)
+        if [ "$got" != "$sha" ]; then
+            echo "toolchain: $name.tar.zst has sha256 $got, the pin says $sha"
+            unlink "$tmp/$name.tar.zst"; rmdir "$tmp"; exit 1
+        fi
+        zstd -dcq "$tmp/$name.tar.zst" | tar -xf - -C "$tmp"
+        unlink "$tmp/$name.tar.zst"
+        [ -d "$tmp/$name" ] || { echo "toolchain: $name.tar.zst does not unpack into $name/"; exit 1; }
+        mv "$tmp/$name" "$dir/$name"
+        rmdir "$tmp"
+        echo "toolchain: $name unpacked, sha256 $got"
+    }
+    fetch "{{devtools_llvm}}" "{{devtools_llvm_sha256}}"
+    fetch "{{devtools_rust}}" "{{devtools_rust_sha256}}"
+    command -v rustup >/dev/null || PATH=/opt/homebrew/opt/rustup/bin:$PATH
+    rustup toolchain link emibsd "$dir/{{devtools_rust}}-aarch64-apple-darwin"
+    echo "toolchain: rustup's emibsd is $(rustup run emibsd rustc --version)"
+    echo "toolchain: EMIBSD_LLVM_BIN=$dir/{{devtools_llvm}}-aarch64-apple-darwin/bin ($("$dir/{{devtools_llvm}}-aarch64-apple-darwin/bin/ld.lld" --version))"
 
 # M12+: the same scenarios on EmiBSD and on a real OpenBSD VM, compared step by step
 # (`cargo xtask diff-openbsd`, tools/xtask/src/diffopenbsd.rs; the scenarios and the expected
@@ -3176,9 +3245,9 @@ comp:
 # arm64's 128-byte console limit. Not in `smokes`: it needs `just comp`, which is not part of
 # `ci`. Time limits are five times the usual (`EMIBSD_TIMEOUT_SCALE`): clang runs under TCG.
 smoke-cc: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs || \
+    @{{ramdisks}} || \
         { echo "smoke-cc: no ramdisk image; run just userland first"; exit 1; }
-    @test -f target/comp/amd64/comp.ffs -a -f target/comp/arm64/comp.ffs || \
+    @{{comps}} || \
         { echo "smoke-cc: no comp image; run just comp first"; exit 1; }
     cp target/comp/amd64/comp.ffs target/disk-amd64-comp.img
     EMIBSD_TIMEOUT_SCALE=5 cargo xtask smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
@@ -3219,17 +3288,17 @@ test-ref:
 # bare targets with `--features qemu`: a superset of the plain build, which `just build` covers;
 # amd64 also with `viocon` (M16d), whose ioconf and cdevsw entries only that feature compiles
 clippy:
-    cargo clippy -p bsd --target {{amd64}} --features qemu -- -D warnings
+    {{amd64_cmd}} cargo clippy -p bsd --target {{amd64}} --features qemu -- -D warnings
     cargo clippy -p bsd --target {{arm64}} --features qemu -- -D warnings
-    cargo clippy -p bsd --target {{amd64}} --features qemu,multiprocessor -- -D warnings
+    {{amd64_cmd}} cargo clippy -p bsd --target {{amd64}} --features qemu,multiprocessor -- -D warnings
     cargo clippy -p bsd --target {{arm64}} --features qemu,multiprocessor -- -D warnings
-    cargo clippy -p bsd --target {{amd64}} --features qemu,multiprocessor,viocon -- -D warnings
-    cargo clippy -p init --target {{amd64}} -- -D warnings
+    {{amd64_cmd}} cargo clippy -p bsd --target {{amd64}} --features qemu,multiprocessor,viocon -- -D warnings
+    {{amd64_cmd}} cargo clippy -p init --target {{amd64}} -- -D warnings
     cargo clippy -p init --target {{arm64}} -- -D warnings
     cargo clippy -p libkern -p libz -p bsd -p xtask -- -D warnings
     cargo clippy -p libsa -p boot -p efi -- -D warnings
     cargo clippy -p libsa -p boot -p efi --target {{arm64}} -- -D warnings
-    cargo clippy -p efiboot-amd64 --target {{amd64}} -- -D warnings
+    {{amd64_cmd}} cargo clippy -p efiboot-amd64 --target {{amd64}} -- -D warnings
     cargo clippy -p efiboot-arm64 --target {{arm64}} -- -D warnings
 
 fmt:
@@ -3265,7 +3334,7 @@ miniroot_sectors := "65536"
 build-bsdrd: build-bsdrd-amd64 build-bsdrd-arm64
 
 build-bsdrd-amd64:
-    EMIBSD_MINIROOTSIZE={{miniroot_sectors}} cargo build -p bsd --target {{amd64}} --features qemu,multiprocessor,miniroot --target-dir target/bsdrd
+    {{amd64_cmd}} EMIBSD_MINIROOTSIZE={{miniroot_sectors}} cargo build -p bsd --target {{amd64}} --features qemu,multiprocessor,miniroot --target-dir target/bsdrd
 
 build-bsdrd-arm64:
     EMIBSD_MINIROOTSIZE={{miniroot_sectors}} cargo build -p bsd --target {{arm64}} --features qemu,multiprocessor,miniroot --target-dir target/bsdrd
@@ -3273,7 +3342,7 @@ build-bsdrd-arm64:
 # The install media of one arch: the miniroot, `bsd.rd` and the signed sets, in
 # target/install/<arch> (`cargo xtask install-media`). Needs `just userland` and `just comp`.
 install-media-amd64: build-bsdrd-amd64 (build-amd64 "--features qemu,multiprocessor") efiboot-amd64
-    @test -f target/comp/amd64/comp.ffs || { echo "install-media: no comp build; run just comp first"; exit 1; }
+    @{{comp_amd64}} || { echo "install-media: no comp build; run just comp first"; exit 1; }
     cargo xtask install-media --arch amd64 --rd-kernel target/bsdrd/{{amd64}}/debug/bsd --bsd target/{{amd64}}/debug/bsd
 
 install-media-arm64: build-bsdrd-arm64 (build-arm64 "--features qemu,multiprocessor") efiboot-arm64
@@ -3371,7 +3440,7 @@ smoke-install80-arm64: install-img-arm64
 # CD with mount_cd9660(8) (its Rock Ridge names) and reads `etc/boot.conf`. amd64 only, as
 # M16g's cd80.iso. The ISO is made by `smoke-build` (`cd-iso-amd64`). Part of `smoke`.
 smoke-cd80:
-    @test -f target/install/amd64/cd80.iso || { echo "smoke-cd80: no cd80.iso; run just cd-iso-amd64"; exit 1; }
+    @[ "{{amd64_frozen}}" = true ] || test -f target/install/amd64/cd80.iso || { echo "smoke-cd80: no cd80.iso; run just cd-iso-amd64"; exit 1; }
     cargo xtask cd80 {{smp}} --arch amd64
 
 ci: fmt clippy test build smoke check-ports check-syscalls

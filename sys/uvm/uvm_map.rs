@@ -5801,7 +5801,7 @@ mod tests {
         for _ in 0..64 {
             let addr = uvm_map_pie(1 << 21);
             assert_eq!(addr & ((1 << 21) - 1), 0);
-            assert!(addr >= VM_PIE_MIN_ADDR && addr < VM_PIE_MAX_ADDR + (1 << 21));
+            assert!((VM_PIE_MIN_ADDR..VM_PIE_MAX_ADDR + (1 << 21)).contains(&addr));
         }
     }
 

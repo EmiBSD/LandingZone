@@ -1229,10 +1229,8 @@ mod tests {
         );
         assert_eq!(plen(Some(sin([255, 0x7f, 0, 0], 16))), Err(Errno::EINVAL));
         // SAFETY: a NULL mask.
-        assert_eq!(
-            unsafe { rtable_satoplen(crate::sys::socket::AF_UNIX, ptr::null()) },
-            Err(Errno::EINVAL)
-        );
+        let r = unsafe { rtable_satoplen(crate::sys::socket::AF_UNIX, ptr::null()) };
+        assert_eq!(r, Err(Errno::EINVAL));
     }
 
     #[test]

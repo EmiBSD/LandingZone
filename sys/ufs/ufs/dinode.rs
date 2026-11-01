@@ -404,8 +404,10 @@ mod tests {
 
     #[test]
     fn the_ufs1_union_views_share_the_bytes() {
-        let mut d = Ufs1Dinode::default();
-        d.di_u = [7, 9];
+        let d = Ufs1Dinode {
+            di_u: [7, 9],
+            ..Default::default()
+        };
         assert_eq!((d.di_ouid(), d.di_ogid()), (7, 9));
         let mut b = [0u8; 4];
         b[..2].copy_from_slice(&7u16.to_ne_bytes());

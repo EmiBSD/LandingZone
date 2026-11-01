@@ -1194,7 +1194,7 @@ mod tests {
         r[28..32].copy_from_slice(&[1, 0, 0, 1]);
         r[32] = name.len() as u8;
         r.extend_from_slice(name);
-        if name.len() % 2 == 0 {
+        if name.len().is_multiple_of(2) {
             r.push(0);
         }
         for e in entries {

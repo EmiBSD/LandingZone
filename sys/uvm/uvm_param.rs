@@ -183,7 +183,7 @@ mod tests {
         assert_eq!(Paddr::ptoa(5), Paddr::new(0x5000));
         assert_eq!(Vaddr::new(0x1001).round_page(), Vaddr::new(0x2000));
         assert_eq!(Vsize::new(0x1001).round_page().atop(), 2);
-        assert!(VM_KERNEL_SPACE_SIZE > 0);
+        const _: () = assert!(VM_KERNEL_SPACE_SIZE > 0);
     }
 }
 /* </TESTS> */
