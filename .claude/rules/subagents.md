@@ -48,7 +48,8 @@ The definitions are generic; the prompt of each launch supplies the specifics:
 1. the task and its scope (ports.toml rows, ROADMAP row, files);
 2. the branch to merge first (the coordinator's), or the base commit;
 3. the scratchpad directory for `HANDOFF.md` and logs;
-4. the machine lock path (`ci.lock` in the launching session's scratchpad), or "no lock";
+4. the machine lock path (`/tmp/emibsd/ci.lock`, or `ci.lock` in the launching session's
+   scratchpad), or "no lock";
 5. what else runs on the machine at the same time;
 6. any authorisation the user gave for this launch, quoted.
 
@@ -76,11 +77,14 @@ A prompt that misses one of these gets a question back, not a guess.
 - Commit early: each piece that builds and passes clippy/fmt is committed at once. Trailers:
   `Upstream: <c path>@<12-hex>` per ported C file, then the session's `Co-Authored-By:` line.
   Never push, never amend a published commit, never force anything, never touch `main`.
-- Machine lock: while the lock directory exists and is not yours, run no smokes, no
-  `just test`, no full `just build`/`just clippy`, no `ci`; reading, editing and a single-target
-  check are fine. To take it: `mkdir <lock>`, your name in `<lock>/owner`, `rmdir`-remove it when
-  done. Only coordinators and integrators run `just ci` / `just smoke` (all); porters run single
-  smokes, one QEMU at a time.
+- Machine lock: `/tmp/emibsd/ci.lock`, a DIRECTORY made with `mkdir` (taken when `mkdir`
+  succeeds), shared with the Kernel and DevTools repositories on purpose: one Mac, one `ci` at a
+  time (DevTools' D-0007 and the user's note of 2026-11-01). Never `flock` a file at that path
+  and never create a plain file there: it blocks every other taker. While the directory exists
+  and is not yours, run no smokes, no `just test`, no full `just build`/`just clippy`, no `ci`;
+  reading, editing and a single-target check are fine. To take it: `mkdir <lock>`, your name in
+  `<lock>/owner`; to release it, remove `owner` and `rmdir` the directory. Only coordinators and
+  integrators run `just ci` / `just smoke` (all); porters run single smokes, one QEMU at a time.
 - Long runs (`large-ports.md`): every background run of minutes has a watcher that warns when
   its log has not changed for ten minutes (`stat -f %m <log>`); a progress report gives the
   log's last change time; before the final report every background task started is waited for
