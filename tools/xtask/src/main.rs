@@ -259,7 +259,7 @@ fn run(args: &[String]) -> Result<()> {
     let argv: Vec<&str> = args.iter().map(String::as_str).collect();
     if let Some(arch) = frozen_arch(&argv) {
         println!(
-            "xtask: {} is frozen (the toolchain has no {}; docs/ARCHITECTURE.md, \"Frozen \
+            "xtask: {} is frozen (no toolchain for {}; docs/ARCHITECTURE.md, \"Frozen \
              amd64\"): `{}` skipped",
             arch.name(),
             arch.target(),

@@ -6,7 +6,7 @@ from your distribution; the rest is identical.
 ## Why the Homebrew `rust` formula is not enough
 
 Homebrew's `rust` ships only the host target (`aarch64-apple-darwin`) and no `rust-lld`.
-The bare-metal targets `x86_64-unknown-none` and `aarch64-unknown-none-softfloat` need both.
+The bare-metal targets `x86_64-emibsd-none-softfloat` and `aarch64-emibsd-none-softfloat` need both.
 `rustup` manages them; in Homebrew it is keg-only because it conflicts with the `rust` formula.
 (An alternative that keeps Homebrew rust, `rustup toolchain link system "$(brew --prefix rust)"`,
 still lacks the bare targets. Not recommended.)
@@ -42,8 +42,7 @@ rustc --print sysroot              # ~/devel/emibsd/toolchains/rust-1.99.1+emibs
 ls "$(brew --prefix qemu)/share/qemu/"edk2-{x86_64,aarch64}-code.fd
 ls "$(brew --prefix limine)/share/limine/"BOOT{X64,AA64}.EFI
 cargo check && cargo test          # host build of bsd + libkern
-cargo check -p bsd --target x86_64-unknown-none
-cargo check -p bsd --target aarch64-unknown-none-softfloat
+just build-amd64 && just build-arm64  # the kernels (`cargo --target` by hand misses the per-arch toolchain)
 just smoke                         # after milestone M0
 ```
 
@@ -159,21 +158,25 @@ uses ports 8443 (trusted), 8444 (echo) and 8445 (untrusted); they must be free.
 
 `just toolchain` installs the EmiBSD toolchains that DevTools releases
 (github.com/EmiBSD/DevTools; the user's decision of 2026-10-31, taken over from the Kernel
-repository on 2026-11-01): `llvm-23.1.4+emibsd.1` and `rust-1.99.1+emibsd.1`, pinned by tag and
-sha256 in the justfile, fetched with `gh release download` (never "latest"), checked before
-unpacking, and unpacked unmodified into `~/devel/emibsd/toolchains` (`EMIBSD_TOOLCHAINS`
-overrides it). The Rust one becomes rustup's toolchain `emibsd`, the channel
-`rust-toolchain.toml` names, so every `cargo` in the repository uses it; the LLVM one's `bin/`
-(`ld.lld`, the binutils, `llvm-objcopy`, clang) is `EMIBSD_LLVM_BIN`, which the justfile exports
-for the userland table above and for efiboot. Needs `gh`, logged in, and `zstd` (Homebrew). A tag
-already unpacked is left alone; never modify, move or delete anything under that directory, it
-is shared by every repository on the machine. Anything that breaks because of the toolchain is
-reported to EmiBSD/DevTools with the command and the output, never worked around here.
+repository on 2026-11-01): `llvm-23.1.4+emibsd.1` and `rust-1.99.1+emibsd.1`, one tarball per
+target architecture since DevTools' D-0008 (2026-11-02), pinned by tag and sha256 in the
+justfile, fetched with `gh release download` (never "latest"), checked before unpacking, and
+unpacked unmodified into `~/devel/emibsd/toolchains` (`EMIBSD_TOOLCHAINS` overrides it). The
+arm64 Rust becomes rustup's toolchain `emibsd`, the channel `rust-toolchain.toml` names; the
+amd64 one `emibsd-amd64`, which the justfile's amd64 recipes select (`RUSTUP_TOOLCHAIN`); the
+two share rustc, cargo and `ld.lld` bit for bit. The arm64 LLVM's `bin/` (`ld.lld`, the
+binutils, `llvm-objcopy`, clang) is `EMIBSD_LLVM_BIN`, which the justfile exports for the
+userland table above and for efiboot; the amd64 LLVM adds `x86_64-emibsd-emibsd8.0-clang`.
+Needs `gh`, logged in, and `zstd` (Homebrew). A directory already unpacked is left alone; never
+modify, move or delete anything under that directory, it is shared by every repository on the
+machine. Anything that breaks because of the toolchain is reported to EmiBSD/DevTools with the
+command and the output, never worked around here.
 
-The Rust release carries the arm64 targets only (`aarch64-apple-darwin`, `aarch64-emibsd-emibsd`,
-`aarch64-unknown-none-softfloat`) and no `llvm-tools`, so amd64 is frozen until it carries
-`x86_64-unknown-none` (`docs/ARCHITECTURE.md`, "Frozen amd64"): `just build`, `clippy` and the
-smokes print a notice for amd64 and go on with arm64.
+Each Rust release carries its kernel target, `aarch64-emibsd-none-softfloat` or
+`x86_64-emibsd-none-softfloat` (upstream's bare-metal targets with the vendor `emibsd`), its
+userland target with std, the host's std and no `llvm-tools`. Without the amd64 pair amd64 is
+frozen (`docs/ARCHITECTURE.md`, "Frozen amd64"): `just build`, `clippy` and the smokes print a
+notice for amd64 and go on with arm64.
 
 ## e2fsprogs (M10d)
 

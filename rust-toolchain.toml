@@ -1,12 +1,14 @@
 # DevTools' toolchain (github.com/EmiBSD/DevTools), the one build of rustc every EmiBSD
-# repository shares: `just toolchain` installs the pinned release into ~/devel/emibsd/toolchains
-# and links it as rustup's toolchain `emibsd` (docs/SETUP.md, "DevTools toolchain"). Bumping is
-# its own commit ("build: bump toolchain to <version>"). The release carries rustfmt, clippy,
-# rust-src and the arm64 targets; amd64 (`x86_64-unknown-none`) is frozen until it carries that
-# target too (docs/ARCHITECTURE.md, "Frozen amd64"). `components` and `targets` say what a rustup
-# channel would have to install to stand in for it; rustup ignores them for a linked toolchain.
+# repository shares: `just toolchain` installs the pinned releases, one pair per target
+# architecture, into ~/devel/emibsd/toolchains and links the arm64 Rust as rustup's `emibsd`,
+# named here, and the amd64 one as `emibsd-amd64`, which the justfile's amd64 recipes select
+# (docs/SETUP.md, "DevTools toolchain"). Bumping is its own commit ("build: bump toolchain to
+# <version>"). The releases carry rustfmt, clippy, rust-src and, each, its kernel target:
+# upstream's bare-metal targets with the vendor `emibsd` (DevTools' D-0008). `components` and
+# `targets` say what one rustup channel would have to install to stand in for both; rustup
+# ignores them for a linked toolchain.
 [toolchain]
 channel = "emibsd"
 profile = "minimal"
 components = ["rustfmt", "clippy", "rust-src"]
-targets = ["x86_64-unknown-none", "aarch64-unknown-none-softfloat"]
+targets = ["x86_64-emibsd-none-softfloat", "aarch64-emibsd-none-softfloat"]

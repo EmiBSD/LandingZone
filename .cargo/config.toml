@@ -4,11 +4,11 @@
 [alias]
 xtask = "run -p xtask --"
 
-[target.x86_64-unknown-none]
+[target.x86_64-emibsd-none-softfloat]
 # static: non-PIE higher-half kernel at 0xffffffff80000000. frame pointers: panic backtraces.
 rustflags = ["-C", "relocation-model=static", "-C", "force-frame-pointers=yes"]
 runner = ["cargo", "xtask", "qemu", "--arch", "amd64", "--kernel"]
 
-[target.aarch64-unknown-none-softfloat]
+[target.aarch64-emibsd-none-softfloat]
 rustflags = ["-C", "relocation-model=static", "-C", "force-frame-pointers=yes"]
 runner = ["cargo", "xtask", "qemu", "--arch", "arm64", "--kernel"]

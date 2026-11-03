@@ -1,14 +1,16 @@
 # Status
 
 Milestone: **M16 done** (QEMU drivers, M16a..M16g); next M17 (real hardware, vmm), with
-M16a's deferred storage drivers (mfi, mfii, pcscp, ufshci). Updated: 2026-11-01.
+M16a's deferred storage drivers (mfi, mfii, pcscp, ufshci). Updated: 2026-11-02.
 
-Toolchain: DevTools' Rust 1.99.1 and LLVM 23.1.4 (`channel = "emibsd"`, `just toolchain`,
-`EMIBSD_LLVM_BIN`; f7b1fad3). amd64 is frozen while that Rust release has no
-`x86_64-unknown-none`: its recipes print a notice and skip, its sources stay untouched
-(docs/ARCHITECTURE.md, "Frozen amd64"). `ci` covers host and arm64 until DevTools adds the target.
+Toolchain: DevTools' Rust 1.99.1 and LLVM 23.1.4, one pair per target architecture (D-0008):
+rustup's `emibsd` (arm64, `channel`) and `emibsd-amd64`; `just toolchain`, `EMIBSD_LLVM_BIN`.
+Kernel targets `x86_64-emibsd-none-softfloat` and `aarch64-emibsd-none-softfloat`. amd64 is
+frozen only while the amd64 pair is not installed (docs/ARCHITECTURE.md, "Frozen amd64"); with
+it, `ci` covers both archs again.
 
 Done:
+- 2026-11-02: DevTools' per-arch pairs and the renamed kernel targets; amd64 back in `ci`.
 - 2026-11-01: the toolchain switch and the amd64 freeze; clippy 1.99 on the host tests (86
   test-only sites); `smoke-all` runs its recipes on its own xtask binary (the SIGKILL and dyld
   hang of concurrent `cargo run`s, EXT-225); the machine lock rule (`/tmp/emibsd/ci.lock`).
@@ -18,14 +20,14 @@ Done:
 - M16d: pckbc, pckbd, pms; viogpu, viomb, viornd with rnd(4); viocon (feature); lpt; pcppi, spkr; eap.
 
 Next:
-- amd64 back in `ci` once DevTools' Rust release carries `x86_64-unknown-none` (no change here).
+- DevTools' T1/T2 proof: the C, C++ and Rust hellos under QEMU on both archs (their request of
+  2026-11-02; `ci` booting both kernels on the renamed targets is the kernel half).
 - M17 (the user's decisions below first).
 - Left by M14: GPL parts of the sets, lldb, efi(4), base programs (sort, find, ...), `__thrsleep`.
 
 Unsafe (`cargo xtask unsafe-report`): kernel 8992 blocks, 1143 fn, 822 impl, 31 trait, 340 other; tests 826 more.
 
 Blockers:
-- amd64 frozen (above): no amd64 work lands while it cannot be built.
 - amd64 kernel stacks are tight: about 4.9 KB stay free under softraid I/O (M10f measure).
 - A `diagnostic` MP kernel panics at boot (`uvm_page_physload: page size not set!`).
 - Statistics counters the C bumps unlocked stay `Cell`s (docs/ARCHITECTURE.md, M11e).

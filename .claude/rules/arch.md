@@ -32,7 +32,8 @@ paths:
   `extern "x86-interrupt"` (unstable).
 - `arch/host/` is a test double: it prints to stdout, has no-op SPL, a `HashMap`-backed fake pmap.
   It must not grow logic. If a test needs behaviour, the behaviour belongs in generic code.
-- Targets are `x86_64-unknown-none` and `aarch64-unknown-none-softfloat`. No FP/SIMD in kernel code:
+- Targets are `x86_64-emibsd-none-softfloat` and `aarch64-emibsd-none-softfloat` (upstream's
+  bare-metal targets with the vendor `emibsd`, DevTools' D-0008 of 2026-11-02). No FP/SIMD in kernel code:
   the softfloat target enforces it on arm64, the `none` target on amd64.
 - Hardware addresses and IRQ numbers come from firmware (ACPI, DTB). A hardcoded address is a
   bootstrap shortcut and carries a `// TODO(Mn):` naming the milestone that removes it.

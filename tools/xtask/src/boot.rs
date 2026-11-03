@@ -30,7 +30,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -64,38 +64,20 @@ impl Arch {
     /// The Rust target triple the kernel is built for.
     pub fn target(self) -> &'static str {
         match self {
-            Arch::Amd64 => "x86_64-unknown-none",
-            Arch::Arm64 => "aarch64-unknown-none-softfloat",
+            Arch::Amd64 => "x86_64-emibsd-none-softfloat",
+            Arch::Arm64 => "aarch64-emibsd-none-softfloat",
         }
     }
 
-    /// Whether this arch is frozen: the active toolchain has no `rust-std` for its target
-    /// (DevTools' Rust release carries no `x86_64-unknown-none`; the user's decision of
-    /// 2026-11-01, docs/ARCHITECTURE.md "Frozen amd64"). Every xtask command that builds or
-    /// boots a frozen arch is skipped with a notice (`main::run`), as the justfile skips its
-    /// `cargo` lines (`amd64_cmd`). A `rustc` that cannot be asked freezes nothing: the build
-    /// then fails on its own.
+    /// Whether this arch is frozen: the justfile lists it in `EMIBSD_FROZEN` (amd64 while
+    /// DevTools' amd64 toolchain pair is not installed; the user's decision of 2026-11-01,
+    /// docs/ARCHITECTURE.md "Frozen amd64"). Every xtask command that builds or boots a frozen
+    /// arch is skipped with a notice (`main::run`), as the justfile skips its `cargo` lines
+    /// (`amd64_cmd`). Run by hand, with nothing exported, nothing is frozen.
     pub fn frozen(self) -> bool {
-        static SYSROOT: OnceLock<Option<PathBuf>> = OnceLock::new();
-        let sysroot = SYSROOT.get_or_init(|| {
-            // The justfile exports the sysroot it evaluated once (`EMIBSD_SYSROOT`), so a
-            // recipe's xtask asks no rustc of its own; run by hand, xtask asks.
-            if let Some(dir) = std::env::var_os("EMIBSD_SYSROOT") {
-                return Some(PathBuf::from(dir));
-            }
-            let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
-            let out = Command::new(rustc)
-                .args(["--print", "sysroot"])
-                .output()
-                .ok()?;
-            out.status
-                .success()
-                .then(|| PathBuf::from(String::from_utf8_lossy(&out.stdout).trim()))
-        });
-        match sysroot {
-            Some(s) => !s.join("lib/rustlib").join(self.target()).is_dir(),
-            None => false,
-        }
+        std::env::var("EMIBSD_FROZEN")
+            .map(|v| v.split(',').any(|a| a == self.name()))
+            .unwrap_or(false)
     }
 
     pub(crate) fn qemu(self) -> &'static str {

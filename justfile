@@ -8,38 +8,44 @@ export EMIBSD_BUILD := `git rev-list --count HEAD 2>/dev/null || echo 0`
 export SOURCE_DATE_EPOCH := `git log -1 --format=%ct 2>/dev/null || echo 0`
 export EMIBSD_BUILD_HOST := `hostname -s 2>/dev/null || echo localhost`
 
-amd64 := "x86_64-unknown-none"
-arm64 := "aarch64-unknown-none-softfloat"
+amd64 := "x86_64-emibsd-none-softfloat"
+arm64 := "aarch64-emibsd-none-softfloat"
 
 # The toolchains DevTools releases (github.com/EmiBSD/DevTools; the user's decision of
-# 2026-10-31, taken from the Kernel repository on 2026-11-01): fetched by tag, never "latest",
+# 2026-10-31, taken from the Kernel repository on 2026-11-01), macOS arm64 host, one tarball per
+# target architecture since DevTools' D-0008 (2026-11-02): fetched by tag, never "latest",
 # checked against the pinned sha256 before unpacking, and used in place, unmodified, from
-# `toolchain_dir` (outside every repository, so `cargo clean` never removes it). The Rust one is
-# rustup's toolchain `emibsd`, the one rust-toolchain.toml names; the LLVM one's bin/ is
-# `EMIBSD_LLVM_BIN` (ld.lld, llvm-ar, llvm-objcopy: the userland's linker and binutils, and
-# efiboot's objcopy, since the Rust release has no llvm-tools). `just toolchain` installs them
-# (docs/SETUP.md, "DevTools toolchain").
+# `toolchain_dir` (outside every repository, so `cargo clean` never removes it). The arm64 Rust
+# is rustup's toolchain `emibsd`, the one rust-toolchain.toml names; the amd64 one is
+# `emibsd-amd64`, which the amd64 recipes select (`amd64_cmd`). The two pairs share rustc, cargo
+# and ld.lld bit for bit, so the arm64 LLVM's bin/ is `EMIBSD_LLVM_BIN` for both (ld.lld,
+# llvm-ar, llvm-objcopy: the userland's linker and binutils, and efiboot's objcopy, since the
+# Rust releases have no llvm-tools). `just toolchain` installs them (docs/SETUP.md, "DevTools
+# toolchain").
 toolchain_dir := env("EMIBSD_TOOLCHAINS", env("HOME") / "devel/emibsd/toolchains")
 devtools_llvm := "llvm-23.1.4+emibsd.1"
-devtools_llvm_sha256 := "4f6b15c8106ad45eb834f1490c64ddf411a9680ba42b4d7b5bbd2ffcf50ae499"
 devtools_rust := "rust-1.99.1+emibsd.1"
-devtools_rust_sha256 := "c30aa833a2e634ce9a349be9f7581d1a4b55f3403bce21444dacb323d4f1c933"
-export EMIBSD_LLVM_BIN := env("EMIBSD_LLVM_BIN", toolchain_dir / devtools_llvm + "-aarch64-apple-darwin/bin")
-# The Rust release ships no `rust-lld`: the kernels, init and efiboot link with the LLVM release's
+devtools_llvm_sha256_arm64 := "fd37a7437e30bfa803dac82a72ff56170b86edf6e84c4c101f8c0e277c2f1165"
+devtools_rust_sha256_arm64 := "b229378962fa5e3638f4a0ca8d28661f0fe18ba137895d24317a8b2802e0e417"
+devtools_llvm_sha256_amd64 := "18aa91402e18b002ce577ab80898ff50ae29ad7146184e1590b22d90760bc1a4"
+devtools_rust_sha256_amd64 := "8cc842e4b99837f805128c9be7f34ac6020168ec3f020e11c8bcd1f8eca92ecd"
+rust_amd64 := toolchain_dir / devtools_rust + "-aarch64-apple-darwin-amd64"
+export EMIBSD_LLVM_BIN := env("EMIBSD_LLVM_BIN", toolchain_dir / devtools_llvm + "-aarch64-apple-darwin-arm64/bin")
+# The Rust releases ship no `rust-lld`: the kernels, init and efiboot link with the LLVM release's
 # `ld.lld` (cargo's per-target linker, read from the environment; the host crates keep cc).
-export CARGO_TARGET_AARCH64_UNKNOWN_NONE_SOFTFLOAT_LINKER := EMIBSD_LLVM_BIN / "ld.lld"
-export CARGO_TARGET_X86_64_UNKNOWN_NONE_LINKER := EMIBSD_LLVM_BIN / "ld.lld"
+export CARGO_TARGET_AARCH64_EMIBSD_NONE_SOFTFLOAT_LINKER := EMIBSD_LLVM_BIN / "ld.lld"
+export CARGO_TARGET_X86_64_EMIBSD_NONE_SOFTFLOAT_LINKER := EMIBSD_LLVM_BIN / "ld.lld"
 
-# Frozen amd64 (the user's decision of 2026-11-01; docs/ARCHITECTURE.md, "Frozen amd64"):
-# DevTools' Rust release carries no `x86_64-unknown-none`, so while the active toolchain lacks
-# that target every amd64 build, clippy and boot is skipped with a notice: here the `cargo` lines
-# of the amd64 recipes (`amd64_cmd` becomes an `echo`), in xtask every `--arch amd64` command
-# (`Arch::frozen`). The amd64 sources stay in the tree untouched; the day the release carries the
-# target, amd64 is back in `ci` with no change here.
-sysroot := `rustc --print sysroot`
-export EMIBSD_SYSROOT := sysroot
-amd64_frozen := if path_exists(sysroot / "lib/rustlib" / amd64) == "true" { "false" } else { "true" }
-amd64_cmd := if amd64_frozen == "true" { "echo '[amd64 frozen: the toolchain has no x86_64-unknown-none; skipped]'" } else { "" }
+# Frozen amd64 (the user's decision of 2026-11-01; docs/ARCHITECTURE.md, "Frozen amd64"): while
+# DevTools' amd64 pair is not installed (no `rust_amd64` with the amd64 kernel target; `just
+# toolchain`), every amd64 build, clippy and boot is skipped with a notice: here the `cargo`
+# lines of the amd64 recipes (`amd64_cmd` becomes an `echo`; otherwise it selects rustup's
+# `emibsd-amd64`), in xtask every `--arch amd64` command (`EMIBSD_FROZEN`, `Arch::frozen`). The
+# amd64 sources stay in the tree untouched. Since DevTools' D-0008 the pair exists, so amd64 is
+# in `ci` wherever `just toolchain` has run.
+amd64_frozen := if path_exists(rust_amd64 / "lib/rustlib" / amd64) == "true" { "false" } else { "true" }
+amd64_cmd := if amd64_frozen == "true" { "echo '[amd64 frozen: no amd64 toolchain installed (just toolchain); skipped]'" } else { "RUSTUP_TOOLCHAIN=emibsd-amd64" }
+export EMIBSD_FROZEN := if amd64_frozen == "true" { "amd64" } else { "" }
 
 # How the recipes run xtask. By hand, `cargo xtask` builds it on demand. `smoke-all` sets
 # `EMIBSD_XTASK` to its own binary, so the recipes it runs in parallel exec that file directly:
@@ -3177,17 +3183,17 @@ userland:
     {{xtask}} userland --arch amd64
     {{xtask}} userland --arch arm64
 
-# Installs the DevTools toolchains the variables at the top pin (`toolchain_dir`, `devtools_*`):
-# `gh release download` by tag, sha256 checked, unpacked unmodified, the Rust one linked as
-# rustup's `emibsd`. A tag already unpacked is left as it is. Needs `gh` (logged in) and `zstd`
-# (docs/SETUP.md, "DevTools toolchain").
+# Installs the DevTools toolchains the variables at the top pin (`toolchain_dir`, `devtools_*`),
+# both pairs: `gh release download` by tag, sha256 checked, unpacked unmodified, the arm64 Rust
+# linked as rustup's `emibsd` and the amd64 one as `emibsd-amd64`. A directory already unpacked
+# is left as it is. Needs `gh` (logged in) and `zstd` (docs/SETUP.md, "DevTools toolchain").
 toolchain:
     #!/bin/zsh
     set -eu
     dir="{{toolchain_dir}}"
     mkdir -p "$dir"
     fetch() {
-        local name="$1-aarch64-apple-darwin" sha="$2"
+        local name="$1-aarch64-apple-darwin-$2" sha="$3"
         if [ -d "$dir/$name" ]; then echo "toolchain: $name already unpacked"; return; fi
         local tmp; tmp=$(mktemp -d "$dir/.fetch.XXXXXX")
         gh release download "$1" --repo EmiBSD/DevTools --pattern "$name.tar.zst" --dir "$tmp"
@@ -3203,12 +3209,16 @@ toolchain:
         rmdir "$tmp"
         echo "toolchain: $name unpacked, sha256 $got"
     }
-    fetch "{{devtools_llvm}}" "{{devtools_llvm_sha256}}"
-    fetch "{{devtools_rust}}" "{{devtools_rust_sha256}}"
+    fetch "{{devtools_llvm}}" arm64 "{{devtools_llvm_sha256_arm64}}"
+    fetch "{{devtools_rust}}" arm64 "{{devtools_rust_sha256_arm64}}"
+    fetch "{{devtools_llvm}}" amd64 "{{devtools_llvm_sha256_amd64}}"
+    fetch "{{devtools_rust}}" amd64 "{{devtools_rust_sha256_amd64}}"
     command -v rustup >/dev/null || PATH=/opt/homebrew/opt/rustup/bin:$PATH
-    rustup toolchain link emibsd "$dir/{{devtools_rust}}-aarch64-apple-darwin"
-    echo "toolchain: rustup's emibsd is $(rustup run emibsd rustc --version)"
-    echo "toolchain: EMIBSD_LLVM_BIN=$dir/{{devtools_llvm}}-aarch64-apple-darwin/bin ($("$dir/{{devtools_llvm}}-aarch64-apple-darwin/bin/ld.lld" --version))"
+    for arch name in arm64 emibsd amd64 emibsd-amd64; do
+        rustup toolchain link "$name" "$dir/{{devtools_rust}}-aarch64-apple-darwin-$arch"
+        echo "toolchain: rustup's $name is $(rustup run "$name" rustc --version)"
+    done
+    echo "toolchain: EMIBSD_LLVM_BIN=$dir/{{devtools_llvm}}-aarch64-apple-darwin-arm64/bin ($("$dir/{{devtools_llvm}}-aarch64-apple-darwin-arm64/bin/ld.lld" --version))"
 
 # M12+: the same scenarios on EmiBSD and on a real OpenBSD VM, compared step by step
 # (`cargo xtask diff-openbsd`, tools/xtask/src/diffopenbsd.rs; the scenarios and the expected
