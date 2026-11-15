@@ -1280,3 +1280,49 @@ the seven parts were met as M16f, M16e, M16b, M16c, M16d, M16a and M16g, from 20
 Effort: _(user)_
 
 Time: _(user)_
+
+## TD1a Self-hosting: the kernel
+
+Boundary: the commit that marks TD1a met ("docs: TD1a met"), on the branch
+`build/devtools-direct` from main `a2348da4`. The coordinator (the main session) did the
+toolchain, the selfhost disk and the integration; three subagents ported `__thrsleep` (porter),
+found the hvf crash (debugger) and added the build tools of TD1b's first step (porter).
+
+- Went well: borrowing before rediscovering. The Kernel repository had met the native
+  toolchain first (DevTools' T3b proof, its in-VM attempt of 2026-11-12); its commits gave the
+  shared libcrypto/libssl, `--memory`, `smoke --timeout`, smoke-all's timeout, `just rust-bin`,
+  the userland by DevTools' clang (3e21c6ca) and, the blocker, its decision 48 (b2a15ba6).
+- Went well: the isolation. A first try in a throwaway worktree with Kernel's libssl copied
+  in found the shape of the problem before any of it was committed; the real criterion then
+  ran on the branch with this tree's own libraries.
+- Failed: native clang, rustc and cargo all answered `No such file or directory` in the
+  chroot. The kernel refused them with ENOEXEC: their ident note is `.note.emibsd.ident`,
+  owner "EmiBSD", and `elf_note_names[]` held "OpenBSD" alone; chroot(8)'s execvp then tried
+  a /bin/sh the disk had not. Found by running one binary outside the chroot (ksh's "NUL byte
+  unexpected"). Fixed by Kernel's decision 48, recorded as a deviation.
+- Failed: the first two criterion runs sat idle for hours of limit: the disk was comp's root
+  only, with no /bin/ksh for build.sh, and the console is shown only at the end. QEMU's own
+  CPU use (2 % idle against 300 % busy) told a stall from a long rustc; build.sh now streams
+  cargo's lines and the disk starts from userland's root.
+- Failed: rustc on the kernel crate outgrows DFLDSIZ (512 MiB, as OpenBSD's); build.sh raises
+  the data limit to the hard one (Kernel's finding).
+- Failed: `--accel hvf` aborted QEMU (`isv`). The debugger found a kernel bug TCG hides: the
+  bootloader's direct map, which the arm64 pmap adopts, was executable at EL0, and on a host
+  CPU with FEAT_EPAN every kernel read of it faulted under PAN, the fault handler read it
+  again, and the recursion left its u-area into the ECAM's last page. Fixed with UXN on the
+  adopted tables; hvf now boots to `login:` in under ten seconds.
+- Failed: a lost space in the `smokes` list (`smoke-ntfssmoke-tcpbench`) had dropped two
+  smokes from `just smoke` since 7f3d210b; found by the TD1b porter.
+- Rules: TD1..TD6 in ROADMAP (the user's decision and restatement of 2026-11-15); SETUP and
+  the agents' rules say cargo is DevTools' only (`just cargo`), no rustup.
+- Numbers (`git rev-list --count a2348da4..HEAD`, `git diff --shortstat`): 28 commits (26
+  without merges), 50 files, +3223 -296, of them sys/ 21 files +1420 -62. Unsafe
+  (`cargo xtask unsafe-report`): kernel 9003 blocks (8992 before). `smoke-selfhost-kernel` ok
+  in 1953.9 s (cargo `Finished ... in 32m 21s`, -j 4, -smp 4, 6 GiB, TCG). `just ci`: fmt,
+  clippy, 2816 host tests, build, check-ports, check-syscalls green; smoke 84 of 86 in 24m12s,
+  the two others passed alone (`smoke-buildtools` needed the merged userland's base.ffs,
+  `smoke-uhci` met EDK2's EXT-1 twice in a row).
+
+Effort: _(user)_
+
+Time: _(user)_
