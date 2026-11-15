@@ -21,7 +21,8 @@
 //!
 //! Generic code reaches architecture code ONLY through this module. One module per OpenBSD header
 //! ([`param`], [`vmparam`], [`cpu`], [`cons`], [`bus`], [`pmap`], [`intr`], [`db_machdep`],
-//! [`disklabel`], [`fdt`], [`proc`], [`signal`], [`tcb`], [`pci_machdep`], [`isa_machdep`], [`atomic`];
+//! [`disklabel`], [`fdt`], [`proc`], [`signal`], [`spinlock`], [`tcb`], [`pci_machdep`],
+//! [`isa_machdep`], [`atomic`];
 //! [`acpi_machdep`] is the machine half of `<dev/acpi/acpivar.h>` (each arch's `acpi_machdep.c`)
 //! and [`pciide_machdep`] that of `<dev/pci/pciidevar.h>` (each arch's `pciide_machdep.c`);
 //! [`autoconf`] is what `ioconf.c` and the machine's `autoconf.c` give `subr_autoconf.c`;
@@ -59,6 +60,7 @@ pub mod pciide_machdep;
 pub mod pmap;
 pub mod proc;
 pub mod signal;
+pub mod spinlock;
 pub mod sysarch;
 pub mod tcb;
 pub mod vmparam;
@@ -87,6 +89,7 @@ pub use pciide_machdep::*;
 pub use pmap::*;
 pub use proc::*;
 pub use signal::*;
+pub use spinlock::*;
 pub use sysarch::*;
 pub use tcb::*;
 pub use vmparam::*;
@@ -122,6 +125,7 @@ const _: () = {
             + UserCopy
             + MachineExec
             + MachineSignal
+            + MachineSpinlock
             + Tcb,
     >() {
     }

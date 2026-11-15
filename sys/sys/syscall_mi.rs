@@ -96,13 +96,11 @@ use crate::unported;
 /// `NOLOCK` system calls (`syscalls.master`) whose bodies are not audited for
 /// `MULTIPROCESSOR`: `mi_syscall` keeps the kernel lock for them although `sysent` marks them
 /// `SY_NOLOCK` (see the module's deviations). Each group names what unlocks it; an entry
-/// leaves the table when its body's locking is the C's. Since the end of the M11e audit
-/// (files, uvm, kern, net and netinet) only the unported calls are left.
-pub const SY_NOLOCK_DEFERRED: &[i32] = &[
-    // __thrsleep(2) and __thrwakeup(2) are not ported (`sys_nosys`, which posts SIGSYS).
-    SYS___thrsleep,
-    SYS___thrwakeup,
-];
+/// leaves the table when its body's locking is the C's. The M11e audit (files, uvm, kern,
+/// net and netinet) left only the unported `__thrsleep(2)` and `__thrwakeup(2)`; TD1 ported
+/// them with the C's locking (bucket mutexes and `SCHED_LOCK`, as `futex(2)`), so the table
+/// is empty and stays as the place for the next unaudited one.
+pub const SY_NOLOCK_DEFERRED: &[i32] = &[];
 
 /// [`SY_NOLOCK_DEFERRED`] as a table indexed by system call number.
 const SY_NOLOCK_DEFERRED_MAP: [bool; SYS_MAXSYSCALL] = {
@@ -381,6 +379,9 @@ mod tests {
             SYS_getthrid,
             SYS___thrsigdivert,
             SYS_adjfreq,
+            // __thrsleep(2)/__thrwakeup(2): bucket mutexes and SCHED_LOCK, as futex(2) (TD1)
+            SYS___thrsleep,
+            SYS___thrwakeup,
             SYS___set_tcb,
             SYS___get_tcb,
             // the `files` audit

@@ -183,7 +183,7 @@ smokes := "smoke-boot smoke-shell smoke-login smoke-net smoke-route smoke-diag s
     "smoke-wg smoke-pf smoke-ipsec smoke-esp smoke-pfsync smoke-ipcomp smoke-https smoke-tcp " + \
     "smoke-divert smoke-tcpdump smoke-inet6 smoke-disk smoke-ufsopts smoke-fs smoke-cd smoke-softraid " + \
     "smoke-nvme smoke-ahci smoke-smmu smoke-power smoke-siop smoke-wd smoke-fd smoke-mpi smoke-sdmmc smoke-em smoke-igb smoke-re smoke-vmx smoke-pcn smoke-ne smoke-fxp smoke-dc smoke-vmwpvs smoke-efiboot smoke-acpi smoke-gicv3 smoke-clock smoke-rtc " + \
-    "smoke-nfs smoke-ext2fs smoke-fuse smoke-ntfs smoke-tcpbench smoke-mp smoke-ddbmp " + \
+    "smoke-nfs smoke-ext2fs smoke-fuse smoke-thrsleep smoke-ntfssmoke-tcpbench smoke-mp smoke-ddbmp " + \
     "smoke-net-mp smoke-up smoke-audio smoke-usb smoke-puc smoke-fb smoke-wscons smoke-vga smoke-kbd " + \
     "smoke-powerbtn smoke-ukc smoke-ppb smoke-dmar smoke-iic smoke-ipmi smoke-tpm smoke-virtio smoke-viogpu " + \
     "smoke-mouse smoke-ugen smoke-ehci smoke-uaudio smoke-uhci smoke-ohci smoke-cdce smoke-ucom " + \
@@ -2272,6 +2272,28 @@ fuse_steps := disk_login + " " + \
     "--send-after 'fuse-umount-42' --send 'case \"$(mount)\" in *fuse*) echo still;; *) echo fuse-gone-$((40+2));; esac\\n' " + \
     "--expect 'on /fuse type fuse' --expect 'fuse-up-42' --expect 'm10d-fuse-42' --expect 'm10d-fuse-sub-42' " + \
     "--expect 'hello.txt' --expect 'deep.txt' --expect 'fuse-ro-42' --expect 'fuse-umount-42' --expect 'fuse-gone-42'"
+
+# TD1: __thrsleep(2) and __thrwakeup(2) (kern_synch.c). tools/thrtest, a static program linked
+# with libpthread, checks what the calls return (EINVAL for ident 0 and a bad timespec, ESRCH,
+# a time already passed and a real timeout, the abort word, sleepers woken one at a time and
+# the ident -1 broadcast), then runs 300 rounds of four threads that each create and join a
+# thread while they fight over one FILE lock (libc's flockfile(3) sleeps in __thrsleep when
+# contended), the pattern that killed threaded programs with SIGSYS. Both archs. Part of `smoke`.
+smoke-thrsleep: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
+    @{{ramdisks}} || \
+        { echo "smoke-thrsleep: no ramdisk image; run just userland first"; exit 1; }
+    {{xtask}} smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --timeout 400 --expect-ramdisk --until-seen {{thrsleep_steps}}
+    {{xtask}} smoke {{reject}} {{smp}} --arch arm64 --kernel target/{{arm64}}/debug/bsd --timeout 400 --expect-ramdisk --until-seen {{thrsleep_steps}}
+
+# `smoke-thrsleep`'s session.
+thrsleep_steps := disk_login + " " + \
+    "--send-after '# ' --send 'thrtest 300 && echo thrtest-done-$((40+2))\\n' " + \
+    "--expect 'thrtest: thrsleep ident 0 EINVAL ok' --expect 'thrtest: thrwakeup no sleeper ESRCH ok' " + \
+    "--expect 'thrtest: thrsleep past EWOULDBLOCK ok' --expect 'thrtest: thrsleep timeout slept ok' " + \
+    "--expect 'thrtest: thrsleep abort EINTR ok' --expect 'thrtest: thrsleep woken 0 ok' " + \
+    "--expect 'thrtest: thrwakeup n=1 each ok' --expect 'thrtest: thrwakeup -1 broadcast ok' " + \
+    "--expect 'thrtest: 300 rounds' --expect 'thrtest: stress 300 rounds ok' --expect 'thrtest: all ok' " + \
+    "--expect 'thrtest-done-42' --reject 'Bad system call' --reject ' FAILED: '"
 
 # M10d: NTFS, read-only, amd64 only (OpenBSD builds ntfs and mount_ntfs(8) for alpha, amd64 and
 # i386). The ramdisk's /root/images/ntfs.img (an NTFS volume made on this machine by
