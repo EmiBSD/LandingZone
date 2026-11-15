@@ -2223,6 +2223,7 @@ pub(crate) mod miniroot;
 mod passwd;
 mod ramdisk;
 mod seed;
+pub(crate) mod selfhost;
 pub(crate) use ramdisk::TIMESTAMP;
 pub(crate) use ramdisk::check_devices as check_ramdisk_devices;
 pub(crate) mod sets;

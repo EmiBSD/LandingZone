@@ -18,7 +18,13 @@ paths:
   files, which `sys/dev/microcode/fxp/build.c` writes, made from `rcvbundl.h` by
   `userland/firmware.rs`; a worktree's first build, and its first `comp`, is seeded from the
   main checkout's by an APFS clone with the paths rebased, `userland/seed.rs`), `comp` (M14: OpenBSD's clang, lld and libc++ from
-  `gnu/llvm` by its build glue, `userland/comp.rs`; outside `ci`, `just comp`).
+  `gnu/llvm` by its build glue, `userland/comp.rs`; outside `ci`, `just comp`). `selfhost` (TD1a: `smoke-selfhost-kernel`'s disk, `comp`'s staging root with
+  `userland`'s shared libraries, DevTools' native LLVM and Rust laid over it from tarballs
+  checked against their pins in the justfile, and `HEAD` with its crates vendored offline;
+  `userland/selfhost.rs`). `--memory SIZE` (qemu, smoke, smoke2; 256M..16G) replaces
+  `boot::VM_MEMORY` (512M); `smoke --timeout SECS` replaces `boot::SMOKE_TIMEOUT` (180 s),
+  still scaled, and `smoke-all`'s watchdog reads it; `--accel hvf` (arm64 qemu and smoke)
+  runs the guest under Hypervisor.framework for the build VMs, used by no recipe of `smokes`.
 - External tools (`qemu-system-*`, Limine binaries, EDK2 firmware) are located at runtime via
   `brew --prefix <formula>` or `$PATH`, with an error that names the missing formula and points to
   `docs/SETUP.md`. Never hardcode `/opt/homebrew` or `/usr/local`. Exception: `userland`'s

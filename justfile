@@ -3241,6 +3241,50 @@ diff-openbsd: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--fea
         { echo "diff-openbsd: no difftest in target/userland; run just userland first"; exit 1; }
     EMIBSD_RUN_DIR=${EMIBSD_RUN_DIR:-target/diff-openbsd} {{xtask}} diff-openbsd {{smp4}}
 
+# --- self-hosting (TD1) ------------------------------------------------------------------
+
+# TD1a: this repository's kernel built inside EmiBSD by DevTools' native toolchain (D-0009),
+# the milestone's criterion (docs/ROADMAP.md). `cargo xtask selfhost` makes the native disk
+# (comp's staging root with userland's shared libraries, DevTools' native LLVM then Rust,
+# each checked against its pin below, and this tree's HEAD with its crates vendored;
+# tools/xtask/src/userland/selfhost.rs); the smoke boots the MP kernel with it as sd0
+# (`--disk-set selfhost`), mounts it on /mnt, gives it /dev/null, /dev/zero and /dev/urandom,
+# and in a chroot(8) checks rustc and cargo, then runs /src/build.sh: `cargo build --offline
+# -p bsd --target aarch64-emibsd-none-softfloat --features qemu,multiprocessor`, whose
+# `lz-build-rc-0` and `lz-elf-2` (the native llvm-readelf finds AArch64 and EXEC in the `bsd`
+# it made) are the criterion. Each marker is printed by the guest, never typed (`$?`,
+# `$((40+2))`), and any step's nonzero status is rejected. arm64 only: DevTools' amd64 native
+# pair is not proved yet. -smp 4 and 6 GiB, under TCG: the build takes hours, so the limit is
+# `selfhost_timeout` seconds. Not in `smokes`: it needs `just comp`, `just userland` and
+# DevTools' tarballs in `selfhost_dist` (pinned to the released ones).
+selfhost_dist := env("DEVTOOLS_DIST", env("HOME") / "devel/emibsd/DevTools/dist")
+selfhost_llvm := "llvm-23.1.4+emibsd.6-aarch64-emibsd-emibsd8.0-arm64.tar.zst"
+selfhost_llvm_sha256 := "a778ef6d3dcf281e9a9d71e1565de9315beb7814e1fcf9a1e42c502dc2986aab"
+selfhost_rust := "rust-1.99.1+emibsd.5-aarch64-emibsd-emibsd-arm64.tar.zst"
+selfhost_rust_sha256 := "2b7ec9abfd2bfffbb14f7e1d510699899f411d124192882f429a4ea69effc0cc"
+selfhost_timeout := env("EMIBSD_SELFHOST_TIMEOUT", "21600")
+selfhost_script := disk_login + " --reject 'panic:' --reject 'Bad system call' " + \
+    "--reject '-rc-1' --reject '-rc-2' --reject '-rc-3' --reject '-rc-4' --reject '-rc-5' " + \
+    "--reject '-rc-6' --reject '-rc-7' --reject '-rc-8' --reject '-rc-9' " + \
+    "--send-after '# ' --send 'mount /dev/sd0a /mnt && echo sh-mnt-$((40+2))\\n' " + \
+    "--send-after 'sh-mnt-42' --send 'mkdir -p /mnt/dev && cp -Rp /dev/null /dev/zero /dev/urandom /mnt/dev/ && echo sh-dev-$((40+2))\\n' " + \
+    "--send-after 'sh-dev-42' --send '/usr/sbin/chroot /mnt /usr/bin/rustc --version; echo rsv-rc-$?\\n' " + \
+    "--send-after 'rsv-rc-0' --send '/usr/sbin/chroot /mnt /usr/bin/cargo --version; echo cgv-rc-$?\\n' " + \
+    "--send-after 'cgv-rc-0' --send '/usr/sbin/chroot /mnt /src/build.sh\\n' " + \
+    "--expect 'sh-mnt-42' --expect 'sh-dev-42' --expect 'rustc 1.99.1' --expect 'rsv-rc-0' " + \
+    "--expect 'cargo 1.99.1' --expect 'cgv-rc-0' --expect 'lz-elf-2' --expect 'lz-build-rc-0'"
+
+smoke-selfhost-kernel: (build-arm64 "--features qemu,multiprocessor")
+    @{{ramdisks}} || { echo "smoke-selfhost-kernel: no ramdisk image; run just userland first"; exit 1; }
+    @test -d target/comp/arm64/root/usr/lib || { echo "smoke-selfhost-kernel: no comp root; run just comp first"; exit 1; }
+    {{xtask}} selfhost --arch arm64 \
+        --llvm "{{selfhost_dist}}/{{selfhost_llvm}}" --llvm-sha256 {{selfhost_llvm_sha256}} \
+        --rust "{{selfhost_dist}}/{{selfhost_rust}}" --rust-sha256 {{selfhost_rust_sha256}}
+    mkdir -p "${EMIBSD_RUN_DIR:-target}" && rm -f "${EMIBSD_RUN_DIR:-target}/disk-arm64-selfhost.img" && \
+        cp -c target/selfhost/arm64/selfhost.ffs "${EMIBSD_RUN_DIR:-target}/disk-arm64-selfhost.img"
+    {{xtask}} smoke {{reject}} --smp 4 --memory 6G --timeout {{selfhost_timeout}} --arch arm64 \
+        --kernel target/{{arm64}}/debug/bsd --expect-ramdisk --until-seen --disk-set selfhost {{selfhost_script}}
+
 # --- the comp set (M14) --------------------------------------------------------------
 
 # Job count of `comp`: about half the Mac's cores by default (other builds share it).
