@@ -96,6 +96,7 @@ use crate::kern::vfs_syscalls::{
     sys_statfs, sys_symlink, sys_symlinkat, sys_sync, sys_truncate, sys_umask, sys_unlink,
     sys_unlinkat, sys_unmount, sys_unveil, sys_utimensat, sys_utimes,
 };
+use crate::machine::sys_sysarch;
 #[cfg(any(feature = "nfsclient", feature = "nfsserver"))]
 use crate::nfs::nfs_syscalls::sys_nfssvc;
 use crate::sys::syscall::SYS_MAXSYSCALL;
@@ -362,7 +363,7 @@ pub static SYSENT: [Sysent; SYS_MAXSYSCALL] = [
     Sysent::new(0, 0, 0, sys_nosys), // 162 = obsolete ogetdomainname
     Sysent::new(0, 0, 0, sys_nosys), // 163 = obsolete osetdomainname
     Sysent::new(0, 0, 0, sys_nosys), // 164 = obsolete __tmpfd
-    Sysent::new(2, size_of::<SysSysarchArgs>(), 0, sys_nosys), // 165 = sysarch (sys_sysarch not ported)
+    Sysent::new(2, size_of::<SysSysarchArgs>(), 0, sys_sysarch), // 165 = sysarch
     Sysent::new(3, size_of::<SysLseekArgs>(), SY_NOLOCK, sys_lseek), // 166 = lseek
     Sysent::new(2, size_of::<SysTruncateArgs>(), 0, sys_truncate), // 167 = truncate
     Sysent::new(2, size_of::<SysFtruncateArgs>(), 0, sys_ftruncate), // 168 = ftruncate
@@ -370,23 +371,23 @@ pub static SYSENT: [Sysent; SYS_MAXSYSCALL] = [
     Sysent::new(4, size_of::<SysPwriteArgs>(), SY_NOLOCK, sys_pwrite), // 170 = pwrite
     Sysent::new(4, size_of::<SysPreadvArgs>(), SY_NOLOCK, sys_preadv), // 171 = preadv
     Sysent::new(4, size_of::<SysPwritevArgs>(), SY_NOLOCK, sys_pwritev), // 172 = pwritev
-    Sysent::new(0, 0, 0, sys_nosys),                           // 173 = obsolete pad_pread
-    Sysent::new(0, 0, 0, sys_nosys),                           // 174 = obsolete pad_pwrite
+    Sysent::new(0, 0, 0, sys_nosys), // 173 = obsolete pad_pread
+    Sysent::new(0, 0, 0, sys_nosys), // 174 = obsolete pad_pwrite
     Sysent::new(6, size_of::<SysProfilArgs>(), 0, sys_profil), // 175 = profil
-    Sysent::new(0, 0, 0, sys_nosys),                           // 176 = unimplemented ntp_adjtime
-    Sysent::new(0, 0, 0, sys_nosys),                           // 177 = unimplemented
-    Sysent::new(0, 0, 0, sys_nosys),                           // 178 = unimplemented
-    Sysent::new(0, 0, 0, sys_nosys),                           // 179 = unimplemented
-    Sysent::new(0, 0, 0, sys_nosys),                           // 180 = unimplemented
+    Sysent::new(0, 0, 0, sys_nosys), // 176 = unimplemented ntp_adjtime
+    Sysent::new(0, 0, 0, sys_nosys), // 177 = unimplemented
+    Sysent::new(0, 0, 0, sys_nosys), // 178 = unimplemented
+    Sysent::new(0, 0, 0, sys_nosys), // 179 = unimplemented
+    Sysent::new(0, 0, 0, sys_nosys), // 180 = unimplemented
     Sysent::new(1, size_of::<SysSetgidArgs>(), 0, sys_setgid), // 181 = setgid
     Sysent::new(1, size_of::<SysSetegidArgs>(), 0, sys_setegid), // 182 = setegid
     Sysent::new(1, size_of::<SysSeteuidArgs>(), 0, sys_seteuid), // 183 = seteuid
-    Sysent::new(0, 0, 0, sys_nosys),                           // 184 = obsolete lfs_bmapv
-    Sysent::new(0, 0, 0, sys_nosys),                           // 185 = obsolete lfs_markv
-    Sysent::new(0, 0, 0, sys_nosys),                           // 186 = obsolete lfs_segclean
-    Sysent::new(0, 0, 0, sys_nosys),                           // 187 = obsolete lfs_segwait
-    Sysent::new(0, 0, 0, sys_nosys),                           // 188 = obsolete stat35
-    Sysent::new(0, 0, 0, sys_nosys),                           // 189 = obsolete fstat35
+    Sysent::new(0, 0, 0, sys_nosys), // 184 = obsolete lfs_bmapv
+    Sysent::new(0, 0, 0, sys_nosys), // 185 = obsolete lfs_markv
+    Sysent::new(0, 0, 0, sys_nosys), // 186 = obsolete lfs_segclean
+    Sysent::new(0, 0, 0, sys_nosys), // 187 = obsolete lfs_segwait
+    Sysent::new(0, 0, 0, sys_nosys), // 188 = obsolete stat35
+    Sysent::new(0, 0, 0, sys_nosys), // 189 = obsolete fstat35
     Sysent::new(4, size_of::<SysPathconfatArgs>(), 0, sys_pathconfat), // 190 = pathconfat
     Sysent::new(2, size_of::<SysPathconfArgs>(), 0, sys_pathconf), // 191 = pathconf
     Sysent::new(2, size_of::<SysFpathconfArgs>(), 0, sys_fpathconf), // 192 = fpathconf

@@ -49,6 +49,7 @@ use crate::machine::copy::UserCopy;
 use crate::machine::exec::MachineExec;
 use crate::machine::proc::MachineProc;
 use crate::machine::signal::MachineSignal;
+use crate::machine::sysarch::MachineSysarch;
 use crate::machine::tcb::Tcb;
 use crate::machine::{BootInfo, Console, Cpu, Exit, ExitStatus, Intr, MachineInfo, Pmap, VmParam};
 use crate::sys::clockintr::Clockqueue;
@@ -1535,6 +1536,16 @@ impl UserCopy for Machine {
     unsafe fn kcopy(src: *const u8, dst: *mut u8, len: usize) -> Result<(), Errno> {
         // SAFETY: forwarded.
         unsafe { arm64::copy::kcopy(src, dst, len) }
+    }
+}
+
+impl MachineSysarch for Machine {
+    fn sys_sysarch(
+        p: &Proc,
+        v: &SysArgs,
+        retval: &mut [Register; 2],
+    ) -> Result<(), crate::sys::errno::Errno> {
+        arm64::sys_machdep::sys_sysarch(p, v, retval)
     }
 }
 

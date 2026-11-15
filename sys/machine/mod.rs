@@ -59,6 +59,7 @@ pub mod pciide_machdep;
 pub mod pmap;
 pub mod proc;
 pub mod signal;
+pub mod sysarch;
 pub mod tcb;
 pub mod vmparam;
 #[cfg(machine_x86)]
@@ -86,6 +87,7 @@ pub use pciide_machdep::*;
 pub use pmap::*;
 pub use proc::*;
 pub use signal::*;
+pub use sysarch::*;
 pub use tcb::*;
 pub use vmparam::*;
 

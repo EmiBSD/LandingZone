@@ -49,6 +49,7 @@ pub mod pmap;
 #[cfg(feature = "qemu")]
 pub mod qemu;
 pub mod sig_machdep;
+pub mod sys_machdep;
 pub mod syscall;
 pub mod trap;
 pub mod vm_machdep;

@@ -12166,14 +12166,18 @@ notes = "M16f: the whole file: GPIOKEYS_EV_*, GPIOKEYS_SW_LID, GPIOKEYS_KEY_POWE
 [[file]]
 c = "sys/arch/arm64/arm64/sys_machdep.c"
 rust = "sys/arch/arm64/arm64/sys_machdep.rs"
-status = "todo"
-notes = "TD3: sys_sysarch (EINVAL for every op; pledge_fail under pledge); the row answers sys_nosys (SIGSYS) today"
+status = "ported"
+upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
+upstream_blob = "b2291b0026bcc94e5a4125cc70a5eb35a776e05d"
+notes = "TD3: the whole file: sys_sysarch (EINVAL for every op; pledge_fail under pledge), reached from init_sysent through machine::sys_sysarch (MachineSysarch); before TD3 the row answered sys_nosys (SIGSYS); host test through the host double"
 
 [[file]]
 c = "sys/arch/amd64/amd64/sys_machdep.c"
 rust = "sys/arch/amd64/amd64/sys_machdep.rs"
-status = "todo"
-notes = "TD3: sys_sysarch with AMD64_IOPL (amd64_iopl); the row answers sys_nosys (SIGSYS) today"
+status = "ported"
+upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
+upstream_blob = "940b417ccb2ef077a2c57a4635bcb4a8739645bd"
+notes = "TD3: the whole file: amd64_iopl (suser, EPERM above securelevel 0, copyin of struct amd64_iopl_args, PSL_IOPL in the trap frame's rflags) and sys_sysarch (AMD64_IOPL, else EINVAL; pledge_fail under pledge); option APERTURE not configured (the #else branch); reached through machine::sys_sysarch"
 
 [[file]]
 c = "sys/kern/sysv_ipc.c"

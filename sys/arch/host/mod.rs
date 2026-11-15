@@ -53,6 +53,7 @@ use crate::machine::db_machdep::{DbMachdep, PrFn};
 use crate::machine::pci_machdep::{PciIntrFn, PciIntrStr, PciMachdep};
 use crate::machine::proc::MachineProc;
 use crate::machine::signal::MachineSignal;
+use crate::machine::sysarch::MachineSysarch;
 use crate::machine::tcb::Tcb;
 use crate::machine::{
     BootInfo, Console, Cpu, Exit, ExitStatus, Intr, MachineInfo, MachineParam, Pmap, VmParam,
@@ -1751,6 +1752,24 @@ impl crate::machine::fdt::Fdt for Machine {
 }
 
 /// The host has no user mode: no handler is ever entered and there is no trampoline.
+/// The host double's `sysarch(2)`: arm64's (no operation; EINVAL, `pledge_fail` under
+/// pledge), so the generic entry can be tested.
+impl MachineSysarch for Machine {
+    fn sys_sysarch(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Result<(), Errno> {
+        let uap: &crate::sys::syscallargs::SysSysarchArgs = crate::sys::systm::sysargs(v);
+        if p.process()
+            .ps_flags
+            .load(core::sync::atomic::Ordering::Relaxed)
+            & crate::sys::proc::PS_PLEDGE
+            != 0
+        {
+            return Err(crate::kern::kern_pledge::pledge_fail(p, Errno::EINVAL, 0));
+        }
+        let _ = uap.op.get();
+        Err(Errno::EINVAL)
+    }
+}
+
 impl MachineSignal for Machine {
     type Sigcontext = HostSigcontext;
 
