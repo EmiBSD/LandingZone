@@ -45,7 +45,8 @@
 //!    with `pwd.db` and `spwd.db` made by OpenBSD's pwd_mkdb(8), also built for this machine
 //!    (`passwd.rs`).
 //!
-//! `share/mk` is not in the reference clone. `sys.mk` and `bsd.own.mk` are stood in for by
+//! `share/mk` is not read by this build (TD1b installs it into `root/usr/share/mk`, for the
+//! make(1) it builds, `install_share_mk`). `sys.mk` and `bsd.own.mk` are stood in for by
 //! the predefined variables and `BSD_OWN_MK` below; `bsd.prog.mk`/`bsd.lib.mk` by
 //! `BSD_PROG_MK` and the implicit `.c.o`/`.S.o` rules (`RULE_C_O`, `RULE_S_O`). Every compiler
 //! flag workaround is in `UNSUPPORTED_FLAGS`, `HOST_CFLAGS` and `VARIANTS`, and in
@@ -266,6 +267,32 @@ const VARIANTS: &[Variant] = &[
     Variant::statically("sbin/dhcpleased"),
     Variant::statically("sbin/resolvd"),
     Variant::statically("sbin/slaacd"),
+    // TD1b: the build tools of /usr/bin and /usr/sbin (`TD1B`; bin/expr and bin/test are
+    // static by bin/Makefile.inc).
+    Variant::statically("usr.bin/make"),
+    Variant::statically("usr.bin/awk"),
+    Variant::statically("usr.bin/xinstall"),
+    Variant::statically("usr.bin/yacc"),
+    Variant::statically("usr.bin/m4"),
+    Variant::statically("usr.bin/lex"),
+    Variant::statically("usr.bin/xargs"),
+    Variant::statically("usr.bin/sort"),
+    Variant::statically("usr.bin/find"),
+    Variant::statically("usr.bin/tail"),
+    Variant::statically("usr.bin/head"),
+    Variant::statically("usr.bin/cut"),
+    Variant::statically("usr.bin/tr"),
+    Variant::statically("usr.bin/uniq"),
+    Variant::statically("usr.bin/basename"),
+    Variant::statically("usr.bin/dirname"),
+    Variant::statically("usr.bin/env"),
+    Variant::statically("usr.bin/printf"),
+    Variant::statically("usr.bin/join"),
+    Variant::statically("usr.bin/paste"),
+    Variant::statically("usr.bin/diff"),
+    Variant::statically("usr.bin/nm"),
+    Variant::statically("usr.bin/tsort"),
+    Variant::statically("usr.sbin/mtree"),
     Variant {
         dir: "usr.sbin/tcpdump",
         add_cflags: "",
@@ -463,7 +490,108 @@ const PROGRAMS: &[&str] = &[
     "usr.sbin/pwd_mkdb",
     // M16b: usbdevs(8), the USB device tree over /dev/usb0's USB_DEVICEINFO.
     "usr.sbin/usbdevs",
+    // TD1b: what OpenBSD's `make build` runs with the base's make(1) and share/mk (`TD1B`;
+    // out of the ramdisk, `ramdisk::RAMDISK_EXCLUDE`). m4 comes before lex, whose skeleton
+    // runs through m4 (here the Mac's, as for the host lex). install(1) is
+    // `usr.bin/xinstall` (`INSTALL_AS`); lorder(1) and mkdep(1) are scripts
+    // (`INSTALL_SCRIPTS`).
+    "usr.bin/make",
+    "usr.bin/awk",
+    "usr.bin/xinstall",
+    "usr.bin/yacc",
+    "usr.bin/m4",
+    "usr.bin/lex",
+    "usr.bin/xargs",
+    "usr.bin/sort",
+    "usr.bin/find",
+    "usr.bin/tail",
+    "usr.bin/head",
+    "usr.bin/cut",
+    "usr.bin/tr",
+    "usr.bin/uniq",
+    "usr.bin/basename",
+    "usr.bin/dirname",
+    "usr.bin/env",
+    "usr.bin/printf",
+    "usr.bin/join",
+    "usr.bin/paste",
+    "usr.bin/diff",
+    "usr.bin/nm",
+    "usr.bin/tsort",
+    "bin/expr",
+    "bin/test",
+    "usr.sbin/mtree",
 ];
+
+/// The TD1b programs (`PROGRAMS`' last group, with the scripts of `INSTALL_SCRIPTS` and
+/// share/mk): the tools OpenBSD's `make build` needs beside what the ramdisk already had.
+pub(crate) const TD1B: &[&str] = &[
+    "usr.bin/make",
+    "usr.bin/awk",
+    "usr.bin/xinstall",
+    "usr.bin/yacc",
+    "usr.bin/m4",
+    "usr.bin/lex",
+    "usr.bin/xargs",
+    "usr.bin/sort",
+    "usr.bin/find",
+    "usr.bin/tail",
+    "usr.bin/head",
+    "usr.bin/cut",
+    "usr.bin/tr",
+    "usr.bin/uniq",
+    "usr.bin/basename",
+    "usr.bin/dirname",
+    "usr.bin/env",
+    "usr.bin/printf",
+    "usr.bin/join",
+    "usr.bin/paste",
+    "usr.bin/diff",
+    "usr.bin/nm",
+    "usr.bin/tsort",
+    "bin/expr",
+    "bin/test",
+    "usr.sbin/mtree",
+];
+
+/// Programs a Makefile's own `realinstall` rule installs under another name than `PROG`:
+/// (directory, installed name, why).
+const INSTALL_AS: &[(&str, &str, &str)] = &[(
+    "usr.bin/xinstall",
+    "install",
+    "its Makefile's `realinstall` installs PROG=xinstall as ${BINDIR}/install",
+)];
+
+/// Scripts a Makefile's `beforeinstall` or `realinstall` rule installs with `${INSTALL}
+/// ... -m ${BINMODE}` (555): (directory, script in it, installed path). The rules
+/// themselves are not evaluated; lorder and mkdep build no program.
+const INSTALL_SCRIPTS: &[(&str, &str, &str)] = &[
+    ("usr.bin/yacc", "yyfix.sh", "/usr/bin/yyfix"),
+    ("usr.bin/lorder", "lorder.sh", "/usr/bin/lorder"),
+    ("usr.bin/mkdep", "mkdep.gcc.sh", "/usr/bin/mkdep"),
+];
+
+/// Symbolic links a Makefile's `afterinstall` rule makes (`ln -sf`): (directory, target,
+/// link). bin/chmod's "XXX compatibility" links: `/usr/sbin/chown`, `/usr/sbin/chgrp` and
+/// `/usr/bin/chflags`.
+const AFTERINSTALL_SYMLINKS: &[(&str, &str, &str)] = &[
+    ("bin/chmod", "../../sbin/chown", "/usr/sbin/chown"),
+    ("bin/chmod", "../../bin/chgrp", "/usr/sbin/chgrp"),
+    ("bin/chmod", "../../bin/chmod", "/usr/bin/chflags"),
+];
+
+/// Host build tools a program's Makefile compiles with `${HOSTCC}` and runs, which need
+/// more than its rule gives on this machine: (directory, target, extra sources, why). They
+/// are made first, with `LDSTATIC` and `LDADD` empty (a Mach-O program is never static)
+/// and `YACC_COMPAT_H` force-included, and the rule's own commands are then not run.
+const HOST_RULE_TOOLS: &[(&str, &str, &[&str], &str)] = &[(
+    "usr.bin/make",
+    "generate",
+    &["lib/libutil/ohash.c"],
+    "make's hash-constant generator links -lutil for ohash(3), which macOS's libutil does \
+     not have: OpenBSD's lib/libutil/ohash.c is compiled in, its ohash.h found by \
+     -idirafter; the constants it prints do not depend on the machine",
+)];
 
 /// Scripts that a Makefile's `afterinstall` rule installs next to the program: (directory, files).
 const AFTERINSTALL_SCRIPTS: &[(&str, &[&str])] = &[(
@@ -715,6 +843,10 @@ pub(crate) struct Ctx<'a> {
     yacc: Mutex<Option<PathBuf>>,
     /// Where lex(1) was built, once a `.l` source asked for it.
     lex: Mutex<Option<PathBuf>>,
+    /// What the `TD1B` programs, scripts and share/mk installed under `root/` (absolute
+    /// paths of the installed system): in the base set and `base.ffs`, out of the ramdisk
+    /// (`ramdisk::build_ramdisk`).
+    ramdisk_exclude: Mutex<BTreeSet<String>>,
 }
 
 /// The build context of `userland` for `arch`: the reference sources, `target/userland/<arch>`
@@ -740,6 +872,7 @@ fn new_ctx<'a>(root: &Path, arch: Arch, tools: &'a Tools) -> Result<Ctx<'a>> {
         owners: Mutex::new(Vec::new()),
         yacc: Mutex::new(None),
         lex: Mutex::new(None),
+        ramdisk_exclude: Mutex::new(BTreeSet::new()),
         out,
     })
 }
@@ -813,6 +946,10 @@ pub fn userland(root: &Path, arch: Arch) -> Result<()> {
             ),
         }
     }
+    // TD1b: the scripts, chmod's compatibility links and share/mk.
+    install_scripts(&ctx)?;
+    afterinstall_symlinks(&ctx)?;
+    install_share_mk(&ctx)?;
     if !built.is_empty() {
         println!("  executables (static PIE, installed stripped under root/):");
     }
@@ -1886,9 +2023,33 @@ fn build_prog(ctx: &Ctx<'_>, dir: &str) -> Result<Linked> {
         return Err(format!("{dir}: unsupported LDADD word `{w}`").into());
     }
 
+    let mut made = BTreeSet::new();
+    // Build tools of `HOST_RULE_TOOLS` (make's `generate`), made for this machine first.
+    for (tdir, target, extra, why) in HOST_RULE_TOOLS {
+        if *tdir == dir {
+            make_host_rule_tool(ctx, dir, &objdir, target, extra)?;
+            made.insert((*target).to_string());
+            println!("  {dir}: {target} (host tool): {why}");
+        }
+    }
+    // `bsd.dep.mk` makes `BUILDFIRST` before anything else (awk's `awkgram.tab.h`), then
+    // the sources a rule of the Makefile makes (awk's `proctab.c` with its `maketab`, nm's
+    // `elf32.c`), each after what its rule needs, as make would. Their rules may run
+    // `${YACC}` (awk's grammar): OpenBSD's yacc, built for this machine.
+    let firsts = mk.words("BUILDFIRST")?;
+    let generated: Vec<String> = mk
+        .words("SRCS")?
+        .into_iter()
+        .filter(|s| mk.rule_for(s).is_some())
+        .collect();
+    if !firsts.is_empty() || !generated.is_empty() {
+        build_yacc(ctx)?;
+    }
+    for t in firsts.iter().chain(&generated) {
+        libraries::make_target(ctx, &mk, &objdir, t, None, &mut made)?;
+    }
     // Headers a Makefile makes by a rule and names as a dependency of an object (`more.o:
     // morehelp.h` in `distrib/special/more`): made before the objects, as make would.
-    let mut made = BTreeSet::new();
     for src in mk.words("SRCS")? {
         let Some(stem) = src.strip_suffix(".c") else {
             continue;
@@ -1939,7 +2100,15 @@ fn build_prog(ctx: &Ctx<'_>, dir: &str) -> Result<Linked> {
 
     let bindir = mk.var("BINDIR")?;
     let rootdir = ctx.out.join("root");
-    let installed = rootdir.join(bindir.trim_start_matches('/')).join(&prog);
+    // The installed name: `PROG`, or what the Makefile's `realinstall` names (`INSTALL_AS`).
+    let name = match INSTALL_AS.iter().find(|(d, _, _)| *d == dir) {
+        Some((_, as_name, why)) => {
+            println!("  {dir}: installed as {as_name}: {why}");
+            (*as_name).to_string()
+        }
+        None => prog.clone(),
+    };
+    let installed = rootdir.join(bindir.trim_start_matches('/')).join(&name);
     if let Some(parent) = installed.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
     }
@@ -1979,7 +2148,7 @@ fn build_prog(ctx: &Ctx<'_>, dir: &str) -> Result<Linked> {
         && [owner, group, mode].iter().any(|v| !v.is_empty())
     {
         let attr = ramdisk::Attr::installed(
-            &format!("/{}/{prog}", bindir.trim_matches('/')),
+            &format!("/{}/{name}", bindir.trim_matches('/')),
             if owner.is_empty() { "root" } else { owner },
             if group.is_empty() { "bin" } else { group },
             if mode.is_empty() { "555" } else { mode },
@@ -2000,8 +2169,136 @@ fn build_prog(ctx: &Ctx<'_>, dir: &str) -> Result<Linked> {
             }
         }
     }
+    if TD1B.contains(&dir) {
+        let mut ex = ctx.ramdisk_exclude.lock().map_err(|_| "lock poisoned")?;
+        ex.insert(format!("/{}/{name}", bindir.trim_matches('/')));
+        for pair in links.chunks(2) {
+            if let [_, to] = pair {
+                ex.insert(to.clone());
+            }
+        }
+    }
     println!("  {dir}: {} objects ({ran} rebuilt), linked", jobs.len());
-    Ok(Linked::Yes(prog, exe, installed))
+    Ok(Linked::Yes(name, exe, installed))
+}
+
+/// Makes `target` of `dir`'s Makefile, a build tool its rule compiles with `${HOSTCC}`,
+/// for this machine (`HOST_RULE_TOOLS`): the Makefile evaluated again, with `LDSTATIC`
+/// empty, `LDADD` the `extra` sources (relative to the OpenBSD tree) and `HOSTCFLAGS` given
+/// `YACC_COMPAT_H` and, by `-idirafter`, the extra sources' directories for their headers.
+fn make_host_rule_tool(
+    ctx: &Ctx<'_>,
+    dir: &str,
+    objdir: &Path,
+    target: &str,
+    extra: &[&str],
+) -> Result<()> {
+    let mut mk = new_make(ctx, dir, objdir)?;
+    let compat = objdir.join("emibsd-compat.h");
+    ramdisk::write_if_changed(&compat, YACC_COMPAT_H)?;
+    let mut cflags = format!("{} -include {}", mk.var("HOSTCFLAGS")?, compat.display());
+    let mut sources = Vec::new();
+    for e in extra {
+        let p = ctx.src.join(e);
+        if let Some(parent) = p.parent() {
+            cflags.push_str(&format!(" -idirafter {}", parent.display()));
+        }
+        sources.push(p.display().to_string());
+    }
+    mk.set("HOSTCFLAGS", &cflags);
+    mk.set("LDSTATIC", "");
+    mk.set("LDADD", &sources.join(" "));
+    libraries::make_target(ctx, &mk, objdir, target, None, &mut BTreeSet::new())?;
+    Ok(())
+}
+
+/// The scripts of `INSTALL_SCRIPTS`, installed as their Makefiles' rules install them
+/// (mode `${BINMODE}`, 555); all of them are `TD1B`'s.
+fn install_scripts(ctx: &Ctx<'_>) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt as _;
+    let rootdir = ctx.out.join("root");
+    for (dir, file, to) in INSTALL_SCRIPTS {
+        let from = ctx.src.join(dir).join(file);
+        let dest = rootdir.join(to.trim_start_matches('/'));
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+        }
+        let _ = fs::remove_file(&dest);
+        fs::copy(&from, &dest).map_err(|e| format!("{dir}: install {file}: {e}"))?;
+        fs::set_permissions(&dest, fs::Permissions::from_mode(0o555))
+            .map_err(|e| format!("{}: {e}", dest.display()))?;
+        ctx.owners
+            .lock()
+            .map_err(|_| "lock poisoned")?
+            .push(ramdisk::Attr::installed(to, "root", "bin", "555")?);
+        ctx.ramdisk_exclude
+            .lock()
+            .map_err(|_| "lock poisoned")?
+            .insert((*to).to_string());
+        println!("  {dir}: {file} installed as {to} (its Makefile's install rule)");
+    }
+    Ok(())
+}
+
+/// The symbolic links of `AFTERINSTALL_SYMLINKS` (`ln -sf`).
+fn afterinstall_symlinks(ctx: &Ctx<'_>) -> Result<()> {
+    let rootdir = ctx.out.join("root");
+    for (dir, target, link) in AFTERINSTALL_SYMLINKS {
+        let at = rootdir.join(link.trim_start_matches('/'));
+        if let Some(parent) = at.parent() {
+            fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+        }
+        let _ = fs::remove_file(&at);
+        symlink(target, &at)?;
+        println!("  {dir}: afterinstall: {link} -> {target}");
+    }
+    Ok(())
+}
+
+/// `share/mk`'s `install` rule (TD1b): its `FILES` into `${BINDIR}/mk` (`/usr/share/mk`),
+/// mode 444, as OpenBSD's base set has them; the system makefiles of the base's make(1).
+fn install_share_mk(ctx: &Ctx<'_>) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt as _;
+    const DIR: &str = "share/mk";
+    let objdir = ctx.out.join("obj").join(DIR);
+    fs::create_dir_all(&objdir).map_err(|e| format!("{}: {e}", objdir.display()))?;
+    let mk = new_make(ctx, DIR, &objdir)?;
+    let bindir = mk.var("BINDIR")?;
+    if bindir.is_empty() {
+        return Err(format!("{DIR}/Makefile: no BINDIR (share/Makefile.inc)").into());
+    }
+    let files = mk.words("FILES")?;
+    let to_dir = format!("/{}/mk", bindir.trim_matches('/'));
+    let dest_dir = ctx.out.join("root").join(to_dir.trim_start_matches('/'));
+    fs::create_dir_all(&dest_dir).map_err(|e| format!("{}: {e}", dest_dir.display()))?;
+    for f in &files {
+        let from = mk
+            .search(f)
+            .ok_or_else(|| format!("{DIR}: no {f} for FILES"))?;
+        let dest = dest_dir.join(f);
+        let _ = fs::remove_file(&dest);
+        fs::copy(&from, &dest).map_err(|e| format!("{}: {e}", dest.display()))?;
+        fs::set_permissions(&dest, fs::Permissions::from_mode(0o444))
+            .map_err(|e| format!("{}: {e}", dest.display()))?;
+        ctx.owners
+            .lock()
+            .map_err(|_| "lock poisoned")?
+            .push(ramdisk::Attr::installed(
+                &format!("{to_dir}/{f}"),
+                "root",
+                "bin",
+                "444",
+            )?);
+    }
+    ctx.ramdisk_exclude
+        .lock()
+        .map_err(|_| "lock poisoned")?
+        .insert(to_dir.clone());
+    println!(
+        "  {DIR}: {} files into {to_dir} (its install rule)",
+        files.len()
+    );
+    Ok(())
 }
 
 // --- verification ---------------------------------------------------------------------------
@@ -2386,6 +2683,39 @@ mod tests {
                  * and distribution is by permission of Carnegie Mellon and Stanford\n\
                  * University.  Carnegie Mellon makes no representations about the";
         assert_eq!(licence_families(bootp), vec!["CMU/Stanford (BOOTP)"]);
+    }
+
+    /// TD1b's tables agree: every `TD1B` program is built (`PROGRAMS`), linked static
+    /// (bin/Makefile.inc, or a `VARIANTS` entry for the dynamic directories), and the
+    /// install rules name programs or script directories of the tree's layout.
+    #[test]
+    fn td1b_tables_agree() {
+        for dir in TD1B {
+            assert!(PROGRAMS.contains(dir), "{dir} not in PROGRAMS");
+            assert!(
+                dir.starts_with("bin/") || VARIANTS.iter().any(|v| v.dir == *dir && v.static_link),
+                "{dir}: no static VARIANTS entry"
+            );
+        }
+        let mut seen = BTreeSet::new();
+        assert!(
+            TD1B.iter().all(|d| seen.insert(*d)),
+            "TD1B repeats a directory"
+        );
+        for (dir, name, _) in INSTALL_AS {
+            assert!(TD1B.contains(dir) && !name.contains('/'));
+        }
+        for (dir, file, to) in INSTALL_SCRIPTS {
+            assert!(dir.starts_with("usr.bin/") && file.ends_with(".sh"));
+            assert!(to.starts_with("/usr/bin/") && !to.ends_with(".sh"));
+        }
+        for (dir, target, link) in AFTERINSTALL_SYMLINKS {
+            assert!(PROGRAMS.contains(dir));
+            assert!(target.starts_with("../../") && link.starts_with("/usr/"));
+        }
+        for (dir, target, extra, _) in HOST_RULE_TOOLS {
+            assert!(TD1B.contains(dir) && !target.is_empty() && !extra.is_empty());
+        }
     }
 
     #[test]
