@@ -427,8 +427,10 @@ Its tree is `root/` plus `/etc`, `/dev` and the directories below, less TD1b's b
 Those (the `TD1B` programs and their links, the scripts and `/usr/share/mk`, recorded as
 they are installed) stay out of the ramdisk, and only of it (TD1b's brief of 2026-11-15
 prefers that to a larger boot image): the image is twice its tree, and the
-192 MiB boot image (`IMAGE_SECTORS`) already holds a ~100 MB debug kernel and a ~95 MB
-ramdisk, about 2.5 MB short of full on both archs; the tools add 6.0 MB (amd64) and 6.4 MB
+boot image (`IMAGE_SECTORS`) holds a ~100 MB debug kernel and a ~95 MB ramdisk. At
+192 MiB that left about 2.5 MB, and an amd64 kernel built in a worktree with a longer path
+(its debug info carries the paths) filled it even without the tools, so it is 256 MiB
+since TD1b step 2; the tools add 6.0 MB (amd64) and 6.4 MB
 (arm64) to `root/`, 12 MB or more to the ramdisk. They are in `root/`, so in the base set
 and the self-hosting disk, and in `base.ffs`, made beside the ramdisk by the same makefs
 from the whole tree (ramdisk and tools), which `smoke-buildtools` mounts and chroots into.

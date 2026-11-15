@@ -1100,11 +1100,11 @@ pub(super) fn build_ramdisk(ctx: &Ctx<'_>) -> Result<()> {
 
 /// Why the `TD1B` programs, scripts and share/mk stay out of the ramdisk (printed by the
 /// build; docs/ARCHITECTURE.md, "The ramdisk image"). The ramdisk is twice its tree, and the
-/// boot image (`boot::IMAGE_SECTORS`, 192 MiB) already holds a ~100 MB debug kernel and a
-/// ~95 MB ramdisk: the tools' megabytes, doubled, would not fit. They stay in `root/`, so in
-/// the base set, `base.ffs` and the self-hosting disk.
+/// boot image (`boot::IMAGE_SECTORS`, 256 MiB since 192 MiB filled up without them) holds a
+/// ~100 MB debug kernel and a ~95 MB ramdisk: the tools' megabytes, doubled, would eat its
+/// room. They stay in `root/`, so in the base set, `base.ffs` and the self-hosting disk.
 pub(super) const RAMDISK_EXCLUDE: &str = "it leaves out (in root/, the base set and \
-    base.ffs): the 192 MiB boot image has no room for them beside a ~100 MB debug kernel";
+    base.ffs): the boot image keeps its room for the ~100 MB debug kernel and the ramdisk";
 
 /// Removes every path of `excluded` (absolute paths of the installed system: a file, a link
 /// or a directory) from the tree at `staging`; returns how many were there.
