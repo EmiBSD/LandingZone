@@ -263,6 +263,8 @@ pub(crate) fn memory() -> &'static str {
 /// `--accel hvf` (qemu, smoke): the arm64 guest under Hypervisor.framework instead of TCG
 /// (set once by `main`). TD1's build VMs: a QEMU option, not a build tool (proposed by the
 /// user on 2026-11-15); no recipe of `smokes` uses it, so the smokes keep testing under TCG.
+/// It boots to `login:` in under ten seconds since the kernel's adopted direct map carries
+/// UXN (8074550c: with FEAT_EPAN on the host CPU, PAN faulted every kernel read of it).
 static ACCEL_HVF: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 
 /// Records `--accel hvf`.
