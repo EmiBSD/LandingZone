@@ -3260,7 +3260,7 @@ diff-openbsd: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--fea
 # it made) are the criterion. Each marker is printed by the guest, never typed (`$?`,
 # `$((40+2))`), and any step's nonzero status is rejected. arm64 only: DevTools' amd64 native
 # pair is not proved yet. -smp 4 and 6 GiB, under TCG: the build takes hours, so the limit is
-# `selfhost_timeout` seconds. Not in `smokes`: it needs `just comp`, `just userland` and
+# `selfhost_timeout` seconds; `selfhost_jobs` is cargo's -j (EMIBSD_SELFHOST_JOBS). Not in `smokes`: it needs `just comp`, `just userland` and
 # DevTools' tarballs in `selfhost_dist` (pinned to the released ones).
 selfhost_dist := env("DEVTOOLS_DIST", env("HOME") / "devel/emibsd/DevTools/dist")
 selfhost_llvm := "llvm-23.1.4+emibsd.6-aarch64-emibsd-emibsd8.0-arm64.tar.zst"
@@ -3268,6 +3268,7 @@ selfhost_llvm_sha256 := "a778ef6d3dcf281e9a9d71e1565de9315beb7814e1fcf9a1e42c502
 selfhost_rust := "rust-1.99.1+emibsd.5-aarch64-emibsd-emibsd-arm64.tar.zst"
 selfhost_rust_sha256 := "2b7ec9abfd2bfffbb14f7e1d510699899f411d124192882f429a4ea69effc0cc"
 selfhost_timeout := env("EMIBSD_SELFHOST_TIMEOUT", "21600")
+selfhost_jobs := env("EMIBSD_SELFHOST_JOBS", "4")
 selfhost_script := disk_login + " --reject 'panic:' --reject 'Bad system call' " + \
     "--reject '-rc-1' --reject '-rc-2' --reject '-rc-3' --reject '-rc-4' --reject '-rc-5' " + \
     "--reject '-rc-6' --reject '-rc-7' --reject '-rc-8' --reject '-rc-9' " + \
@@ -3275,7 +3276,7 @@ selfhost_script := disk_login + " --reject 'panic:' --reject 'Bad system call' "
     "--send-after 'sh-mnt-42' --send 'mkdir -p /mnt/dev && cp -Rp /dev/null /dev/zero /dev/urandom /mnt/dev/ && echo sh-dev-$((40+2))\\n' " + \
     "--send-after 'sh-dev-42' --send '/usr/sbin/chroot /mnt /usr/bin/rustc --version; echo rsv-rc-$?\\n' " + \
     "--send-after 'rsv-rc-0' --send '/usr/sbin/chroot /mnt /usr/bin/cargo --version; echo cgv-rc-$?\\n' " + \
-    "--send-after 'cgv-rc-0' --send '/usr/sbin/chroot /mnt /src/build.sh\\n' " + \
+    "--send-after 'cgv-rc-0' --send 'JOBS=" + selfhost_jobs + " /usr/sbin/chroot /mnt /src/build.sh\\n' " + \
     "--expect 'sh-mnt-42' --expect 'sh-dev-42' --expect 'rustc 1.99.1' --expect 'rsv-rc-0' " + \
     "--expect 'cargo 1.99.1' --expect 'cgv-rc-0' --expect 'lz-elf-2' --expect 'lz-build-rc-0'"
 

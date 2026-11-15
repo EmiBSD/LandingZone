@@ -43,21 +43,26 @@ use super::*;
 /// takes about 2 GiB of `target/` with `CARGO_INCREMENTAL=0`; the rest is margin.
 const BUILD_ROOM: u64 = 8 << 30;
 
-/// What the guest runs, in the chroot, as `/src/build.sh`. Every line it prints stays under
-/// arm64's 128-byte console limit; its markers are printed, never typed, so the smoke's
-/// expectations cannot be met by an echoed command line.
+/// What the guest runs, in the chroot, as `/src/build.sh`: cargo's lines go to the console as
+/// they come (so the run's log grows and a hang shows) and to `/src/build.log`. Every line it
+/// prints stays under arm64's 128-byte console limit; its markers are printed, never typed,
+/// so the smoke's expectations cannot be met by an echoed command line. `JOBS` is cargo's
+/// `-j` (the recipe passes it).
 const BUILD_SH: &str = r#"#!/bin/ksh
 # TD1a: builds LandingZone's arm64 kernel with DevTools' native toolchain, in the chroot.
 export HOME=/tmp CARGO_HOME=/src/cg CARGO_INCREMENTAL=0
 export CARGO_TARGET_AARCH64_EMIBSD_NONE_SOFTFLOAT_LINKER=/usr/bin/ld.lld
 export EMIBSD_BUILD=0 SOURCE_DATE_EPOCH=0 EMIBSD_BUILD_HOST=emibsd
+# rustc on the kernel crate outgrows the default data limit, DFLDSIZ (512 MiB, as OpenBSD's):
+# raise the soft limit to the hard one, MAXDSIZ, as a user would (`ulimit -d`).
+ulimit -d $(ulimit -H -d)
 cd /src/lz || exit 9
+set -o pipefail
 s=$(date +%s)
 cargo build --offline -p bsd --target aarch64-emibsd-none-softfloat \
-    --features qemu,multiprocessor -j ${JOBS:-4} > /src/build.log 2>&1
+    --features qemu,multiprocessor -j ${JOBS:-4} 2>&1 | tee /src/build.log | cut -c1-110
 rc=$?
 e=$(date +%s)
-tail -n 25 /src/build.log | cut -c1-110
 echo "lz-build-secs-$((e - s))"
 k=target/aarch64-emibsd-none-softfloat/debug/bsd
 n=$(llvm-readelf -h $k 2>/dev/null | grep -cE 'AArch64|EXEC')
@@ -239,7 +244,12 @@ mod tests {
 
     #[test]
     fn build_script_prints_its_markers_and_fits_the_console() {
-        for marker in ["lz-build-rc-$rc", "lz-elf-$n", "lz-build-secs-"] {
+        for marker in [
+            "lz-build-rc-$rc",
+            "lz-elf-$n",
+            "lz-build-secs-",
+            "ulimit -d",
+        ] {
             assert!(BUILD_SH.contains(marker), "{marker}");
         }
         assert!(BUILD_SH.lines().all(|l| l.len() < 128));
