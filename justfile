@@ -113,6 +113,11 @@ default:
 cargo *args:
     cargo {{args}}
 
+# DevTools' Rust bin/ the recipes run, for scripts and hooks that need cargo outside `just`
+# (taken from the Kernel repository's dd1571e9): `"$(just rust-bin)/cargo"`.
+rust-bin:
+    @echo "{{rust_arm64}}/bin"
+
 # `features` lets the image recipes build with `--features qemu` (emulator exit codes).
 build-amd64 features="":
     {{amd64_cmd}} cargo build -p bsd --target {{amd64}} {{features}}
