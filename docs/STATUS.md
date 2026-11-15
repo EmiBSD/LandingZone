@@ -1,7 +1,8 @@
 # Status
 
-Milestone: **M16 done**; **TD under way** (technical debt, TD1..TD6, the user's decision of
-2026-11-15), TD1 self-hosting first; then M17 (real hardware, vmm). Updated: 2026-11-15.
+Milestone: **M16 done**; **TD under way** (the user's decision of 2026-11-15: EmiBSD builds
+EmiBSD, and no Apple tool builds it), TD1a (the kernel built inside the VM) first; then M17.
+Updated: 2026-11-15.
 
 Toolchain: DevTools' Rust 1.99.1+emibsd.5 and LLVM 23.1.4+emibsd.6, one pair per target
 architecture (D-0008), run straight from `~/devel/emibsd/toolchains` (no rustup); `just cargo`.
@@ -10,7 +11,7 @@ frozen only while the amd64 pair is not installed (docs/ARCHITECTURE.md, "Frozen
 it, `ci` covers both archs again.
 
 Done:
-- 2026-11-15: pins to +emibsd.5/+emibsd.6, no rustup (07402dd1); TD1..TD6 in ROADMAP.
+- 2026-11-15: pins to +emibsd.5/+emibsd.6, no rustup (07402dd1); TD1a..d, TD2..TD6 in ROADMAP.
 - 2026-11-02: DevTools' per-arch pairs and the renamed kernel targets; amd64 back in `ci`.
 - 2026-11-01: the toolchain switch and the amd64 freeze; clippy 1.99 on the host tests (86
   test-only sites); `smoke-all` runs its recipes on its own xtask binary (the SIGKILL and dyld
@@ -21,8 +22,10 @@ Done:
 - M16d: pckbc, pckbd, pms; viogpu, viomb, viornd with rnd(4); viocon (feature); lpt; pcppi, spkr; eap.
 
 Next:
-- TD1: DevTools' native cargo builds this kernel inside an arm64 VM (`just smoke-selfhost`).
-- TD2..TD6: Apple clang out of the userland; sysarch, swapctl; SysV IPC; ptrace, ktrace; stubs.
+- TD1a: DevTools' native cargo builds this kernel in an arm64 VM (`just smoke-selfhost-kernel`);
+  libcrypto/libssl shared, `__thrsleep`; `--accel hvf` proposed for the build VMs.
+- TD1b..d: userland by OpenBSD's make, comp with DevTools' native toolchain, sets made inside.
+- TD2: the first image by DevTools' cross toolchain only; TD3..TD6 in self-hosting's order.
 - M17 (the user's decisions below first).
 - Left by M14: GPL parts of the sets, lldb, efi(4), base programs (sort, find, ...), `__thrsleep`.
 
