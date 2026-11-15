@@ -12158,3 +12158,58 @@ upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "22eeec377160a22ff2b89ba675bccb179f467969"
 deps = ["sys/dev/ofw/ofw_gpio.c", "sys/dev/ofw/ofw_pinctrl.c", "sys/kern/kern_sensors.c"]
 notes = "M16f: the whole file: GPIOKEYS_EV_*, GPIOKEYS_SW_LID, GPIOKEYS_KEY_POWER, struct gpiokeys_key (Box'd, gpios cells as a 'static slice), struct gpiokeys_softc, gpiokeys_ca/cd, gpiokeys_match, gpiokeys_attach (labels, the lid sensor, the power key, interrupts or the 1 s sensor task, sensordev_install), gpiokeys_update_key (lid sensor and machdep.lidaction through machine::fdt::lid_action, simplefb_burn_hook), gpiokeys_power_button (powerbutton_event on release), gpiokeys_intr; option SUSPEND waits for kern/subr_suspend.c: cpu_suspended reads 0, device_register_wakeup and request_sleep are unported! stubs; gpiokeys* at fdt? in arm64's ioconf. QEMU virt: gpiokeys0 attaches to the PL061's power key, which has no interrupt and is polled through gpiokeys_update_key, which ignores KEY_POWER: system_powerdown does nothing, exactly as on OpenBSD 8.0 (the M16f criterion, after the user's option A of 2026-10-08); host tests"
+
+# ---------------------------------------------------------------------------
+# TD: technical debt (decided by the user on 2026-11-15; docs/ROADMAP.md, TD1..TD6)
+# ---------------------------------------------------------------------------
+
+[[file]]
+c = "sys/arch/arm64/arm64/sys_machdep.c"
+rust = "sys/arch/arm64/arm64/sys_machdep.rs"
+status = "todo"
+notes = "TD3: sys_sysarch (EINVAL for every op; pledge_fail under pledge); the row answers sys_nosys (SIGSYS) today"
+
+[[file]]
+c = "sys/arch/amd64/amd64/sys_machdep.c"
+rust = "sys/arch/amd64/amd64/sys_machdep.rs"
+status = "todo"
+notes = "TD3: sys_sysarch with AMD64_IOPL (amd64_iopl); the row answers sys_nosys (SIGSYS) today"
+
+[[file]]
+c = "sys/kern/sysv_ipc.c"
+rust = "sys/kern/sysv_ipc.rs"
+status = "todo"
+notes = "TD4: ipcperm, shared by the three System V IPC files"
+
+[[file]]
+c = "sys/kern/sysv_sem.c"
+rust = "sys/kern/sysv_sem.rs"
+status = "todo"
+deps = ["sys/kern/sysv_ipc.c"]
+notes = "TD4: option SYSVSEM (GENERIC): semget, semop, __semctl, semexit, kern.seminfo"
+
+[[file]]
+c = "sys/kern/sysv_msg.c"
+rust = "sys/kern/sysv_msg.rs"
+status = "todo"
+deps = ["sys/kern/sysv_ipc.c"]
+notes = "TD4: option SYSVMSG (GENERIC): msgget, msgsnd, msgrcv, msgctl"
+
+[[file]]
+c = "sys/kern/sysv_shm.c"
+rust = "sys/kern/sysv_shm.rs"
+status = "todo"
+deps = ["sys/kern/sysv_ipc.c"]
+notes = "TD4: option SYSVSHM (GENERIC): shmat, shmdt, shmget, shmctl, shmfork, shmexit, kern.shminfo"
+
+[[file]]
+c = "sys/kern/sys_process.c"
+rust = "sys/kern/sys_process.rs"
+status = "todo"
+notes = "TD5: option PTRACE (GENERIC): sys_ptrace and process_* helpers"
+
+[[file]]
+c = "sys/kern/kern_ktrace.c"
+rust = "sys/kern/kern_ktrace.rs"
+status = "todo"
+notes = "TD5: option KTRACE (GENERIC): sys_ktrace, ktr* record writers, and the KTRACE blocks other ported files left out"
