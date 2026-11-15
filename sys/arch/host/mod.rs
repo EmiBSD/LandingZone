@@ -53,6 +53,7 @@ use crate::machine::db_machdep::{DbMachdep, PrFn};
 use crate::machine::pci_machdep::{PciIntrFn, PciIntrStr, PciMachdep};
 use crate::machine::proc::MachineProc;
 use crate::machine::signal::MachineSignal;
+use crate::machine::spinlock::MachineSpinlock;
 use crate::machine::tcb::Tcb;
 use crate::machine::{
     BootInfo, Console, Cpu, Exit, ExitStatus, Intr, MachineInfo, MachineParam, Pmap, VmParam,
@@ -332,6 +333,13 @@ impl Tcb for Machine {
     fn tcb_invalid(_addr: usize) -> bool {
         false
     }
+}
+
+/// `<machine/spinlock.h>`: an `int` lock word, 0 when free, as on amd64 and arm64.
+impl MachineSpinlock for Machine {
+    type AtomicLock = i32;
+    const ATOMIC_LOCK_UNLOCKED: i32 = 0;
+    const ATOMIC_LOCK_LOCKED: i32 = 1;
 }
 
 /// The host's `struct clockframe`: nothing to read.

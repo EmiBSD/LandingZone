@@ -344,7 +344,7 @@ pub fn main() -> ! {
 
     // Initialize futexes.
     crate::kern::sys_futex::futex_init();
-    let _ = unported!("tslp_init");
+    crate::kern::kern_synch::tslp_init();
 
     // Create credentials.
     p.p_ucred.set(crget());
