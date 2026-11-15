@@ -62,8 +62,17 @@ use super::*;
 /// The libraries built shared besides their static archive, in link order of dependence:
 /// libc first (the others' `.so` objects compile against the sysroot it filled). `libpthread`
 /// (`lib/librthread`) is also built static here, as `comp` builds it for the compiler.
-pub(super) const SHARED_LIBRARIES: &[&str] =
-    &["lib/libc", "lib/libutil", "lib/libm", "lib/librthread"];
+/// LibreSSL's `libcrypto` and then `libssl` (whose `LDADD` names `-lcrypto`), as OpenBSD's
+/// base installs them: DevTools' native cargo loads `libssl.so.60.2` and `libcrypto.so.57.2`
+/// (TD1). The ramdisk's programs still link `-Bstatic`.
+pub(super) const SHARED_LIBRARIES: &[&str] = &[
+    "lib/libc",
+    "lib/libutil",
+    "lib/libm",
+    "lib/librthread",
+    "lib/libcrypto",
+    "lib/libssl",
+];
 
 /// The run-time link-editor's directory.
 const LDSO_DIR: &str = "libexec/ld.so";
