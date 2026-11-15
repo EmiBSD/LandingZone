@@ -269,6 +269,7 @@ fn run(args: &[String]) -> Result<()> {
     }
     boot::set_smp(smp_flag(&argv)?);
     boot::set_memory(memory_flag(&argv)?);
+    boot::set_accel_hvf(accel_flag(&argv)?);
     if argv.first() == Some(&"smoke") {
         boot::set_smoke_timeout(timeout_flag(&argv)?);
     }
@@ -551,6 +552,19 @@ fn memory_flag(args: &[&str]) -> Result<Option<String>> {
     match mib {
         Some(m) if (256..=16384).contains(&m) => Ok(Some(s.to_string())),
         _ => Err(format!("--memory {s}: expected 256M to 16G (a number then M or G)").into()),
+    }
+}
+
+/// `--accel hvf` (qemu, smoke): arm64 guests under Hypervisor.framework (TD1's build VMs); the
+/// only accelerator accepted; an amd64 guest cannot use it on an arm64 Mac.
+fn accel_flag(args: &[&str]) -> Result<bool> {
+    match optional_flag(args, "--accel") {
+        None => Ok(false),
+        Some("hvf") if optional_flag(args, "--arch") == Some("amd64") => {
+            Err("--accel hvf: arm64 guests only (the Mac is arm64)".into())
+        }
+        Some("hvf") => Ok(true),
+        Some(other) => Err(format!("--accel {other}: only `hvf` is known").into()),
     }
 }
 
@@ -1006,6 +1020,10 @@ mod tests {
         for bad in ["17G", "100M", "6", "G", "6g", "x"] {
             assert!(memory_flag(&["--memory", bad]).is_err(), "{bad}");
         }
+        assert!(!accel_flag(&[]).unwrap());
+        assert!(accel_flag(&["--arch", "arm64", "--accel", "hvf"]).unwrap());
+        assert!(accel_flag(&["--arch", "amd64", "--accel", "hvf"]).is_err());
+        assert!(accel_flag(&["--accel", "kvm"]).is_err());
         assert_eq!(timeout_flag(&[]).unwrap(), None);
         assert_eq!(timeout_flag(&["--timeout", "14400"]).unwrap(), Some(14_400));
         for bad in ["0", "86401", "soon"] {
