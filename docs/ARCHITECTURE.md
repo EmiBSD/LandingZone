@@ -148,14 +148,16 @@ Stable Rust, pinned in `rust-toolchain.toml`.
 Since 2026-11-01 the pin is DevTools' build of Rust 1.99.1 (github.com/EmiBSD/DevTools),
 `channel = "emibsd"`: `just toolchain` installs its releases by tag and sha256 into
 `~/devel/emibsd/toolchains` (`docs/SETUP.md`, "DevTools toolchain"), one pair per target
-architecture since DevTools' D-0008 (2026-11-02), and links the arm64 Rust as rustup's
-toolchain `emibsd` and the amd64 one as `emibsd-amd64`, which the justfile's amd64 recipes
-select with `RUSTUP_TOOLCHAIN` (`amd64_cmd`); rustc, cargo and `ld.lld` are the same bytes in
-both. The LLVM release's `ld.lld` and binutils are the userland's linker and efiboot's
+architecture since DevTools' D-0008 (2026-11-02). Since 2026-11-15 nothing goes through
+rustup (the user's instruction of 2026-11-12, "usa toolchain": EmiBSD is compiled only by
+DevTools' tools): the justfile puts the arm64 Rust's `bin/` first on `PATH` and exports
+`RUSTC`, and the amd64 recipes put the amd64 one's (`amd64_cmd`); rustc, cargo and `ld.lld`
+are the same bytes in both. `channel = "emibsd"` stays as a tripwire for a proxy run by
+mistake; `just cargo <args>` is a bare cargo with the recipes' environment. The LLVM release's `ld.lld` and binutils are the userland's linker and efiboot's
 `llvm-objcopy` through `EMIBSD_LLVM_BIN`, which the justfile exports. The Rust releases ship no
 `rust-lld`, so the justfile also exports cargo's linker for both bare targets
 (`CARGO_TARGET_<triple>_LINKER`) as that `ld.lld`; `.cargo/config.toml` keeps only the
-rustflags. The same version from rustup differs only in who built it.
+rustflags.
 
 The kernel targets are `x86_64-emibsd-none-softfloat` and `aarch64-emibsd-none-softfloat`
 (D-0008): upstream's `x86_64-unknown-none` and `aarch64-unknown-none-softfloat` with the vendor
@@ -167,7 +169,7 @@ the tree reads `target_vendor`.
 amd64 is frozen while DevTools' amd64 pair is not installed (the user's decision of 2026-11-01,
 taken when the Rust release carried the arm64 targets only, as the Kernel repository's decision
 44 of 2026-10-18; since D-0008 the pair exists and `just toolchain` installs it): while
-`rust-1.99.1+emibsd.1-aarch64-apple-darwin-amd64` has no `lib/rustlib/x86_64-emibsd-none-softfloat`,
+the pinned `rust-1.99.1+emibsd.N-aarch64-apple-darwin-amd64` has no `lib/rustlib/x86_64-emibsd-none-softfloat`,
 the justfile's amd64 `cargo` lines print a notice instead of running (`amd64_cmd`) and xtask
 skips every command with `--arch amd64` the same way (`EMIBSD_FROZEN`, `Arch::frozen`;
 `diff-openbsd` excepted, its probe boots OpenBSD). `sys/arch/amd64`, its `sys/machine`

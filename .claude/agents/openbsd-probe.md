@@ -19,7 +19,7 @@ and `subagents.md` (the common contract).
 ## Method
 
 1. Work where your prompt says (by default the main checkout, which holds `target/openbsd`;
-   never re-download or delete it). `PATH=/opt/homebrew/opt/rustup/bin:$PATH`.
+   never re-download or delete it). Run cargo as `just cargo <args>` (DevTools' toolchain; never rustup or Homebrew Rust).
 2. `cargo xtask diff-openbsd --help`, then for each device and arch your prompt lists:
    `cargo xtask diff-openbsd --arch A probe <the same device options the smoke uses>
    [--ukc CMD]... [--sh CMD]...`, with `--sh` commands that exercise the device the way the

@@ -98,7 +98,10 @@ A prompt that misses one of these gets a question back, not a guess.
   reference tree lives only there: `ln -s "$MAIN/reference/openbsd-src" reference/openbsd-src`
   if missing. Never commit it, never `git add -A` / `git add .`; add paths by name. Unlink it
   before the worktree is removed.
-- `PATH=/opt/homebrew/opt/rustup/bin:$PATH` before `cargo`/`just`. Install nothing.
+- Cargo is DevTools' only: `just <recipe>`, or `just cargo <args>` for a bare cargo (the
+  justfile puts the pinned DevTools Rust first on `PATH` and exports `RUSTC`). Never rustup,
+  Homebrew Rust or Apple's compiler for Rust (the user's instruction of 2026-11-12). Install
+  nothing.
 - `diff-openbsd` needs the snapshot: `cp -Rc "$MAIN/target/openbsd" target/openbsd`. Never
   re-download it, never delete the main checkout's copy.
 - A worktree's first `just userland` / `just comp` is seeded from the main checkout

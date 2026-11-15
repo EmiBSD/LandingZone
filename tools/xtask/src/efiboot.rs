@@ -73,38 +73,23 @@ fn efi_name(arch: Arch) -> &'static str {
     }
 }
 
-/// `$EMIBSD_LLVM_BIN`'s llvm-objcopy (DevTools' LLVM), else the toolchain's (`llvm-tools`).
+/// `$EMIBSD_LLVM_BIN`'s llvm-objcopy (DevTools' LLVM). No fallback to another toolchain's
+/// (the user's instruction of 2026-11-12: DevTools' tools only).
 fn llvm_objcopy() -> Result<PathBuf> {
-    if let Some(dir) = std::env::var_os("EMIBSD_LLVM_BIN") {
-        let p = PathBuf::from(dir).join("llvm-objcopy");
-        if p.is_file() {
-            return Ok(p);
-        }
+    let dir = std::env::var_os("EMIBSD_LLVM_BIN").ok_or(
+        "$EMIBSD_LLVM_BIN is not set: run through `just` (it exports DevTools' LLVM bin/) or \
+         set it; docs/SETUP.md (\"DevTools toolchain\")",
+    )?;
+    let p = PathBuf::from(dir).join("llvm-objcopy");
+    if p.is_file() {
+        Ok(p)
+    } else {
+        Err(format!(
+            "{} not found: EMIBSD_LLVM_BIN must be DevTools' LLVM bin/ (`just toolchain`)",
+            p.display()
+        )
+        .into())
     }
-    let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
-    let out = |args: &[&str]| -> Option<String> {
-        let o = Command::new(&rustc).args(args).output().ok()?;
-        o.status
-            .success()
-            .then(|| String::from_utf8_lossy(&o.stdout).trim().to_string())
-    };
-    if let (Some(sysroot), Some(vv)) = (out(&["--print", "sysroot"]), out(&["-vV"]))
-        && let Some(host) = vv.lines().find_map(|l| l.strip_prefix("host: "))
-    {
-        let p = Path::new(&sysroot)
-            .join("lib/rustlib")
-            .join(host)
-            .join("bin/llvm-objcopy");
-        if p.is_file() {
-            return Ok(p);
-        }
-    }
-    Err(
-        "llvm-objcopy not found: set EMIBSD_LLVM_BIN to DevTools' LLVM bin/ (the justfile \
-         exports it; docs/SETUP.md, \"DevTools toolchain\") or install the toolchain's \
-         llvm-tools component"
-            .into(),
-    )
 }
 
 /// `cargo xtask efiboot`: the PE image of the efiboot ELF (module docs).

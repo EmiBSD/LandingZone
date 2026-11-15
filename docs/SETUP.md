@@ -3,47 +3,34 @@
 Verified 2026-10-02 on Darwin 25.6 with Homebrew. Linux users: `rustup`, `qemu`, `limine`, `just`
 from your distribution; the rest is identical.
 
-## Why the Homebrew `rust` formula is not enough
+## Rust comes from DevTools only
 
-Homebrew's `rust` ships only the host target (`aarch64-apple-darwin`) and no `rust-lld`.
-The bare-metal targets `x86_64-emibsd-none-softfloat` and `aarch64-emibsd-none-softfloat` need both.
-`rustup` manages them; in Homebrew it is keg-only because it conflicts with the `rust` formula.
-(An alternative that keeps Homebrew rust, `rustup toolchain link system "$(brew --prefix rust)"`,
-still lacks the bare targets. Not recommended.)
+EmiBSD's compilers are the ones DevTools builds (the user's instruction of 2026-11-12: no
+Homebrew Rust, no rustup, "usa toolchain"). The justfile puts the pinned DevTools Rust's `bin/`
+first on `PATH` and exports `RUSTC`, so every recipe runs that cargo, rustc, clippy and
+rustfmt; nothing falls back to another toolchain. Homebrew stays for what is not a compiler.
 
 ## Steps
 
-1. Remove Homebrew rust. Nothing else depends on it (`brew uses --installed rust` is empty):
+1. Install the tools:
    ```sh
-   brew uninstall rust
-   ```
-2. Install the tools:
-   ```sh
-   brew install rustup qemu limine just
+   brew install qemu limine just gh zstd
    brew install x86_64-elf-gdb aarch64-elf-gdb   # optional, for `just gdb-*` later
    ```
-3. Put rustup and cargo on `PATH`. Add to `~/.zshrc`, then open a new shell:
-   ```sh
-   export PATH="$HOME/.cargo/bin:$(brew --prefix rustup)/bin:$PATH"
-   ```
-4. Install a default toolchain once:
-   ```sh
-   rustup default stable
-   ```
-5. In the repository, `just toolchain` installs the pinned DevTools toolchains and links the Rust
-   one as rustup's `emibsd`, the channel `rust-toolchain.toml` names ("DevTools toolchain" below).
+2. In the repository, `just toolchain` installs the pinned DevTools toolchains ("DevTools
+   toolchain" below). Nothing goes on your shell's `PATH`: run cargo through
+   `just cargo <args>` (same `PATH`, `RUSTC` and linkers as the recipes).
 
 ## Verify
 
 ```sh
-which cargo                        # ~/.cargo/bin/cargo or the rustup keg, NOT /opt/homebrew/bin
-cargo --version                    # cargo 1.99.1 (EmiBSD DevTools): rust-toolchain.toml's `emibsd`
-rustc --print sysroot              # ~/devel/emibsd/toolchains/rust-1.99.1+emibsd.1-aarch64-apple-darwin
+just cargo --version               # cargo 1.99.1 (EmiBSD DevTools 1.99.1+emibsd.5)
+just --evaluate RUSTC              # ~/devel/emibsd/toolchains/rust-1.99.1+emibsd.5-aarch64-apple-darwin-arm64/bin/rustc
 ls "$(brew --prefix qemu)/share/qemu/"edk2-{x86_64,aarch64}-code.fd
 ls "$(brew --prefix limine)/share/limine/"BOOT{X64,AA64}.EFI
-cargo check && cargo test          # host build of bsd + libkern
-just build-amd64 && just build-arm64  # the kernels (`cargo --target` by hand misses the per-arch toolchain)
-just smoke                         # after milestone M0
+just test                          # host build of bsd + libkern
+just build                         # the kernels
+just smoke
 ```
 
 ## Editor
@@ -158,15 +145,20 @@ uses ports 8443 (trusted), 8444 (echo) and 8445 (untrusted); they must be free.
 
 `just toolchain` installs the EmiBSD toolchains that DevTools releases
 (github.com/EmiBSD/DevTools; the user's decision of 2026-10-31, taken over from the Kernel
-repository on 2026-11-01): `llvm-23.1.4+emibsd.1` and `rust-1.99.1+emibsd.1`, one tarball per
-target architecture since DevTools' D-0008 (2026-11-02), pinned by tag and sha256 in the
-justfile, fetched with `gh release download` (never "latest"), checked before unpacking, and
-unpacked unmodified into `~/devel/emibsd/toolchains` (`EMIBSD_TOOLCHAINS` overrides it). The
-arm64 Rust becomes rustup's toolchain `emibsd`, the channel `rust-toolchain.toml` names; the
-amd64 one `emibsd-amd64`, which the justfile's amd64 recipes select (`RUSTUP_TOOLCHAIN`); the
-two share rustc, cargo and `ld.lld` bit for bit. The arm64 LLVM's `bin/` (`ld.lld`, the
-binutils, `llvm-objcopy`, clang) is `EMIBSD_LLVM_BIN`, which the justfile exports for the
-userland table above and for efiboot; the amd64 LLVM adds `x86_64-emibsd-emibsd8.0-clang`.
+repository on 2026-11-01): `llvm-23.1.4+emibsd.6` and `rust-1.99.1+emibsd.5` (bumped from
+`+emibsd.1` on 2026-11-15, after DevTools replaced its releases), one tarball per target
+architecture since DevTools' D-0008 (2026-11-02), pinned by tag and sha256 in the justfile,
+fetched with `gh release download` (never "latest"), checked before unpacking, and unpacked
+unmodified into `~/devel/emibsd/toolchains` (`EMIBSD_TOOLCHAINS` overrides it). Nothing is
+linked into rustup: the justfile runs the arm64 Rust's `bin/` directly (`PATH`, `RUSTC`), and
+the amd64 recipes the amd64 one's (`amd64_cmd`); the two share rustc, cargo and `ld.lld` bit
+for bit. `rust-toolchain.toml` names the channel `emibsd` only as a tripwire: a rustup proxy
+run by mistake resolves it or fails, never an official toolchain. After moving a pin, remove
+the cargo output (`target/`'s build directories) and build from scratch: before +emibsd.5,
+cargo's fingerprint did not see a std rebuilt under the same `rustc -vV`. The arm64 LLVM's
+`bin/` (`ld.lld`, the binutils, `llvm-objcopy`, clang) is `EMIBSD_LLVM_BIN`, which the justfile
+exports for the userland table above and for efiboot (no fallback to `llvm-tools`); the amd64
+LLVM adds `x86_64-emibsd-emibsd8.0-clang`.
 Needs `gh`, logged in, and `zstd` (Homebrew). A directory already unpacked is left alone; never
 modify, move or delete anything under that directory, it is shared by every repository on the
 machine. Anything that breaks because of the toolchain is reported to EmiBSD/DevTools with the
