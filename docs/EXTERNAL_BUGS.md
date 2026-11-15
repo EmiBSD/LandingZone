@@ -263,6 +263,7 @@ means EmiBSD's code has it too ("Bugs the port reproduces").
 | EXT-78 | `sys/dev/softraid_raid5.c:608` | RAID 5 leaks a strip block on error | alloc-failure | leak | read | fixed | open |
 | EXT-79 | `sys/dev/softraid_raid6.c:632` | RAID 6 leaks blocks and ccbs on error | alloc-failure | leak | read | fixed | open |
 | EXT-215 | `sys/dev/pci/pcscp.c:304` | attach's error path unmaps the DMA map pointer, not the MDL mapping | alloc-failure | wrong result | read | not ported (M17) | open |
+| EXT-226 | `sys/dev/rnd.c:659` | `random_start` reads kernel text through a misaligned `u_int32_t *` (amd64) | — (the kernel's own link) | cosmetic | reproduced | read unaligned | open |
 
 ## Entries (EXT-1 to EXT-8, EXT-192 to EXT-197)
 
@@ -752,6 +753,24 @@ Every C line in this and the following sections is at the pin 3ce1f3f79392, unde
 - Port's handling: `sys/netinet/tcp_output.rs:126` copies the header out and back.
 - Severity: memory corruption, if reachable.
 - Fix: re-take `ip`/`ip6` after the pullup, and pull up `hlen` before copying options.
+
+### EXT-226: `random_start` reads kernel text through a misaligned `u_int32_t *`
+
+- Where: `sys/dev/rnd.c:659` at 3ce1f3f79392, `random_start`.
+- What: `add_entropy_words((u_int32_t *)etext - 32*1024, 8192/sizeof(u_int32_t))` turns
+  `etext` (`extern char etext[]`, the end of `.text`, which `sys/arch/amd64/conf/ld.script:78`
+  places right after the last instruction) into a `u_int32_t *`. On amd64 the code can end on
+  any byte, so the pointer, and every word read through it, is misaligned: undefined in C
+  (C11 6.3.2.3p7). The x86 loads work, so OpenBSD never sees it.
+- Reach: none from outside; it depends on the kernel's own link (the TD1 amd64 kernel ends
+  at `etext = 0xffffffff8155457f`).
+- Verified: reproduced in the port: Rust's debug check on `slice::from_raw_parts` panicked at
+  boot right after `warning: no entropy supplied by boot loader` (`panic: unsafe
+  precondition(s) violated: slice::from_raw_parts requires the pointer to be aligned`).
+- Port's handling: `sys/dev/rnd.rs` (`random_start`) reads the same 2048 words with
+  `read_unaligned`.
+- Severity: cosmetic (undefined behaviour that the hardware tolerates).
+- Fix: read the words with `memcpy`, or round the pointer down to 4 bytes.
 
 ## file systems
 
