@@ -21,7 +21,12 @@ paths:
   `gnu/llvm` by its build glue, `userland/comp.rs`; outside `ci`, `just comp`). `selfhost` (TD1a: `smoke-selfhost-kernel`'s disk, `comp`'s staging root with
   `userland`'s shared libraries, DevTools' native LLVM and Rust laid over it from tarballs
   checked against their pins in the justfile, and `HEAD` with its crates vendored offline;
-  `userland/selfhost.rs`). `--memory SIZE` (qemu, smoke, smoke2; 256M..16G) replaces
+  `userland/selfhost.rs`), and `selfhost-userland` (TD1b: `smoke-selfhost-userland`'s disk,
+  the same base with the native LLVM only, a copy of the pin's sources in `/usr/src` with
+  every `__OpenBSD__` renamed `__EmiBSD__` (and so in the base's LibreSSL headers), the
+  compilers on their own `aarch64-emibsd-emibsd8.0` triple with no `--target`, OpenBSD's
+  stock users, `/etc/mk.conf` and `/etc/clang-defaults.cfg`, and `/td1b/build.sh`, whose
+  steps follow `make build`). `--memory SIZE` (qemu, smoke, smoke2; 256M..16G) replaces
   `boot::VM_MEMORY` (512M); `smoke --timeout SECS` replaces `boot::SMOKE_TIMEOUT` (180 s),
   still scaled, and `smoke-all`'s watchdog reads it; `--accel hvf` (arm64 qemu and smoke)
   runs the guest under Hypervisor.framework for the build VMs, used by no recipe of `smokes`.
