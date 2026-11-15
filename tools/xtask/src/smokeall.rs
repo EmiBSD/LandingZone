@@ -311,31 +311,30 @@ fn recipe_limit(root: &Path, just_bin: &str, recipe: &str, scale: usize) -> Dura
     boots.unwrap_or(UNKNOWN_BOOTS) * u32::try_from(scale).unwrap_or(10) + LIMIT_MARGIN
 }
 
-/// The sum of the time limits of the boots in a recipe's commands: `boot::SMOKE_TIMEOUT` for
-/// each `xtask smoke`, its `--timeout` (or the same default) for each `xtask smoke2`. `None`
-/// when there is no boot.
+/// The sum of the time limits of the boots in a recipe's commands: its `--timeout` (or
+/// `boot::SMOKE_TIMEOUT`) for each `xtask smoke` and each `xtask smoke2`. `None` when there
+/// is no boot.
 fn boot_limits(commands: &str) -> Option<Duration> {
     let mut sum = Duration::ZERO;
     let mut boots = 0;
     for line in commands.lines() {
         let mut words = line.split_whitespace();
-        let Some(cmd) = words
+        if words
             .by_ref()
             .skip_while(|w| Path::new(w).file_name().is_none_or(|n| n != "xtask"))
             .nth(1)
             .filter(|c| *c == "smoke" || *c == "smoke2")
-        else {
+            .is_none()
+        {
             continue;
-        };
+        }
         let mut limit = boot::SMOKE_TIMEOUT;
-        if cmd == "smoke2" {
-            let mut rest = words;
-            while let Some(w) = rest.next() {
-                if w == "--timeout"
-                    && let Some(s) = rest.next().and_then(|v| v.parse::<u64>().ok())
-                {
-                    limit = Duration::from_secs(s);
-                }
+        let mut rest = words;
+        while let Some(w) = rest.next() {
+            if w == "--timeout"
+                && let Some(s) = rest.next().and_then(|v| v.parse::<u64>().ok())
+            {
+                limit = Duration::from_secs(s);
             }
         }
         sum += limit;
@@ -578,12 +577,17 @@ mod tests {
             cargo xtask nvme-root --arch amd64 target/x.img\n\
             cargo xtask smoke2 --arch arm64 --timeout 400 --both-expect ok\n\
             cargo xtask smoke2 --arch amd64\n";
-        // 180 (a smoke's --timeout-like text is not smoke2's flag) + 400 + 180.
+        // 180 (a --timeout inside a quoted --send is not the flag) + 400 + 180.
         assert_eq!(boot_limits(cmds), Some(Duration::from_secs(760)));
         // Under smoke-all the recipes name the binary (`EMIBSD_XTASK`), not `cargo xtask`.
         assert_eq!(
             boot_limits("/r/target/debug/xtask smoke2 --arch arm64 --timeout 100\n"),
             Some(Duration::from_secs(100))
+        );
+        // A smoke's own --timeout (TD1a's build session).
+        assert_eq!(
+            boot_limits("cargo xtask smoke --arch arm64 --timeout 21600 --expect x\n"),
+            Some(Duration::from_secs(21_600))
         );
         assert_eq!(boot_limits("cargo xtask smoke-all -j 4 smoke-a\n"), None);
         assert_eq!(boot_limits("echo nothing\n"), None);
