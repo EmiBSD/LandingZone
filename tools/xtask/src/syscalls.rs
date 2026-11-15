@@ -403,6 +403,8 @@ fn ported_syscalls(root: &Path) -> Result<BTreeMap<String, String>> {
         ("sys/uvm", "crate::uvm"),
         ("sys/dev", "crate::dev"),
         ("sys/nfs", "crate::nfs"),
+        // TD3: the machine-dependent calls (`sysarch`) through their machine contract.
+        ("sys/machine", "crate::machine"),
     ] {
         let mut names: Vec<_> = fs::read_dir(root.join(dir))?
             .filter_map(|e| e.ok())

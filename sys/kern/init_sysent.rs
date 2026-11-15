@@ -96,7 +96,7 @@ use crate::kern::vfs_syscalls::{
     sys_statfs, sys_symlink, sys_symlinkat, sys_sync, sys_truncate, sys_umask, sys_unlink,
     sys_unlinkat, sys_unmount, sys_unveil, sys_utimensat, sys_utimes,
 };
-use crate::machine::sys_sysarch;
+use crate::machine::sysarch::sys_sysarch;
 #[cfg(any(feature = "nfsclient", feature = "nfsserver"))]
 use crate::nfs::nfs_syscalls::sys_nfssvc;
 use crate::sys::syscall::SYS_MAXSYSCALL;
