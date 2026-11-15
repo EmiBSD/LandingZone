@@ -3345,6 +3345,49 @@ selfhost_script := disk_login + " --reject 'panic:' --reject 'Bad system call' "
     "--expect 'sh-mnt-42' --expect 'sh-dev-42' --expect 'rustc 1.99.1' --expect 'rsv-rc-0' " + \
     "--expect 'cargo 1.99.1' --expect 'cgv-rc-0' --expect 'lz-elf-2' --expect 'lz-build-rc-0'"
 
+# TD1b: the base system's programs built inside EmiBSD by the base's make(1), the pin's
+# share/mk and DevTools' native clang with its own triple (aarch64-emibsd-emibsd8.0), as
+# `make build` builds them (docs/ROADMAP.md). `cargo xtask selfhost-userland` makes the disk
+# (the selfhost base and native LLVM, a copy of the pin's sources in /usr/src with
+# __OpenBSD__ renamed __EmiBSD__, OpenBSD's stock /etc/master.passwd and group for make
+# obj's `build` user, /etc/mk.conf with the compile defaults of the base system's clang
+# (/etc/clang-defaults.cfg) and STACK_PROTECTOR, an empty /usr/obj, /td1b/build.sh;
+# tools/xtask/src/userland/selfhost.rs); the smoke boots the MP kernel under hvf with it as
+# sd0, mounts it, gives it /dev's null, zero, random and fd nodes, and in a chroot(8) runs
+# `build.sh ls` (mtree(8) lays 4.4BSD.dist's hierarchy, as etc/Makefile does, then
+# `make obj && make` in bin/ls, then the ls it made: `ul-ls-out-...` and
+# `ul-ls-run-rc-0`), then each step of `selfhost_ul_steps`: a directory (make obj, then make
+# as the build user in each SUBDIR, listing `ul-ok-`/`ul-FAIL-` lines, then make at the top:
+# `ul-<dir>-rc-0`), or `build` (make build's do-build for lib, bin, sbin, usr.bin and
+# libexec: share/mk, make includes, each SUBDIR built and installed). Every
+# marker is printed by the guest; `halt -p` ends the VM after the last step, whatever it
+# printed (rejects are judged when the VM stops). arm64 only; not in `smokes` (it needs `just comp`, `just
+# userland`, DevTools' native LLVM tarball and macOS's Hypervisor.framework).
+selfhost_ul_timeout := env("EMIBSD_SELFHOST_UL_TIMEOUT", "7200")
+selfhost_ul_steps := env("EMIBSD_SELFHOST_UL_STEPS", "bin")
+selfhost_ul_script := disk_login + " --reject 'panic:' --reject 'Bad system call' " + \
+    "--reject '-rc-1' --reject '-rc-2' --reject '-rc-3' --reject '-rc-4' --reject '-rc-5' " + \
+    "--reject '-rc-6' --reject '-rc-7' --reject '-rc-8' --reject '-rc-9' " + \
+    "--send-after '# ' --send 'mount /dev/sd0a /mnt && echo ul-mnt-$((40+2))\\n' " + \
+    "--send-after 'ul-mnt-42' --send 'mkdir -p /mnt/dev && cp -Rp /dev/null /dev/zero /dev/random /dev/urandom /dev/fd /dev/stdin /dev/stdout /dev/stderr /dev/tty /mnt/dev/ && echo ul-dev-$((40+2))\\n' " + \
+    "--send-after 'ul-dev-42' --send 'JOBS=4 /usr/sbin/chroot /mnt /td1b/build.sh ls\\n' " + \
+    "--expect 'ul-mnt-42' --expect 'ul-dev-42' --expect 'ul-mtree-rc-0' --expect 'ul-ls-rc-0' " + \
+    "--expect 'ul-ls-out-/usr/share/mk/sys.mk' --expect 'ul-ls-run-rc-0'"
+
+smoke-selfhost-userland: (build-arm64 "--features qemu,multiprocessor")
+    @test -f target/userland/arm64/ramdisk.ffs || { echo "smoke-selfhost-userland: no arm64 ramdisk image; run just userland first"; exit 1; }
+    @test -d target/comp/arm64/root/usr/lib || { echo "smoke-selfhost-userland: no comp root; run just comp first"; exit 1; }
+    {{xtask}} selfhost-userland --arch arm64 \
+        --llvm "{{selfhost_dist}}/{{selfhost_llvm}}" --llvm-sha256 {{selfhost_llvm_sha256}}
+    mkdir -p "${EMIBSD_RUN_DIR:-target}" && rm -f "${EMIBSD_RUN_DIR:-target}/disk-arm64-ul.img" && \
+        cp -c target/selfhost-userland/arm64/userland.ffs "${EMIBSD_RUN_DIR:-target}/disk-arm64-ul.img"
+    set --; last="ul-ls-rc-"; for s in {{selfhost_ul_steps}}; do t=$(echo $s | tr / -); \
+        set -- "$@" --send-after "$last" --send "JOBS=4 /usr/sbin/chroot /mnt /td1b/build.sh $s\n" \
+        --expect "ul-$t-rc-0"; last="ul-$t-rc-"; done; \
+        set -- "$@" --send-after "$last" --send "halt -p\n"; \
+    {{xtask}} smoke {{reject}} --accel hvf --smp 4 --memory 6G --timeout {{selfhost_ul_timeout}} --status 0 --arch arm64 \
+        --kernel target/{{arm64}}/debug/bsd --expect-ramdisk --until-seen --disk-set ul {{selfhost_ul_script}} "$@"
+
 smoke-selfhost-kernel: (build-arm64 "--features qemu,multiprocessor")
     @{{ramdisks}} || { echo "smoke-selfhost-kernel: no ramdisk image; run just userland first"; exit 1; }
     @test -d target/comp/arm64/root/usr/lib || { echo "smoke-selfhost-kernel: no comp root; run just comp first"; exit 1; }

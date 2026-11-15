@@ -428,6 +428,17 @@ fn run(args: &[String]) -> Result<()> {
                 },
             )
         }
+        ["selfhost-userland", rest @ ..] => {
+            let arch = boot::Arch::parse(flag(rest, "--arch")?)?;
+            userland::selfhost::selfhost_userland(
+                &root,
+                arch,
+                userland::selfhost::Pinned {
+                    tarball: Path::new(flag(rest, "--llvm")?),
+                    sha256: flag(rest, "--llvm-sha256")?,
+                },
+            )
+        }
         ["comp", rest @ ..] => {
             let arch = boot::Arch::parse(flag(rest, "--arch")?)?;
             // Half the CPUs by default: other builds may share the machine.
