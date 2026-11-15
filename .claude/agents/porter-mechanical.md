@@ -2,6 +2,7 @@
 name: porter-mechanical
 description: Mechanical EmiBSD port work in its own worktree - C headers of constants and structs with their reference-backed tests, small self-contained leaf functions (libkern-style), tables (ioconf entries, syscall numbers, ports.toml rows), and doc updates once the decision is made. Not for uvm, traps, pmap, MP, DMA/interrupt drivers or anything over a few hundred lines of logic; use porter for those.
 model: sonnet
+effort: medium
 isolation: worktree
 memory: project
 color: cyan

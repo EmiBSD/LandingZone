@@ -2,6 +2,7 @@
 name: milestone-coordinator
 description: Coordinates one EmiBSD milestone or sub-milestone (M16g, M17a, ...) end to end in its own worktree - probes OpenBSD 8.0 on the QEMU devices, splits the ROADMAP row into ports, launches porter/porter-mechanical subagents (at most 2 at a time), integrates their branches, renumbers ioconf, runs the close CI under the machine lock and writes the close docs. Use when the user starts or resumes a milestone. Never for a single file.
 model: opus
+effort: high
 isolation: worktree
 memory: project
 color: purple

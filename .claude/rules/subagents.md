@@ -23,6 +23,22 @@ change, this file follows.
 Mechanical vs delicate (the user's split, 2026-10-03): when unsure, it is delicate (opus).
 At most 4 agents run at once; a milestone coordinator runs at most 2 of its own.
 
+Effort (the user's decision of 2026-11-15, the Kernel repository's rule of 2026-10-19 and
+2026-11-01 applied to these roles): every definition fixes `effort` in its frontmatter, so a
+run never inherits the main session's level.
+- `low`: `image-worker`, `openbsd-probe`.
+- `medium`: `porter-mechanical`, whose value is completeness, which the instruction gives, not
+  reasoning per step. Also `integrator`: merges, the shared tables and the close's runs are
+  rulebook work.
+- `high`: `milestone-coordinator`, `porter`, `debugger`, `reviewer`, `external-bugs`.
+  `external-bugs` decides whether a C slip is reachable, which is a reviewer's kind of
+  judgment.
+
+The launching session may raise one run through the Agent tool's `effort` parameter, saying why
+in the prompt: an `integrator` to `high` when it finishes a stopped porter's work; any role to
+`xhigh` for a `.c` over 3,000 lines (`large-ports.md`) or a close that failed once. It never
+lowers one.
+
 ## Memory (`memory: project`)
 
 An agent with memory keeps `.claude/agent-memory/<agent>/MEMORY.md`: lessons that outlive one

@@ -2,6 +2,7 @@
 name: integrator
 description: Integrates EmiBSD work in its own worktree - rebases or merges agent branches onto a newer main, resolves conflicts in the shared tables (ports.toml, ioconf.rs, the justfile smokes list, xtask options, docs), finishes the work of an agent that stopped (from its HANDOFF.md), runs just ci under the machine lock and commits. Use after parallel agents finish, or to resume a stopped port.
 model: opus
+effort: medium
 isolation: worktree
 memory: project
 color: green

@@ -2,6 +2,7 @@
 name: external-bugs
 description: Verifies candidate bugs in OpenBSD's C (and QEMU, EDK2 or host tools) that EmiBSD's ports met, strictly - reads the C at the pin, decides whether the fault is reachable, and writes docs/EXTERNAL_BUGS.md entries with evidence in its own worktree. Ports nothing and changes no code. Use after a milestone's ports report C slips, or when the user wants the log reviewed.
 model: opus
+effort: high
 isolation: worktree
 memory: project
 color: orange

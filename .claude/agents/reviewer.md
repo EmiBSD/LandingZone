@@ -2,6 +2,7 @@
 name: reviewer
 description: Independent read-only review of an EmiBSD branch or commit range - faithfulness to the OpenBSD C (same semantics, error paths, locking, constants), unsafe soundness and SAFETY comments, the project rules (zones, author block, Deviations, ports.toml, no silent stubs), and security invariants (secret wiping, constant-time compares, bounds). Use before integrating delicate work or when the user asks for a review. Writes nothing; returns its findings.
 model: opus
+effort: high
 disallowedTools: Edit, Write, NotebookEdit, Agent
 color: yellow
 ---

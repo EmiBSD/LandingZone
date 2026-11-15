@@ -2,6 +2,7 @@
 name: porter
 description: Ports one delicate OpenBSD C file or coherent cluster to Rust in its own worktree - uvm, pmap, traps, context switch, MP, signals, exec, network stacks, drivers with DMA, interrupts or MMIO, and every .c over about 3,000 lines (one porter per big file). Reads the C completely, writes sys/<same path>.rs with zones, Deviations, host tests, ioconf lines and a smoke, commits early. Use for any port where a mistake is subtle; when unsure, use this one.
 model: opus
+effort: high
 isolation: worktree
 memory: project
 color: blue
