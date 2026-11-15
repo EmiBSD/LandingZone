@@ -292,6 +292,11 @@ const VARIANTS: &[Variant] = &[
     Variant::statically("usr.bin/diff"),
     Variant::statically("usr.bin/nm"),
     Variant::statically("usr.bin/tsort"),
+    Variant::statically("usr.bin/ctags"),
+    Variant::statically("usr.bin/hexdump"),
+    Variant::statically("usr.bin/rpcgen"),
+    Variant::statically("usr.bin/mandoc"),
+    Variant::statically("usr.bin/mktemp"),
     Variant::statically("usr.sbin/mtree"),
     Variant {
         dir: "usr.sbin/tcpdump",
@@ -494,7 +499,10 @@ const PROGRAMS: &[&str] = &[
     // out of the ramdisk, `ramdisk::RAMDISK_EXCLUDE`). m4 comes before lex, whose skeleton
     // runs through m4 (here the Mac's, as for the host lex). install(1) is
     // `usr.bin/xinstall` (`INSTALL_AS`); lorder(1) and mkdep(1) are scripts
-    // (`INSTALL_SCRIPTS`).
+    // (`INSTALL_SCRIPTS`). ctags(1) for libc's `tags` target, hexdump(1) for the manuals
+    // fdisk(8) and disklabel(8) embed (which mandoc(1) formats), rpcgen(1) for librpcsvc's
+    // sources, mktemp(1) for lorder(1), without which every static library is archived
+    // empty (step 2).
     "usr.bin/make",
     "usr.bin/awk",
     "usr.bin/xinstall",
@@ -518,6 +526,11 @@ const PROGRAMS: &[&str] = &[
     "usr.bin/diff",
     "usr.bin/nm",
     "usr.bin/tsort",
+    "usr.bin/ctags",
+    "usr.bin/hexdump",
+    "usr.bin/rpcgen",
+    "usr.bin/mandoc",
+    "usr.bin/mktemp",
     "bin/expr",
     "bin/test",
     "usr.sbin/mtree",
@@ -549,6 +562,11 @@ pub(crate) const TD1B: &[&str] = &[
     "usr.bin/diff",
     "usr.bin/nm",
     "usr.bin/tsort",
+    "usr.bin/ctags",
+    "usr.bin/hexdump",
+    "usr.bin/rpcgen",
+    "usr.bin/mandoc",
+    "usr.bin/mktemp",
     "bin/expr",
     "bin/test",
     "usr.sbin/mtree",
