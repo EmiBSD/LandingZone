@@ -1869,7 +1869,11 @@ The same arm64 kernel ELF boots from Limine and from arm64's efiboot.
   0 (write-back) and 1 (device); the kernel pmap is four-level where OpenBSD's is three-level,
   and `pmap_growkernel` populates the first GiB that the C's `pmap_bootstrap` pre-allocates.
   The level-2/3 tables of the kernel image and of the direct map stay the bootloader's on both
-  archs. `pg_nx` comes from `EFER.NXE` as the bootloader left it. `uvm_km_init` only records the
+  archs. On arm64 `pmap_bootstrap` sets `ATTR_UXN` on every block and page it adopts (TD1):
+  Limine maps its direct map execute-only at EL0 (AP 00, UXN clear), and on a CPU with
+  FEAT_PAN3, which QEMU's `-accel hvf -cpu host` exposes on Apple silicon, the C's
+  `SCTLR_EL1.EPAN` makes PAN fault every privileged read of such a page; the C maps nothing
+  of the kernel half executable at EL0, so this restores its invariant. `pg_nx` comes from `EFER.NXE` as the bootloader left it. `uvm_km_init` only records the
   kernel map's bounds until `uvm_map.c`; `kern/selftest.rs` (feature `qemu`) maps a page there
   at boot and `smoke` asserts `selftest: pmap kernel mapping ok` on both archs.
 - Kernel allocators (M3, part 3): `km_alloc` has no `kernel_map`/`kmem_map` yet (`uvm_map.c`
