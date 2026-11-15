@@ -28,10 +28,11 @@ paths:
 - External tools (`qemu-system-*`, Limine binaries, EDK2 firmware) are located at runtime via
   `brew --prefix <formula>` or `$PATH`, with an error that names the missing formula and points to
   `docs/SETUP.md`. Never hardcode `/opt/homebrew` or `/usr/local`. Exception: `userland`'s
-  toolchain, approved by the user on 2026-10-03: `/usr/bin/clang` (`$EMIBSD_CC`) and, since
-  2026-11-01, DevTools' LLVM release (ld.lld 23.1.4, llvm-ar, llvm-ranlib, llvm-objcopy,
-  llvm-objdump) through `$EMIBSD_LLVM_BIN`, which the justfile exports from its `devtools_llvm`
-  pin; there is no other default. `efiboot` takes its llvm-objcopy from the same directory.
+  toolchain is DevTools' LLVM (TD2, the user's instruction of 2026-11-12): `$EMIBSD_LLVM_BIN`,
+  which the justfile exports from its `devtools_llvm` pin (clang, ld.lld, ld64.lld, llvm-ar,
+  llvm-ranlib, llvm-objcopy, llvm-objdump), is required, and `$EMIBSD_CC` names another
+  clang; the build tools for the Mac take the SDK from `$SDKROOT` or `xcrun --show-sdk-path`.
+  There is no other default. `efiboot` takes its llvm-objcopy from the same directory.
   Every xtask command with `--arch amd64` is skipped with a notice while amd64 is frozen
   (`Arch::frozen`, docs/ARCHITECTURE.md "Frozen amd64"); `diff-openbsd` is the exception.
 - Network: nothing downloads but `diff-openbsd fetch` (approved by the user on 2026-10-05):

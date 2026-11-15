@@ -3193,7 +3193,7 @@ symbolize arch:
 
 # Cross-compile OpenBSD's libc, init(8), ksh(1), cat(1), echo(1), ls(1) and uname(1), unmodified,
 # and makefs(8) for the host, from the reference sources into target/userland/<arch> (with the
-# ffs ramdisk image) with Apple clang and LLD 17 (docs/SETUP.md, "Userland
+# ffs ramdisk image) with DevTools' clang and lld (docs/SETUP.md, "Userland
 # toolchain"). Slow and tool-dependent, so not part of `ci`.
 userland:
     {{xtask}} userland --arch amd64

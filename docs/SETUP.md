@@ -56,20 +56,21 @@ OpenBSD's makefs(8) and pwd_mkdb(8), built for the Mac with the same clang, as a
 yacc(1), which `pfctl` and `ipsecctl`'s `parse.y` need, and lex(1) for `.l` sources, whose own
 `scan.l` the Mac's `/usr/bin/lex` makes since the tree has no `initscan.c`), into
 `target/userland/<arch>/`. It is not part of
-`just ci`. The user approved these tools on 2026-10-03; nothing else is installed for it:
+`just ci`. Since 2026-11-15 (TD2; the user's instruction of 2026-11-12, replacing the Apple
+clang approved on 2026-10-03; taken from the Kernel repository's 3e21c6ca) its tools are
+DevTools' LLVM, the release `just toolchain` installs, and nothing else is installed for it:
 
 | Tool | Default | Override | Use |
 |---|---|---|---|
-| Apple clang 21 (Xcode) | `/usr/bin/clang` | `$EMIBSD_CC` | compiles for `x86_64-unknown-openbsd` and `aarch64-unknown-openbsd` (ELF), and builds `rpcgen` and `yacc` for the Mac |
-| LLD 23.1.4 (DevTools) | `$EMIBSD_LLVM_BIN/ld.lld`, exported by the justfile | `$EMIBSD_LLVM_BIN` (the directory) | links static PIE executables |
+| DevTools' clang 23 | `$EMIBSD_LLVM_BIN/clang` | `$EMIBSD_CC` | compiles for `x86_64-unknown-openbsd` and `aarch64-unknown-openbsd` (ELF), and, told the Mac's triple and SDK, builds `rpcgen`, `yacc`, `lex`, makefs and the comp set's build tools for the Mac |
+| DevTools' lld 23 | `$EMIBSD_LLVM_BIN/ld.lld` | `$EMIBSD_LLVM_BIN` (the directory; the justfile exports the pinned release's `bin/`) | links static PIE executables and the shared libraries; `ld64.lld` links the Mac's build tools |
 | `llvm-ar`, `llvm-ranlib`, `llvm-objcopy`, `llvm-objdump` | `$EMIBSD_LLVM_BIN/` | `$EMIBSD_LLVM_BIN` | archives, `install -s`, verification |
 
-Since 2026-11-01 `$EMIBSD_LLVM_BIN` is DevTools' LLVM release ("DevTools toolchain" below); the
-justfile exports it, and `cargo xtask userland` run by hand needs it set (M8's `~/.swiftly/bin`
-LLD 17 is no default any more). Any LLVM 17 or newer `ld.lld` with OpenBSD
-support (it must emit `PT_OPENBSD_SYSCALLS`) and matching binutils work through
-`$EMIBSD_LLVM_BIN`. `/bin/sh`, `sed` and `/usr/bin/cpp` (Apple clang's, run by `rpcgen`) are the
-system's.
+Without `$EMIBSD_LLVM_BIN` the build stops; it never looks for another compiler. The Mac's
+build tools need the macOS SDK (`xcrun --show-sdk-path`, or `$SDKROOT`): its headers and
+libc++. Still the Mac's own, until TD1 builds everything inside EmiBSD (docs/ROADMAP.md,
+TD2): the SDK, `/bin/sh`, `sed`, `/usr/bin/cpp` (Apple's, run by `rpcgen`), and the `cc` cargo
+links xtask with.
 
 The OpenBSD sources come from `$OPENBSD_SRC` if set (absolute, or relative to the repository),
 else `reference/openbsd-src`, else, from a git worktree, the main checkout's

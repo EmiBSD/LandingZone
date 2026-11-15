@@ -388,7 +388,7 @@ The real console also prints `unported: <name>` lines. Each one is a known gap, 
 You need:
 
 - Homebrew `rustup`, `qemu`, `limine` and `just`. The pinned toolchain installs itself.
-- For the userland: Apple clang and an LLD 17 or newer with OpenBSD support.
+- For the userland: DevTools' LLVM (clang, lld and the binutils), the same release.
 - The sparse clone of the OpenBSD sources in `reference/openbsd-src` ([reference/README.md](reference/README.md)).
 
 Every step is in [docs/SETUP.md](docs/SETUP.md). Then:
