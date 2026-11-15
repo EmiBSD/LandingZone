@@ -2028,6 +2028,13 @@ Every file-level deviation is in that file's `//! ## Deviations` list and in `po
   out; with `Hyp` set the C's EL2 forms stay (M16f; `v3.sc_has_hyp` is not in the C). QEMU
   ignores the EL2 invalidations, so a map's IOTLB entries outlived its unload and the next
   load of the same IOVA read the old pages: the NVMe root's disklabel came back wrong.
+- exec(2) accepts an ELF ident note named "EmiBSD" as well as "OpenBSD", with the same id
+  (`ELF_NOTE_NAMES`, `sys/kern/exec_elf.rs`; TD1a, 2026-11-15, the Kernel repository's
+  decision 48 of 2026-11-07 adopted here). DevTools' native toolchain and Userland's base
+  carry `.note.emibsd.ident`; OpenBSD's table holds "OpenBSD" alone, so this kernel refused
+  them with ENOEXEC (seen as ksh's "NUL byte unexpected" and, in a chroot without /bin/sh,
+  as ENOENT from chroot(8)'s execvp). Every numeric value is the C's; an OpenBSD binary
+  execs as before.
 
 ## Testing architecture
 
