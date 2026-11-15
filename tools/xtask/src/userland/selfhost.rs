@@ -22,10 +22,11 @@
 //!
 //! `cargo xtask selfhost --arch A --llvm TAR --llvm-sha256 HEX --rust TAR --rust-sha256 HEX`
 //! makes `target/selfhost/<arch>/selfhost.ffs`, an ffs image of:
-//! - the base: a clone of `comp`'s staging root (libc, crt, ld.so, the headers), its libc++
-//!   headers and clang resource directory removed (DevTools' LLVM replaces them as a whole),
-//!   and the shared libraries of `userland`'s root laid over it, so libcrypto and libssl are
-//!   this tree's (native cargo loads them);
+//! - the base: a clone of `userland`'s root (`/bin/ksh` and the tools `build.sh` runs) with
+//!   `comp`'s staging root (libc, crt, ld.so, the headers) laid over it, its libc++ headers
+//!   and clang resource directory removed (DevTools' LLVM replaces them as a whole), and the
+//!   shared libraries of `userland`'s root laid over again, so libcrypto and libssl are this
+//!   tree's (native cargo loads them);
 //! - DevTools' native LLVM, then Rust (`aarch64-emibsd-emibsd8.0`; D-0009, D-0010): each
 //!   tarball checked against its pin, holding one top directory, its `usr/` laid over the
 //!   base unmodified;
@@ -58,9 +59,11 @@ export EMIBSD_BUILD=0 SOURCE_DATE_EPOCH=0 EMIBSD_BUILD_HOST=emibsd
 ulimit -d $(ulimit -H -d)
 cd /src/lz || exit 9
 set -o pipefail
+# Each line cut to 110 columns with ksh's own `typeset -L` (the base may have no cut(1)).
+short() { typeset -L110 l; while IFS= read -r l; do print -r -- "$l"; done; }
 s=$(date +%s)
 cargo build --offline -p bsd --target aarch64-emibsd-none-softfloat \
-    --features qemu,multiprocessor -j ${JOBS:-4} 2>&1 | tee /src/build.log | cut -c1-110
+    --features qemu,multiprocessor -j ${JOBS:-4} 2>&1 | tee /src/build.log | short
 rc=$?
 e=$(date +%s)
 echo "lz-build-secs-$((e - s))"
@@ -119,8 +122,15 @@ pub(crate) fn selfhost(root: &Path, arch: Arch, llvm: Pinned<'_>, rust: Pinned<'
         }
     }
     fs::create_dir_all(&unpack).map_err(|e| format!("{}: {e}", unpack.display()))?;
-    // The base, an APFS clone of comp's root (seconds, no space until written).
-    run(Command::new("cp").arg("-Rc").arg(&comp_root).arg(&rootdir))?;
+    // The base system (/bin/ksh and the tools build.sh runs), an APFS clone of userland's
+    // root (seconds, no space until written), with comp's root (libc, crt, ld.so, the
+    // headers) laid over it.
+    let user_root = root.join("target/userland").join(arch.name()).join("root");
+    run(Command::new("cp").arg("-Rc").arg(&user_root).arg(&rootdir))?;
+    run(Command::new("cp")
+        .arg("-R")
+        .arg(comp_root.join("."))
+        .arg(&rootdir))?;
     for stale in ["usr/include/c++", "usr/lib/clang"] {
         let d = rootdir.join(stale);
         if d.exists() {
