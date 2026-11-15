@@ -268,6 +268,10 @@ fn run(args: &[String]) -> Result<()> {
         return Ok(());
     }
     boot::set_smp(smp_flag(&argv)?);
+    boot::set_memory(memory_flag(&argv)?);
+    if argv.first() == Some(&"smoke") {
+        boot::set_smoke_timeout(timeout_flag(&argv)?);
+    }
     hwopts::set(&root, &argv)?;
     storage::set(&root, &argv)?;
     devices::set_from_args(&argv)?;
@@ -529,6 +533,36 @@ fn smp_flag(args: &[&str]) -> Result<Option<u32>> {
     match s.parse::<u32>() {
         Ok(n) if (1..=boot::MAX_SMP).contains(&n) => Ok(Some(n)),
         _ => Err(format!("--smp {s}: expected a number from 1 to {}", boot::MAX_SMP).into()),
+    }
+}
+
+/// `--memory SIZE` (qemu, smoke, smoke2): QEMU's `-m`, mebibytes (`768M`) or gibibytes
+/// (`6G`), from 256M to 16G; absent, `boot::VM_MEMORY`. For boots that need more, as
+/// `smoke-selfhost`'s rustc (TD1).
+fn memory_flag(args: &[&str]) -> Result<Option<String>> {
+    let Some(s) = optional_flag(args, "--memory") else {
+        return Ok(None);
+    };
+    let mib = match s.split_at(s.len().saturating_sub(1)) {
+        (n, "M") => n.parse::<u32>().ok(),
+        (n, "G") => n.parse::<u32>().ok().and_then(|g| g.checked_mul(1024)),
+        _ => None,
+    };
+    match mib {
+        Some(m) if (256..=16384).contains(&m) => Ok(Some(s.to_string())),
+        _ => Err(format!("--memory {s}: expected 256M to 16G (a number then M or G)").into()),
+    }
+}
+
+/// `smoke --timeout SECS`: the run's whole time limit in seconds (1 to 86400) in place of
+/// `boot::SMOKE_TIMEOUT`, for a boot of hours (`smoke-selfhost`'s build under TCG).
+fn timeout_flag(args: &[&str]) -> Result<Option<u64>> {
+    let Some(s) = optional_flag(args, "--timeout") else {
+        return Ok(None);
+    };
+    match s.parse::<u64>() {
+        Ok(n) if (1..=86_400).contains(&n) => Ok(Some(n)),
+        _ => Err(format!("--timeout {s}: expected seconds from 1 to 86400").into()),
     }
 }
 
@@ -957,6 +991,27 @@ fn git(repo: &Path, args: &[&str]) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn memory_and_timeout_are_optional_and_bounded() {
+        assert_eq!(memory_flag(&[]).unwrap(), None);
+        assert_eq!(
+            memory_flag(&["--memory", "6G"]).unwrap().as_deref(),
+            Some("6G")
+        );
+        assert_eq!(
+            memory_flag(&["--memory", "768M"]).unwrap().as_deref(),
+            Some("768M")
+        );
+        for bad in ["17G", "100M", "6", "G", "6g", "x"] {
+            assert!(memory_flag(&["--memory", bad]).is_err(), "{bad}");
+        }
+        assert_eq!(timeout_flag(&[]).unwrap(), None);
+        assert_eq!(timeout_flag(&["--timeout", "14400"]).unwrap(), Some(14_400));
+        for bad in ["0", "86401", "soon"] {
+            assert!(timeout_flag(&["--timeout", bad]).is_err(), "{bad}");
+        }
+    }
 
     #[test]
     fn smp_is_optional_and_bounded() {

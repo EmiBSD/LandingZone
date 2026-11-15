@@ -242,6 +242,35 @@ pub(crate) fn smp() -> Option<u32> {
     SMP.get().copied()
 }
 
+/// The guest memory of every EmiBSD VM ([`qemu_command`]) unless `--memory` says otherwise.
+pub(crate) const VM_MEMORY: &str = "512M";
+
+/// `--memory SIZE` for every VM this run starts (set once by `main`).
+static MEMORY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// Records `--memory SIZE` (QEMU's `-m`); `None` leaves [`VM_MEMORY`].
+pub(crate) fn set_memory(size: Option<String>) {
+    if let Some(size) = size {
+        let _ = MEMORY.set(size);
+    }
+}
+
+/// The guest memory of this run: `--memory SIZE`, else [`VM_MEMORY`].
+pub(crate) fn memory() -> &'static str {
+    MEMORY.get().map_or(VM_MEMORY, String::as_str)
+}
+
+/// `--timeout SECS` of a `smoke` (set once by `main`): its whole time limit, which
+/// `$EMIBSD_TIMEOUT_SCALE` then scales like the default's.
+static SMOKE_LIMIT: std::sync::OnceLock<Duration> = std::sync::OnceLock::new();
+
+/// Records `smoke --timeout SECS`; `None` leaves [`SMOKE_TIMEOUT`].
+pub(crate) fn set_smoke_timeout(secs: Option<u64>) {
+    if let Some(secs) = secs {
+        let _ = SMOKE_LIMIT.set(Duration::from_secs(secs));
+    }
+}
+
 /// What the boot image is to the VM ([`qemu_command`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum BootMedium {
@@ -703,7 +732,7 @@ pub(crate) fn qemu_command(
 
     let mut cmd = Command::new(arch.qemu());
     // M13 (hwopts.rs): `--screenshot-after` and `--sendkey-after` put the monitor on a socket.
-    cmd.args(["-m", "512M", "-display", "none", "-monitor"]);
+    cmd.args(["-m", memory(), "-display", "none", "-monitor"]);
     cmd.arg(crate::hwopts::monitor_arg());
     // M13 (hwopts.rs): `--reboot` lets a guest reset restart the machine.
     if !crate::hwopts::reboot() {
@@ -1044,7 +1073,7 @@ fn smoke_once(
         }
     };
     let expected_status = status;
-    let limit = time_limit(SMOKE_TIMEOUT);
+    let limit = time_limit(SMOKE_LIMIT.get().copied().unwrap_or(SMOKE_TIMEOUT));
     // M16e (hwopts.rs): `--tpm`'s swtpm, stopped when this returns, after QEMU.
     let _swtpm = crate::hwopts::start_swtpm()?;
     let mut cmd = qemu_command(root, arch, &image, "stdio", None, &disks)?;
