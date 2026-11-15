@@ -66,6 +66,16 @@
 //!   GiB in `pmap_bootstrap`; here `initarm`'s `pmap_growkernel` populates it, so
 //!   `pmap_maxkvaddr` starts at `VM_MIN_KERNEL_ADDRESS`. `initarm` therefore loads the memory
 //!   map into `uvm` before calling `pmap_bootstrap`, which the C does after.
+//! - Adopting those tables, `pmap_bootstrap` sets `ATTR_UXN` on every block and page
+//!   descriptor of the bootloader's under `TTBR1_EL1` (`pmap_bootstrap_uxn`): the C maps
+//!   nothing of the kernel half executable at EL0 (`ap_bits_kern`, `locore0.S`), and Limine's
+//!   higher-half direct map is (`0x...f01`: AP 00 with UXN clear, i.e. execute-only at EL0).
+//!   On a CPU with FEAT_PAN3 `cpu_init` sets `SCTLR_EL1.EPAN` as the C does, and PAN then
+//!   faults every privileged read of an EL0-executable page: the first direct-map access in
+//!   an exception (PAN is set on entry) took a level-1 permission fault, and
+//!   `pmap_fault_fixup`'s own direct-map read faulted again, recursing until the stack ran
+//!   off its u-area (TD1, QEMU's `-accel hvf -cpu host` on Apple silicon; TCG's Cortex-A72
+//!   has no PAN). `locore0.S`'s tables (efiboot) already carry `ATTR_XN`.
 //! - The kernel pmap is four-level (`pm_vp.l0`, `TCR_EL1.T1SZ` = 16 as the bootloader left
 //!   it); the C's is three-level (a 39-bit kernel), so where the C reaches `pm_vp.l1`
 //!   directly, the walks here go through `l0->vp[VP_IDX0(va)]`.
@@ -125,8 +135,9 @@ use crate::arch::arm64::include::pmap::{
 };
 use crate::arch::arm64::include::pte::{
     ATTR_AF, ATTR_GP, ATTR_PXN, ATTR_UXN, ATTR_nG, L3_P, Lx_TABLE_ALIGN, Lx_TYPE_MASK, Lx_TYPE_PT,
-    MAIR_CI, MAIR_DEV_NGNRNE, MAIR_WT, PTE_ATTR_CI, PTE_ATTR_DEV_NGNRE, PTE_ATTR_DEV_NGNRNE,
-    PTE_ATTR_WB, PTE_ATTR_WT, PTE_RPGN, SH_INNER, attr_ap, attr_idx, attr_sh, mair_attr,
+    Lx_TYPE_S, MAIR_CI, MAIR_DEV_NGNRNE, MAIR_WT, PTE_ATTR_CI, PTE_ATTR_DEV_NGNRE,
+    PTE_ATTR_DEV_NGNRNE, PTE_ATTR_WB, PTE_ATTR_WT, PTE_RPGN, SH_INNER, attr_ap, attr_idx, attr_sh,
+    mair_attr,
 };
 use crate::arch::arm64::include::vmparam::USER_SPACE_BITS;
 use crate::arch::arm64::include::vmparam::{VM_MAX_KERNEL_ADDRESS, VM_MIN_KERNEL_ADDRESS};
@@ -872,6 +883,34 @@ pub fn pmap_growkernel(maxkvaddr: Vaddr) -> Vaddr {
     Vaddr::new(cur)
 }
 
+/// Sets `ATTR_UXN` on every block and page descriptor under one of the bootloader's TTBR1
+/// tables, which `pmap_bootstrap` adopts (see the module's deviations).
+///
+/// # Safety
+///
+/// `pa` must be a translation table of `level` (1 to 3) that the bootloader built for
+/// `TTBR1_EL1`, in RAM the direct map covers and the kernel never hands out; the caller
+/// flushes the TLB afterwards.
+unsafe fn pmap_bootstrap_uxn(pa: Paddr, level: u32) {
+    let table = pmap_direct_map(pa).as_usize() as *mut u64;
+    for i in 0..TABLE_ENTRIES {
+        // SAFETY: entry `i` of the table the caller names, which the direct map covers.
+        let slot = unsafe { table.add(i) };
+        // SAFETY: as above.
+        let desc = unsafe { ptr::read_volatile(slot) };
+        let kind = desc & Lx_TYPE_MASK;
+        if level < 3 && kind == Lx_TYPE_PT {
+            // SAFETY: the next level of the same bootloader tables.
+            unsafe { pmap_bootstrap_uxn(Paddr::new((desc & PTE_RPGN) as usize), level + 1) };
+        } else if (level < 3 && kind == Lx_TYPE_S) || (level == 3 && kind == L3_P) {
+            // A block (levels 1 and 2) or a page (level 3): only a permission bit changes,
+            // which needs no break-before-make, just the caller's TLB flush.
+            // SAFETY: as above.
+            unsafe { ptr::write_volatile(slot, desc | ATTR_UXN) };
+        }
+    }
+}
+
 /// `pmap_bootstrap`: adopts the bootloader's kernel page tables into the kernel pmap (see the
 /// module's deviations) and reserves `vmmap`; returns the first free kernel virtual address.
 ///
@@ -938,6 +977,31 @@ pub unsafe fn pmap_bootstrap(_ram_start: Paddr, _ram_end: Paddr) -> Vaddr {
     let vp1_pa = pmap_direct_unmap(Vaddr::new(ptr::from_ref(vp1) as usize));
     vp0.set_vp(kslot, Some(vp1));
     vp0.set_table(kslot, vp_lx(vp1_pa));
+
+    // Nothing of the kernel half is executable at EL0 (see the module's deviations): the
+    // adopted descriptors get the `ATTR_UXN` every kernel mapping of the C carries. The
+    // switch below flushes the TLB.
+    for i in 0..TABLE_ENTRIES {
+        let desc = vp0.table(i);
+        if desc & Lx_TYPE_MASK != Lx_TYPE_PT {
+            continue; // invalid (a 4 KiB granule has no level-0 block)
+        }
+        if i != kslot {
+            // SAFETY: a level-1 table the bootloader built for TTBR1, in RAM the direct map
+            // covers and the kernel never hands out.
+            unsafe { pmap_bootstrap_uxn(Paddr::new((desc & PTE_RPGN) as usize), 1) };
+            continue;
+        }
+        for j in 0..TABLE_ENTRIES {
+            let desc = vp1.table(j);
+            if desc & Lx_TYPE_MASK == Lx_TYPE_PT {
+                // SAFETY: as above, for a level-2 table.
+                unsafe { pmap_bootstrap_uxn(Paddr::new((desc & PTE_RPGN) as usize), 2) };
+            } else if desc & Lx_TYPE_MASK == Lx_TYPE_S {
+                vp1.set_table(j, desc | ATTR_UXN);
+            }
+        }
+    }
 
     let pm = pmap_kernel();
     pm.pm_vp.set(PmVp::L0(ptr::from_ref(vp0).cast_mut()));
