@@ -39,6 +39,26 @@ in the prompt: an `integrator` to `high` when it finishes a stopped porter's wor
 `xhigh` for a `.c` over 3,000 lines (`large-ports.md`) or a close that failed once. It never
 lowers one.
 
+Turns (the user's decision of 2026-11-15, taken from the Kernel repository): the read-only
+roles carry `maxTurns` in their frontmatter as a spending stop: 400 for `reviewer`, 80 for
+`openbsd-probe`, 30 for `image-worker`. These are Kernel's caps, about 1.5 times its longest
+runs, and were not measured here. At the limit Claude Code returns the output marked
+partial. The launching session reads it and, if the work is worth finishing, resumes the run
+once with `SendMessage`. A second partial return is a stop, and the user decides. A cap that
+cuts legitimate runs is raised here, in a `rules:` commit, with the turn counts that showed
+it. The worktree roles carry none: a stop in the middle of their work leaves commits unmade
+(`large-ports.md`).
+
+Guard hook (the same decision): the writing roles (`milestone-coordinator`, `porter`,
+`porter-mechanical`, `integrator`, `debugger`, `external-bugs`) run
+`.claude/hooks/agent-guard.sh` before every Bash, Edit, Write and NotebookEdit call. It
+refuses `git push`, `git commit --amend`, and any write under `reference/`: Edit and Write
+there, write verbs, redirections, `sed -i`, `git add`/`checkout`/`restore`, and every
+`git -C reference/...` subcommand that is not a read. It allows the worktree's symlink
+`reference/openbsd-src` (`ln -s`, `unlink`). It is a belt against a slip, not a wall: a
+refusal is a stop to report, never something to route around. The main session has no such
+hook.
+
 ## Memory (`memory: project`)
 
 An agent with memory keeps `.claude/agent-memory/<agent>/MEMORY.md`: lessons that outlive one
