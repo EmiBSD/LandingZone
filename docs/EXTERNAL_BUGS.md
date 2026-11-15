@@ -70,6 +70,7 @@ means EmiBSD's code has it too ("Bugs the port reproduces").
 | EXT-28 | `sys/nfs/nfs_serv.c:1740` | `nfsrv_rename` error path leaks a vnode reference and a name | remote | leak | read | fixed | open |
 | EXT-30 | `sys/nfs/nfs_syscalls.c:517` | `nfsrv_zapsock` leaks a partial TCP record | remote | leak | read | same fault (see below) | open |
 | EXT-31 | `sys/nfs/krpc_subr.c:432` | `krpc_call` leaks the reply on EBADRPC | remote | leak | read | fixed | open |
+| EXT-227 | `sys/netinet6/nd6.c:446` | an address lifetime past INT_MAX seconds rearms the expiry timer every tick | remote | wrong result | read | same fault (see below) | open |
 | EXT-180 | `sys/lib/libsa/netudp.c:220` | checksum over `uh_ulen` bytes past the datagram | remote | cosmetic | read | fixed | open |
 | EXT-66 | `sys/isofs/udf/udf_subr.c:204` | VAT copy keeps a file entry the cache frees | user | memory corruption | read | fixed | open |
 | EXT-159 | `sys/dev/rasops/rasops8.c:370` | underlined space written two lines up, before the frame buffer | user | memory corruption | read | same fault (see below) | open |
@@ -541,6 +542,8 @@ after M16 and are not fixed here.
   Access Size code as a byte length (they only stop the overrun).
 - EXT-30 nfsd: `sys/nfs/nfs_syscalls.rs:767-792` `nfsrv_zapsock` does not free `ns_frag`,
   and this is not in its Deviations.
+- EXT-227 nd6: `sys/netinet6/nd6.rs:900` keeps `nd6_expire_timer_update`'s truncation to
+  `int` before the clamp. That is faithful, so it is not a Deviation, and a test pins it.
 - Kept as in C, and said so in the Deviations:
   - EXT-42: `sys/miscfs/fuse/fuse_device.rs:59-60`.
   - EXT-44: `sys/miscfs/fuse/fuse_lookup.rs:46-47`.
@@ -771,6 +774,40 @@ Every C line in this and the following sections is at the pin 3ce1f3f79392, unde
   `read_unaligned`.
 - Severity: cosmetic (undefined behaviour that the hardware tolerates).
 - Fix: read the words with `memcpy`, or round the pointer down to 4 bytes.
+
+### EXT-227: an address lifetime past INT_MAX seconds rearms the expiry timer every tick
+
+- Where: `sys/netinet6/nd6.c:446`, `nd6_expire_timer_update`.
+- What: `secs = expire_time - getuptime();` (446) stores a `time_t` difference in an `int`,
+  and only then clamps `if (secs < 0) secs = 0;` (447-448). The lifetimes are `u_int32_t`
+  and `0xffffffff` is infinite (`in6.c:710-717`), so a finite valid or preferred lifetime
+  between 2^31 and 2^32 - 1 seconds truncates to a negative `int` or 0, and the expiry
+  timeout is set for 0 seconds: the next tick (`kern_timeout.c:373-376`). It fires,
+  `nd6_expire_timer` queues `nd6_expire` (492), which finds the address still valid
+  (`IFA6_IS_INVALID`, `in6.h:276-279`) and calls `nd6_expire_timer_update` again (476-481).
+  The timeout is no longer pending, so it is set for 0 seconds again. So every tick takes
+  the exclusive NET_LOCK and walks every address of every interface. It goes on until the
+  remaining lifetime drops to INT_MAX seconds, up to about 68 years.
+- Reach: remote, from the link. slaacd copies a router advertisement's prefix lifetimes
+  unchanged into the stable (not temporary) address (`sbin/slaacd/engine.c:1511-1512`,
+  `2208-2209`; `slaacd.c:663-667`). Its only checks are `vltime != 0` and `pltime <= vltime`
+  (`engine.c:1888-1889`), as the kernel's are (`in6.c:627-630`). So any host on a link
+  where an interface has `inet6 autoconf` can send an RA with an autonomous prefix and
+  vltime = pltime = 3000000000. Each re-advertisement resets the lifetimes, so the loop
+  lasts as long as the advertisements do. Root can also do it with `SIOCAIFADDR_IN6`
+  directly. ifconfig(8) cannot: it caps `vltime` and `pltime` at 1000000
+  (`sbin/ifconfig/ifconfig.c:1540`).
+- Verified: read. Not run on OpenBSD 8.0.
+- Port's handling: same fault (`sys/netinet6/nd6.rs:900`). The port keeps the C's order on
+  purpose, and the host test `a_lifetime_past_int_max_seconds_rearms_the_expiry_at_once_as_in_c`
+  pins it. Before 2026-11-15 the port clamped first and truncated after. That handed
+  `timeout_add_sec` a negative value, and a kernel with overflow checks panicked there
+  (found by the Kernel repository's session).
+- Severity: wrong result (a timer that runs every tick under the exclusive net lock).
+- Fix: clamp in `time_t` before narrowing, e.g.
+  `diff = expire_time - getuptime(); secs = diff < 0 ? 0 : MIN(diff, INT_MAX);`.
+  `nd6_timer`'s `secs = expire - uptime;` (`nd6.c:304`) has the same shape, but `expire` is
+  at most `nd6_gctimer` ahead there, so it cannot overflow.
 
 ## file systems
 

@@ -759,7 +759,8 @@ fn nd6_timer(_unused: *mut c_void) {
     }
     mtx_leave(&ND6_MTX);
 
-    let secs = (expire - uptime).max(1) as i32;
+    // As the C: to `int`, then clamped (`expire` is at most `nd6_gctimer` ahead, so it fits).
+    let secs = ((expire - uptime) as i32).max(1);
 
     net_lock();
     if !ND6_LIST.0.is_empty() {
@@ -893,7 +894,10 @@ pub fn nd6_expire_timer_update(ia6: &In6Ifaddr) {
     if !timeout_pending(&ND6_EXPIRE_TIMEOUT)
         || ND6_EXPIRE_NEXT.load(Ordering::Relaxed) > expire_time
     {
-        let secs = (expire_time - getuptime()).max(0) as i32;
+        // The C stores the difference in an `int` first and clamps after: a lifetime past
+        // INT_MAX seconds wraps negative there and is clamped to 0, which this keeps (clamping
+        // the `time_t` first would hand `timeout_add_sec` a negative value).
+        let secs = ((expire_time - getuptime()) as i32).max(0);
 
         let _ = timeout_add_sec(&ND6_EXPIRE_TIMEOUT, secs);
         ND6_EXPIRE_NEXT.store(expire_time, Ordering::Relaxed);
@@ -2262,6 +2266,37 @@ pub(crate) mod tests {
         nd6_rtrequest(ifp, i32::from(RTM_DELETE), rt);
         net_unlock();
         assert!(ND6_LIST.0.is_empty());
+    }
+
+    #[test]
+    fn a_lifetime_past_int_max_seconds_rearms_the_expiry_at_once_as_in_c() {
+        // `ifconfig <if> inet6 <addr> vltime 3000000000 pltime 3000000000`: finite, but more
+        // seconds than an `int` holds. nd6.c:446-450 truncates to `int` (negative) and clamps
+        // to 0, so the expiry timeout is due in the next tick; it must not overflow.
+        let (_g, ifp) = nd6_setup();
+        let ia = fake_ifa6(ifp, OURS6);
+        let lifetime: u32 = 3_000_000_000;
+        let now = getuptime();
+        let end = now + Time::from(lifetime);
+        ia.ia6_lifetime
+            .set(crate::netinet6::in6_var::In6Addrlifetime {
+                ia6t_expire: end,
+                ia6t_preferred: end,
+                ia6t_vltime: lifetime,
+                ia6t_pltime: lifetime,
+            });
+
+        let t0 = crate::kern::kern_clock::ticks();
+        nd6_expire_timer_update(ia);
+
+        assert!(timeout_pending(&ND6_EXPIRE_TIMEOUT));
+        assert_eq!(
+            ND6_EXPIRE_TIMEOUT.to_time.get().wrapping_sub(t0),
+            1,
+            "timeout_add_sec(.., 0): due in the next tick"
+        );
+        assert_eq!(ND6_EXPIRE_NEXT.load(Ordering::Relaxed), end + 1);
+        crate::kern::kern_timeout::timeout_del(&ND6_EXPIRE_TIMEOUT);
     }
 }
 /* </TESTS> */
