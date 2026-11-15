@@ -149,14 +149,17 @@ STACK_PROTECTOR=
 /// `/etc/clang-defaults.cfg`, a clang configuration file (`--config`, its options before
 /// the command line's): what the base system's clang does by default and DevTools' does
 /// not, the same compile defaults as `world.py`'s `COMPILE_DEFAULTS` where the build needs
-/// them (each kept because the build inside EmiBSD failed without it).
+/// them: each is here because `make build` inside EmiBSD failed without it. The others of
+/// `world.py` are not needed: nothing failed on an implicit declaration
+/// (`-Wno-error=implicit-function-declaration`, `implicit-int`), and DWARF 2
+/// (`-fdebug-default-version=2`) is for its reproducible sets, not for a build.
 ///
 /// - `-Wno-pointer-sign`: the pin's clang makes `-Wpointer-sign` `DefaultIgnore`
 ///   (`gnu/llvm/clang/include/clang/Basic/DiagnosticSemaKinds.td`, the diagnostic
 ///   `ext_typecheck_convert_incompatible_pointer_sign`); upstream's, and so DevTools', is
-///   on, and the libraries that build with `-Werror` (librthread, libssl, libtls) then
-///   fail on `char *` passed as `uint8_t *`. The cross build turns it off where `-Werror`
-///   is (`userland.rs`, `WERROR_DEFAULTS`).
+///   on, and what builds with `-Werror` then fails on `char *` passed as `uint8_t *`:
+///   librthread, libssl, libtls, usr.bin/openssl, usr.bin/ssh (`mux.c`) and ld.so. The
+///   cross build turns it off where `-Werror` is (`userland.rs`, `WERROR_DEFAULTS`).
 /// - `-Wno-error=unused-but-set-global`: LLVM 23's clang warns about a static global that
 ///   is set and never read (`-Wunused-but-set-global`, in `-Wunused`); the pin's clang has
 ///   no such diagnostic (its `Sema::DiagnoseUnusedButSetDecl`,
@@ -508,27 +511,37 @@ fn renamed_macro(text: &[u8]) -> Option<Vec<u8>> {
     found.then_some(out)
 }
 
-/// Renames `__OpenBSD__` to `__EmiBSD__` in every regular file under `dir` (the disk's
-/// copy of the sources, never the reference tree), as `world.py`'s `tree` step does in its
-/// copy: DevTools' clang predefines `__EmiBSD__` alone (the user's decision of 2026-11-04).
-/// Symbolic links are left alone. A file rewritten in place keeps its mode; an APFS clone
-/// then gets its own blocks. Returns how many files changed.
-fn rename_openbsd_macro(dir: &Path) -> Result<usize> {
-    let mut n = 0;
-    for entry in fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))? {
-        let path = entry.map_err(|e| format!("{}: {e}", dir.display()))?.path();
-        let kind = fs::symlink_metadata(&path)
-            .map_err(|e| format!("{}: {e}", path.display()))?
-            .file_type();
-        if kind.is_dir() {
-            n += rename_openbsd_macro(&path)?;
-        } else if kind.is_file() {
-            let text = fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-            if let Some(new) = renamed_macro(&text) {
-                fs::write(&path, new).map_err(|e| format!("{}: {e}", path.display()))?;
-                n += 1;
+/// Renames `__OpenBSD__` to `__EmiBSD__` in `path`, a regular file, or in every regular
+/// file under it, a directory, never descending into the names in `skip` (relative to
+/// `path`), as `world.py`'s `tree` step does in its copy: DevTools' clang predefines
+/// `__EmiBSD__` alone (the user's decision of 2026-11-04). Only the disk's copies are
+/// given, never the reference tree. Symbolic links are left alone. A file rewritten in
+/// place keeps its mode; an APFS clone then gets its own blocks. Returns how many files
+/// changed.
+fn rename_openbsd_macro(path: &Path, skip: &[&str]) -> Result<usize> {
+    let kind = fs::symlink_metadata(path)
+        .map_err(|e| format!("{}: {e}", path.display()))?
+        .file_type();
+    if kind.is_file() {
+        let text = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        return Ok(match renamed_macro(&text) {
+            Some(new) => {
+                fs::write(path, new).map_err(|e| format!("{}: {e}", path.display()))?;
+                1
             }
+            None => 0,
+        });
+    }
+    if !kind.is_dir() {
+        return Ok(0);
+    }
+    let mut n = 0;
+    for entry in fs::read_dir(path).map_err(|e| format!("{}: {e}", path.display()))? {
+        let entry = entry.map_err(|e| format!("{}: {e}", path.display()))?;
+        if skip.iter().any(|s| entry.file_name() == *s) {
+            continue;
         }
+        n += rename_openbsd_macro(&entry.path(), &[])?;
     }
     Ok(n)
 }
@@ -553,7 +566,17 @@ pub(crate) fn selfhost_userland(root: &Path, arch: Arch, llvm: Pinned<'_>) -> Re
     run(Command::new("find")
         .arg(&drm)
         .args(["-type", "f", "!", "-name", "*.h", "-delete"]))?;
-    let renamed = rename_openbsd_macro(&usr_src)?;
+    let renamed = rename_openbsd_macro(&usr_src, &[])?;
+    // The base's own headers in /usr/include were installed by the cross build on the Mac,
+    // which compiles with `__OpenBSD__`: the six of LibreSSL that test it (`openssl/bio.h`
+    // defines a three-argument `__bounded__` when it is not set, which then breaks
+    // `<stdio.h>`'s four-argument use in every program that includes both) get the same
+    // rename, as `make includes` from the renamed copy would install them; it cannot,
+    // since libcrypto's `includes` needs /usr/bin/perl for `obj_mac.h`, and include's loop
+    // stops there. DevTools' libc++ headers (`c++/`) are DevTools' and name both macros
+    // already.
+    let headers = rename_openbsd_macro(&rootdir.join("usr/include"), &["c++"])?;
+    println!("  /usr/include: __OpenBSD__ renamed __EmiBSD__ in {headers} headers");
     println!(
         "  /usr/src: {} of {}; __OpenBSD__ renamed __EmiBSD__ in {renamed} files",
         USR_SRC.join(" "),
@@ -725,12 +748,22 @@ mod tests {
         let outside = dir.with_extension("outside");
         fs::write(&outside, "__OpenBSD__").unwrap();
         std::os::unix::fs::symlink(&outside, dir.join("link")).unwrap();
-        assert_eq!(rename_openbsd_macro(&dir).unwrap(), 1);
+        fs::create_dir_all(dir.join("c++/v1")).unwrap();
+        fs::write(dir.join("c++/v1/__config"), "defined(__OpenBSD__)").unwrap();
+        assert_eq!(rename_openbsd_macro(&dir, &["c++"]).unwrap(), 1);
         assert_eq!(
             fs::read_to_string(dir.join("a/b/x.h")).unwrap(),
             "#ifdef __EmiBSD__\n"
         );
         assert_eq!(fs::read_to_string(&outside).unwrap(), "__OpenBSD__");
+        // A skipped directory is skipped only at the top.
+        assert_eq!(
+            fs::read_to_string(dir.join("c++/v1/__config")).unwrap(),
+            "defined(__OpenBSD__)"
+        );
+        assert_eq!(rename_openbsd_macro(&dir.join("c++"), &["c++"]).unwrap(), 1);
+        assert_eq!(rename_openbsd_macro(&outside, &[]).unwrap(), 1);
+        assert_eq!(fs::read_to_string(&outside).unwrap(), "__EmiBSD__");
         fs::remove_dir_all(&dir).unwrap();
         fs::remove_file(&outside).unwrap();
     }
