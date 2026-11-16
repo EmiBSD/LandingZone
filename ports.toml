@@ -1829,10 +1829,10 @@ notes = "license: public domain, kept whole; __USE_MI_MPLOCK"
 [[file]]
 c = "sys/arch/amd64/include/i82489reg.h"
 rust = "sys/arch/amd64/include/i82489reg.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "f75ab1c90901bab273ffdbe8b517cae08f69fdfb"
-notes = "M4: the registers and bits lapic.c's boot path uses (ID, version, TPR, EOI, SVR, LVTs, timer, delivery modes, LAPIC_BASE, MSR_X2APIC_BASE); the ICR fields, ESR, LDR/DFR, ISR/TMR/IRR and the x2APIC MSR map are M5; M11a: LAPIC_ICRLO and LAPIC_ICRHI for the IPIs (reference test with the ICR fields); ESR, LDR/DFR, ISR/TMR/IRR and the rest of the x2APIC MSR map come with their users; M14: MSR_X2APIC_ID, X2APIC_ID_MASK (mptramp.S)"
+notes = "the whole header (TD1; 75 of its 116 defines had come with lapic.c and the IPIs): every local APIC register with the fields and values nested under it, LAPIC_BASE, LAPIC_IRQ_MASK (const fn) and the x2APIC MSR map; register offsets are i32, fields u32; a reference-backed test of every value"
 
 [[file]]
 c = "sys/arch/amd64/include/i82489var.h"
