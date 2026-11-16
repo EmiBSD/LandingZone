@@ -184,7 +184,7 @@ smokes := "smoke-boot smoke-shell smoke-login smoke-net smoke-route smoke-diag s
     "smoke-divert smoke-tcpdump smoke-inet6 smoke-disk smoke-ufsopts smoke-fs smoke-cd smoke-softraid " + \
     "smoke-nvme smoke-ahci smoke-smmu smoke-power smoke-siop smoke-wd smoke-fd smoke-mpi smoke-sdmmc smoke-em smoke-igb smoke-re smoke-vmx smoke-pcn smoke-ne smoke-fxp smoke-dc smoke-vmwpvs smoke-efiboot smoke-acpi smoke-gicv3 smoke-clock smoke-rtc " + \
     "smoke-nfs smoke-ext2fs smoke-fuse smoke-thrsleep smoke-ntfs smoke-tcpbench smoke-mp smoke-ddbmp " + \
-    "smoke-net-mp smoke-up smoke-audio smoke-usb smoke-puc smoke-fb smoke-wscons smoke-vga smoke-kbd " + \
+    "smoke-net-mp smoke-up smoke-sve smoke-audio smoke-usb smoke-puc smoke-fb smoke-wscons smoke-vga smoke-kbd " + \
     "smoke-powerbtn smoke-ukc smoke-ppb smoke-dmar smoke-iic smoke-ipmi smoke-tpm smoke-virtio smoke-viogpu " + \
     "smoke-mouse smoke-ugen smoke-ehci smoke-uaudio smoke-uhci smoke-ohci smoke-cdce smoke-ucom " + \
     "smoke-pckbc smoke-eap smoke-lpt smoke-bell smoke-cd80"
@@ -2448,6 +2448,21 @@ build-up:
 # passes (`build-up` makes `bsd.up`). Since M13 amd64's processor comes from the MADT as the
 # boot processor (`apid 0 (boot processor)`, as OpenBSD's `bsd.sp` prints it), no longer as
 # the `(uniprocessor)` mainbus attached without tables. Part of `smoke`.
+# TD1 (2026-11-16): a processor with SVE. `cpu_init`'s SVE setup wrote ZCR_EL1 with FP still
+# trapped at EL1, so every such CPU took "FP exception in kernel" while it attached, as
+# OpenBSD 8.0 does (docs/EXTERNAL_BUGS.md, EXT-230); no smoke saw it, their Cortex-A72 has no
+# SVE. arm64 only, on QEMU's `a64fx` (`--cpu`): SVE, and neither BTI nor pointer
+# authentication, on which the init stand-in stops at its signals step (seen on neoverse-n2
+# and under hvf; not understood yet, docs/STATUS.md). The MP kernel attaches every CPU, SVE
+# is in the feature line, and the init stand-in runs to its end. Part of `smoke`.
+smoke-sve: (build-arm64 "--features qemu,multiprocessor") build-init-arm64
+    {{xtask}} smoke {{reject}} --reject "FP exception in kernel" {{smp}} --arch arm64 --cpu a64fx \
+        --kernel target/{{arm64}}/debug/bsd --ramdisk none \
+        --expect "bsd: booted on arm64" --expect "cpu0 at mainbus0 mpidr 0: " --expect ",SVE," \
+        --expect "cpu{{aps}} at mainbus0 mpidr {{aps}}: " --expect "selftest: {{ncpu}} cpus running" \
+        --expect "init: signals ok" --expect "init: processes ok" \
+        --expect "init exited with status 0 (signal 0)"
+
 smoke-up: build-up build-init-amd64 build-init-arm64
     {{xtask}} smoke {{reject}} --arch amd64 --kernel target/{{amd64}}/debug/bsd.up --ramdisk none \
         --expect "bsd: booted on amd64" --expect "acpimadt0 at acpi0 addr 0xfee00000: PC-AT compat" \

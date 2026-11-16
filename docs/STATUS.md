@@ -55,6 +55,12 @@ Blockers:
 - amd64 kernel stacks are tight: about 4.9 KB stay free under softraid I/O (M10f measure). TX.
 - A `diagnostic` MP kernel panics at boot (`uvm_page_physload: page size not set!`). TX.
 - Statistics counters the C bumps unlocked stay `Cell`s (docs/ARCHITECTURE.md, M11e). TX.
+- The init stand-in (`init/`, what `smoke-boot` loads) stops at its signals step, after
+  `init: ids and tcb ok`, on a CPU with BTI and pointer authentication: QEMU's neoverse-n2
+  (with or without SVE) and the Mac's own under `--accel hvf` (2026-11-16); it runs to its end
+  on cortex-a72 and a64fx. Not understood yet. The ramdisk's userland (OpenBSD's init, ksh,
+  the native toolchain) runs under hvf, so it is the stand-in, built without landing pads,
+  that the kernel does not get through a signal; no smoke runs on such a CPU.
 - Flakes: amd64 serial cut at QEMU exit (M16f); host test `no idleproc set on CPU0` (~1/80);
   EDK2's UhciDxe ASSERT on arm64 (EXT-1).
 

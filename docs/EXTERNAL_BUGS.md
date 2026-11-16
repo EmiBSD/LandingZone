@@ -48,6 +48,7 @@ means EmiBSD's code has it too ("Bugs the port reproduces").
 | EXT-182 | `sys/dev/isa/spkr.c:190` | 26 or more dots after a note divide by zero in `playtone` | root | crash | reproduced | same fault (Rust's division panics as the C traps) | open |
 | EXT-181 | `sys/dev/pckbc/pckbd.c:499` | opening the keyboard fails when the opener runs on the CPU that takes IRQ1 | root | wrong result | reproduced | same fault; smokes retry the open | open |
 | EXT-4 | OpenBSD `sys/dev/pci/ehci_pci.c:128` | 16-bit write to the 32-bit EHCI `USBINTR` register; OpenBSD 8.0 panics on arm64 QEMU | firmware/hardware | crash | reproduced | faithful; criterion restated (M16b) | open |
+| EXT-230 | OpenBSD `sys/arch/arm64/arm64/cpu.c:1851` | `cpu_init` writes `ZCR_EL1` with FP still trapped at EL1: every CPU with SVE takes "FP exception in kernel" while it attaches | firmware/hardware | crash | reproduced (in the port; OpenBSD 8.0 second-hand) | FP opened beside SVE around the write (a deviation); `smoke-sve` | open |
 | EXT-5 | QEMU I/O APIC with OpenBSD's cold routing (amd64) | ehci's INTx raised while its pin is masked and edge-triggered is dropped, the controller never interrupts | — | — | reproduced | faithful; criterion restated (M16b) | open, to analyse |
 | EXT-6 | QEMU `pci-ohci` or OpenBSD ohci(4) | a write to a stick through ohci halts the controller | — | — | reproduced | faithful; criterion restated (M16b) | open, to analyse |
 | EXT-7 | QEMU `tulip` or OpenBSD dc(4) | `failed to force tx to idle state`, `watchdog timeout`, no traffic | — | — | reproduced | faithful; criterion restated (M16c) | open, to analyse |
@@ -2863,6 +2864,34 @@ Every C line in this and the following sections is at the pin 3ce1f3f79392, unde
 - Reach: firmware/hardware.
 - Port's handling: the same lines (`smoke-viogpu` expects them).
 - Fix: `printf("\n")` before `virtio_attach_finish`, the size after the name.
+
+### EXT-230: `cpu_init` writes `ZCR_EL1` while FP is trapped: no boot on a CPU with SVE
+
+- Where: `sys/arch/arm64/arm64/cpu.c:1844-1856` at 3ce1f3f79392, `cpu_init`, "Setup SVE with
+  the default 128-bit vector length".
+- What: the block clears `CPACR_EL1.ZEN`'s trap for EL1, writes `ZCR_EL1` (line 1851) and
+  traps SVE again. It leaves `CPACR_EL1.FPEN` alone, and an access to `ZCR_EL1` also traps
+  while FPEN traps EL1. FP is trapped by then on every CPU: on the boot CPU efi0 attaches
+  before cpu0 (`mainbus.c:131-135`) and `efi_attach`'s `efi_leave` ends in `fpu_kernel_exit`,
+  which traps FPEN and ZEN; on the others `cpu_hatch` traps them before `cpu_init` runs. So
+  the write faults: "FP exception in kernel", `esr 0x1fe00000` (EC 0x07), `elr` at the
+  `msr`, while cpu0 attaches.
+- Reach: any arm64 machine whose processors implement SVE (`ID_AA64PFR0_EL1.SVE`); nothing a
+  user does. Apple's cores and the Cortex-A72 have no SVE.
+- Verified: reproduced in the port on 2026-11-16, QEMU TCG, `-M virt`, the MP kernel on two
+  CPUs: `-cpu neoverse-n2` (cpu0 prints its `SVE2,...` line, then `FP exception in kernel`,
+  `esr 0x1fe00000 far 0x0000000000000000 elr 0xffffffff801370c0`) and `-cpu a64fx` (the same
+  after its feature line). OpenBSD 8.0 itself: reported by the Kernel repository's session
+  (GENERIC.MP #120, the diff-openbsd snapshot, QEMU 11.1.3 `-M virt,acpi=off -cpu
+  neoverse-n2` stops at `cpu_init+0xf8: msr s3_0_c1_c2_0, x8`; `-cpu neoverse-n2,sve=off`
+  does not fault); not repeated here, and not checked on hardware with SVE.
+- Port's handling: `sys/arch/arm64/arm64/cpu.rs` opens FPEN for EL1 beside ZEN around the
+  write and puts FPEN back as it was (a deviation, in the file's list; the change is the
+  Kernel repository's, its commit 94d0c9ed). With it neoverse-n2 and a64fx attach every CPU
+  and reach user mode; `just smoke-sve` boots a64fx and fails without the change.
+- Severity: crash (the kernel does not boot).
+- Fix: in that block, also set `CPACR_FPEN_TRAP_EL0` (EL1 may use FP) before the write of
+  `ZCR_EL1`, and restore the saved FPEN bits after it.
 
 ## boot loaders
 

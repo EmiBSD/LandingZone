@@ -52,6 +52,10 @@
 //! `cpu_psci_idle_cycle`; the kstats.
 //!
 //! ## Deviations
+//! - `cpu_init`'s SVE setup opens FP for EL1 beside SVE around its write of `ZCR_EL1`, and
+//!   puts FP back as it was. The C opens SVE alone, and the write traps ("FP exception in
+//!   kernel", EC 0x07) on every CPU with SVE, since FP is trapped by then
+//!   (docs/EXTERNAL_BUGS.md, EXT-230; OpenBSD 8.0 stops at the same instruction).
 //! - The application processors are started through the boot protocol (`BootMp`, kept by
 //!   `initarm`), not PSCI `CPU_ON` or a spin table into `locore.S`'s `cpu_hatch_secondary`
 //!   (`docs/ARCHITECTURE.md`). `cpu_start_secondary` still reads the `enable-method` and
@@ -2276,16 +2280,24 @@ pub fn cpu_init() {
     // Setup SVE with the default 128-bit vector length.
     if CPU_ID_AA64PFR0.load(Ordering::Relaxed) & ID_AA64PFR0_SVE_MASK >= ID_AA64PFR0_SVE_IMPL {
         let mut cpacr = read_specialreg!("cpacr_el1");
-        cpacr &= !CPACR_ZEN_MASK;
-        cpacr |= CPACR_ZEN_TRAP_EL0;
-        // SAFETY: SVE is enabled at EL1 just long enough to write ZCR_EL1 (by encoding,
-        // the assembler wants SVE for the name), then trapped again.
+        // The C opens ZEN alone. A write of ZCR_EL1 also traps while CPACR_EL1.FPEN traps
+        // EL1, and it does here on every CPU: on the boot CPU efi0 has attached and
+        // `efi_leave`'s `fpu_kernel_exit` trapped FP again, and `cpu_hatch` traps it on the
+        // others. So FP is opened for EL1 beside SVE, and put back as it was (a deviation,
+        // docs/EXTERNAL_BUGS.md EXT-230).
+        let fpen = cpacr & CPACR_FPEN_MASK;
+        cpacr &= !(CPACR_ZEN_MASK | CPACR_FPEN_MASK);
+        cpacr |= CPACR_ZEN_TRAP_EL0 | CPACR_FPEN_TRAP_EL0;
+        // SAFETY: SVE and FP are open at EL1 just long enough to write ZCR_EL1 (by encoding,
+        // the assembler wants SVE for the name): no FP or SVE register is read or written
+        // in between, EL0 stays trapped throughout, and then SVE is trapped again and FP is
+        // as it was.
         unsafe {
             write_specialreg!("cpacr_el1", cpacr);
             asm!("isb", options(nomem, nostack, preserves_flags));
             write_specialreg!("s3_0_c1_c2_0", 0);
-            cpacr &= !CPACR_ZEN_MASK;
-            cpacr |= CPACR_ZEN_TRAP_ALL1;
+            cpacr &= !(CPACR_ZEN_MASK | CPACR_FPEN_MASK);
+            cpacr |= CPACR_ZEN_TRAP_ALL1 | fpen;
             write_specialreg!("cpacr_el1", cpacr);
             asm!("isb", options(nomem, nostack, preserves_flags));
         }
