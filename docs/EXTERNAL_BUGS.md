@@ -268,6 +268,7 @@ means EmiBSD's code has it too ("Bugs the port reproduces").
 | EXT-215 | `sys/dev/pci/pcscp.c:304` | attach's error path unmaps the DMA map pointer, not the MDL mapping | alloc-failure | wrong result | read | not ported (M17) | open |
 | EXT-226 | `sys/dev/rnd.c:659` | `random_start` reads kernel text through a misaligned `u_int32_t *` (amd64) | — (the kernel's own link) | cosmetic | reproduced | read unaligned | open |
 | EXT-229 | `sys/arch/arm64/include/armreg.h:813` | `MAIR_ATTR_MASK(idx)` expands to `(0xff << ((n)* 8))`: `n` is not its parameter | — (the macro has no user) | cosmetic | read | `mair_attr_mask(idx)` shifts by `idx` | open |
+| EXT-231 | `sys/arch/amd64/include/specialreg.h:1540` | `SVM_INTERCEPT_DR3_READ` is `(1UL << 2)`, the bit of `SVM_INTERCEPT_DR2_READ` | — (the constant has no user) | cosmetic | read | `SVM_INTERCEPT_DR3_READ` is `1 << 3` | open |
 
 ## Entries (EXT-1 to EXT-8, EXT-192 to EXT-197)
 
@@ -791,6 +792,25 @@ Every C line in this and the following sections is at the pin 3ce1f3f79392, unde
   `idx` (a deviation listed in the file).
 - Severity: cosmetic.
 - Fix: `(0xff << ((idx) * 8))`.
+
+### EXT-231: `SVM_INTERCEPT_DR3_READ` has DR2's bit
+
+- Where: `sys/arch/amd64/include/specialreg.h:1540` at 3ce1f3f79392.
+- What: the VMCB's debug-register intercept word has one read bit per register, 0 to 15, then
+  one write bit per register, 16 to 31. The header numbers them so (`SVM_INTERCEPT_DR0_READ`
+  is `(1UL << 0)`, ..., `SVM_INTERCEPT_DR15_READ` is `(1UL << 15)`,
+  `SVM_INTERCEPT_DR3_WRITE` is `(1UL << 19)`), except for line 1540:
+  `#define SVM_INTERCEPT_DR3_READ (1UL << 2)`, the value of `SVM_INTERCEPT_DR2_READ` on the
+  line above. Bit 3 is meant.
+- Reach: none. `grep -rn SVM_INTERCEPT_DR sys` finds only the definitions: vmm(4) does not
+  set the debug-register intercepts by these names. A first user that wanted to intercept
+  reads of DR3 would intercept DR2 twice and DR3 not at all.
+- Verified: read.
+- Port's handling: `sys/arch/amd64/include/specialreg.rs`, `SVM_INTERCEPT_DR3_READ` is
+  `1 << 3` (a deviation listed in the file); the file's reference-backed test holds the
+  header's value, so a pin that fixes it is noticed.
+- Severity: cosmetic.
+- Fix: `(1UL << 3)`.
 
 ### EXT-227: an address lifetime past INT_MAX seconds rearms the expiry timer every tick
 
