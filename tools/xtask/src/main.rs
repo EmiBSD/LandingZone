@@ -657,18 +657,43 @@ fn is_structural(rel: &str) -> bool {
 }
 
 pub(crate) fn walk_rs(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
+    walk_ext(dir, "rs", out)
+}
+
+/// Every file with the extension `ext` under `dir`, but for `target` directories.
+fn walk_ext(dir: &Path, ext: &str, out: &mut Vec<PathBuf>) -> Result<()> {
     for entry in fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))? {
         let path = entry?.path();
         if path.is_dir() {
             if path.file_name().and_then(|n| n.to_str()) == Some("target") {
                 continue;
             }
-            walk_rs(&path, out)?;
-        } else if path.extension().and_then(|x| x.to_str()) == Some("rs") {
+            walk_ext(&path, ext, out)?;
+        } else if path.extension().and_then(|x| x.to_str()) == Some(ext) {
             out.push(path);
         }
     }
     Ok(())
+}
+
+/// Whether the C file `c` (a path inside the reference tree) belongs to the kernel's
+/// inventory (TD0, docs/ROADMAP.md): a `.c` under `sys/` that is not another architecture's
+/// (`arch/` other than amd64 and arm64) and not a driver's (a subdirectory of `dev/`; `dev/`'s
+/// own files are in). `ports check` refuses such a file with no row.
+fn in_inventory(c: &str) -> bool {
+    let Some(rest) = c.strip_prefix("sys/") else {
+        return false;
+    };
+    if !rest.ends_with(".c") {
+        return false;
+    }
+    let parts: Vec<&str> = rest.split('/').collect();
+    match parts.as_slice() {
+        ["arch", arch, ..] => matches!(*arch, "amd64" | "arm64"),
+        ["dev", _file] => true,
+        ["dev", ..] => false,
+        _ => true,
+    }
 }
 
 /// Second-level grouping used by `ports status`: `sys/kern/x.c` → `kern`,
@@ -758,6 +783,26 @@ fn ports_check(root: &Path) -> Result<()> {
         for d in &e.deps {
             if !ports.files.iter().any(|o| &o.c == d) {
                 errors.push(format!("{tag}: dep {d} has no entry"));
+            }
+        }
+    }
+
+    // TD0: every C file of the kernel's inventory has a row.
+    if have_reference {
+        let mut c_files = Vec::new();
+        walk_ext(&reference.join("sys"), "c", &mut c_files)?;
+        c_files.sort();
+        for f in &c_files {
+            let rel = f
+                .strip_prefix(&reference)
+                .unwrap_or(f)
+                .to_string_lossy()
+                .replace('\\', "/");
+            if in_inventory(&rel) && !seen_c.contains(rel.as_str()) {
+                errors.push(format!(
+                    "{rel}: a kernel C file with no row in ports.toml (add a [[file]] entry: \
+                     todo, or skipped with its reason)"
+                ));
             }
         }
     }
@@ -1024,6 +1069,35 @@ fn git(repo: &Path, args: &[&str]) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inventory_is_the_kernel_without_other_archs_and_drivers() {
+        for c in [
+            "sys/kern/kern_srp.c",
+            "sys/uvm/uvm_device.c",
+            "sys/net80211/ieee80211.c",
+            "sys/miscfs/fifofs/fifo_vnops.c",
+            "sys/lib/libkern/ffs.c",
+            "sys/dev/ksyms.c",
+            "sys/arch/amd64/amd64/mtrr.c",
+            "sys/arch/amd64/stand/boot/conf.c",
+            "sys/arch/arm64/dev/aplintc.c",
+        ] {
+            assert!(in_inventory(c), "{c}");
+        }
+        for c in [
+            "sys/dev/pci/if_em.c",
+            "sys/dev/ic/ne2000.c",
+            "sys/dev/pci/drm/i915/i915_drv.c",
+            "sys/arch/sparc64/sparc64/pmap.c",
+            "sys/arch/arm/arm/cpufunc.c",
+            "sys/kern/kern_srp.h",
+            "sys/arch/amd64/amd64/locore.S",
+            "lib/libc/gen/fts.c",
+        ] {
+            assert!(!in_inventory(c), "{c}");
+        }
+    }
 
     #[test]
     fn memory_and_timeout_are_optional_and_bounded() {

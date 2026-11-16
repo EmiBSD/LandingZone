@@ -1,6 +1,7 @@
 # Porting tracker: the source of truth for what has been ported from OpenBSD.
 # Schema and rules: .claude/rules/ports-tracker.md.  Validate: cargo xtask ports check.
-# Entries are added when a milestone claims them, never by bulk-importing the C tree.
+# Entries are added when a milestone claims them; TD0 (2026-11-15) claimed every .c of the kernel
+# tree outside the drivers, and `ports check` refuses such a file with no row.
 
 [meta]
 upstream = "https://github.com/EmiBSD/OpenBSD-src"
@@ -12234,3 +12235,1618 @@ c = "sys/kern/kern_ktrace.c"
 rust = "sys/kern/kern_ktrace.rs"
 status = "todo"
 notes = "TD3: option KTRACE (GENERIC): sys_ktrace, ktr* record writers, and the KTRACE blocks other ported files left out"
+
+# ---------------------------------------------------------------------------
+# TD0: the inventory. Every .c of the pinned kernel tree outside the drivers (sys/ less the
+# other architectures' arch/ and less the subdirectories of dev/) that had no row gets one:
+# todo with the milestone that claims it, or skipped with its reason. `ports check` refuses
+# such a file with no row.
+# ---------------------------------------------------------------------------
+
+[[file]]
+c = "sys/arch/amd64/amd64/aesni.c"
+rust = "sys/arch/amd64/amd64/aesni.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/aesni.c crypto\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/amd64_mem.c"
+rust = "sys/arch/amd64/amd64/amd64_mem.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/amd64_mem.c mtrr\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/amd64errata.c"
+rust = "sys/arch/amd64/amd64/amd64errata.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/amd64errata.c\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/cacheinfo.c"
+rust = "sys/arch/amd64/amd64/cacheinfo.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/cacheinfo.c\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/codepatch.c"
+rust = "sys/arch/amd64/amd64/codepatch.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/codepatch.c\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/db_disasm.c"
+rust = "sys/arch/amd64/amd64/db_disasm.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/db_disasm.c ddb\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/db_memrw.c"
+rust = "sys/arch/amd64/amd64/db_memrw.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/db_memrw.c ddb\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/dkcsum.c"
+rust = "sys/arch/amd64/amd64/dkcsum.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/dkcsum.c bios\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/efi_machdep.c"
+rust = "sys/arch/amd64/amd64/efi_machdep.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/efi_machdep.c efi\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/est.c"
+rust = "sys/arch/amd64/amd64/est.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/est.c !small_kernel\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/ghcb.c"
+rust = "sys/arch/amd64/amd64/ghcb.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/ghcb.c amdsev\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/hibernate_machdep.c"
+rust = "sys/arch/amd64/amd64/hibernate_machdep.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/hibernate_machdep.c hibernate\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/k1x-pstate.c"
+rust = "sys/arch/amd64/amd64/k1x_pstate.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/k1x-pstate.c !small_kernel\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/kexec.c"
+rust = "sys/arch/amd64/amd64/kexec.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/kexec.c kexec needs-flag\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/mp_setperf.c"
+rust = "sys/arch/amd64/amd64/mp_setperf.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/mp_setperf.c multiprocessor\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/mpbios_intr_fixup.c"
+rust = "sys/arch/amd64/amd64/mpbios_intr_fixup.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/mpbios_intr_fixup.c mpbios & pci\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/mpbios.c"
+rust = "sys/arch/amd64/amd64/mpbios.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/mpbios.c mpbios needs-flag\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/mtrr.c"
+rust = "sys/arch/amd64/amd64/mtrr.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/mtrr.c mtrr\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/nvram.c"
+rust = "sys/arch/amd64/amd64/nvram.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/nvram.c nvram needs-flag\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/pctr.c"
+rust = "sys/arch/amd64/amd64/pctr.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/pctr.c pctr needs-flag\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/powernow-k8.c"
+rust = "sys/arch/amd64/amd64/powernow_k8.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/powernow-k8.c !small_kernel\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/process_machdep.c"
+rust = "sys/arch/amd64/amd64/process_machdep.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/process_machdep.c\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/rbus_machdep.c"
+rust = "sys/arch/amd64/amd64/rbus_machdep.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/rbus_machdep.c cardbus\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/sev_bus_space.c"
+rust = "sys/arch/amd64/amd64/sev_bus_space.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/sev_bus_space.c amdsev\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/ucode.c"
+rust = "sys/arch/amd64/amd64/ucode.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/ucode.c !small_kernel\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/via.c"
+rust = "sys/arch/amd64/amd64/via.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/via.c\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/vmm_machdep.c"
+rust = "sys/arch/amd64/amd64/vmm_machdep.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/vmm_machdep.c vmm needs-flag\""
+
+[[file]]
+c = "sys/arch/amd64/amd64/wscons_machdep.c"
+rust = "sys/arch/amd64/amd64/wscons_machdep.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/amd64/wscons_machdep.c wsdisplay\""
+
+[[file]]
+c = "sys/arch/amd64/pci/aapic.c"
+rust = "sys/arch/amd64/pci/aapic.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/pci/aapic.c aapic\""
+
+[[file]]
+c = "sys/arch/amd64/pci/agp_machdep.c"
+rust = "sys/arch/amd64/pci/agp_machdep.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/pci/agp_machdep.c agp | inteldrm\""
+
+[[file]]
+c = "sys/arch/amd64/pci/pchb.c"
+rust = "sys/arch/amd64/pci/pchb.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/pci/pchb.c pchb\""
+
+[[file]]
+c = "sys/arch/amd64/pci/pcib.c"
+rust = "sys/arch/amd64/pci/pcib.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/pci/pcib.c pcib | amdpcib | tcpcib\""
+
+[[file]]
+c = "sys/arch/amd64/pci/vga_post.c"
+rust = "sys/arch/amd64/pci/vga_post.rs"
+status = "todo"
+notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/pci/vga_post.c vga_pci & x86emu\""
+
+[[file]]
+c = "sys/arch/amd64/stand/boot/conf.c"
+rust = "sys/arch/amd64/stand/boot/conf.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/cdboot/conf.c"
+rust = "sys/arch/amd64/stand/cdboot/conf.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/libsa/bioscons.c"
+rust = "sys/arch/amd64/stand/libsa/bioscons.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/libsa/biosdev.c"
+rust = "sys/arch/amd64/stand/libsa/biosdev.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/libsa/biosprobe.c"
+rust = "sys/arch/amd64/stand/libsa/biosprobe.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/libsa/cmd_i386.c"
+rust = "sys/arch/amd64/stand/libsa/cmd_i386.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/libsa/dev_i386.c"
+rust = "sys/arch/amd64/stand/libsa/dev_i386.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/libsa/diskprobe.c"
+rust = "sys/arch/amd64/stand/libsa/diskprobe.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/libsa/exec_i386.c"
+rust = "sys/arch/amd64/stand/libsa/exec_i386.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/libsa/gateA20.c"
+rust = "sys/arch/amd64/stand/libsa/gateA20.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/libsa/machdep.c"
+rust = "sys/arch/amd64/stand/libsa/machdep.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/libsa/memprobe.c"
+rust = "sys/arch/amd64/stand/libsa/memprobe.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/libsa/pxe_net.c"
+rust = "sys/arch/amd64/stand/libsa/pxe_net.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/libsa/pxe.c"
+rust = "sys/arch/amd64/stand/libsa/pxe.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/libsa/time.c"
+rust = "sys/arch/amd64/stand/libsa/time.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/pxeboot/conf.c"
+rust = "sys/arch/amd64/stand/pxeboot/conf.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/pxeboot/devopen.c"
+rust = "sys/arch/amd64/stand/pxeboot/devopen.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/pxeboot/open.c"
+rust = "sys/arch/amd64/stand/pxeboot/open.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/pxeboot/pxe_udp.c"
+rust = "sys/arch/amd64/stand/pxeboot/pxe_udp.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/rdboot/cmd.c"
+rust = "sys/arch/amd64/stand/rdboot/cmd.rs"
+status = "todo"
+notes = "no milestone claims it: rdboot, a program linked with libc, libutil and libz (its Makefile's PROG) that runs in a ramdisk kernel's userland and loads the real kernel through kexec (sys/arch/amd64/amd64/kexec.c); the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/rdboot/disk.c"
+rust = "sys/arch/amd64/stand/rdboot/disk.rs"
+status = "todo"
+notes = "no milestone claims it: rdboot, a program linked with libc, libutil and libz (its Makefile's PROG) that runs in a ramdisk kernel's userland and loads the real kernel through kexec (sys/arch/amd64/amd64/kexec.c); the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/rdboot/rdboot.c"
+rust = "sys/arch/amd64/stand/rdboot/rdboot.rs"
+status = "todo"
+notes = "no milestone claims it: rdboot, a program linked with libc, libutil and libz (its Makefile's PROG) that runs in a ramdisk kernel's userland and loads the real kernel through kexec (sys/arch/amd64/amd64/kexec.c); the user's pending decision"
+
+[[file]]
+c = "sys/arch/amd64/stand/rdboot/vars.c"
+rust = "sys/arch/amd64/stand/rdboot/vars.rs"
+status = "todo"
+notes = "no milestone claims it: rdboot, a program linked with libc, libutil and libz (its Makefile's PROG) that runs in a ramdisk kernel's userland and loads the real kernel through kexec (sys/arch/amd64/amd64/kexec.c); the user's pending decision"
+
+[[file]]
+c = "sys/arch/arm64/arm64/acpiapm.c"
+rust = "sys/arch/arm64/arm64/acpiapm.rs"
+status = "todo"
+notes = "TD6: sys/arch/arm64/conf/files.arm64: \"file arch/arm64/arm64/acpiapm.c apm\""
+
+[[file]]
+c = "sys/arch/arm64/arm64/codepatch.c"
+rust = "sys/arch/arm64/arm64/codepatch.rs"
+status = "todo"
+notes = "TD6: sys/arch/arm64/conf/files.arm64: \"file arch/arm64/arm64/codepatch.c\""
+
+[[file]]
+c = "sys/arch/arm64/arm64/cryptox.c"
+rust = "sys/arch/arm64/arm64/cryptox.rs"
+status = "todo"
+notes = "TD6: sys/arch/arm64/conf/files.arm64: \"file arch/arm64/arm64/cryptox.c crypto\""
+
+[[file]]
+c = "sys/arch/arm64/arm64/db_disasm.c"
+rust = "sys/arch/arm64/arm64/db_disasm.rs"
+status = "todo"
+notes = "TD6: sys/arch/arm64/conf/files.arm64: \"file arch/arm64/arm64/db_disasm.c ddb\""
+
+[[file]]
+c = "sys/arch/arm64/arm64/disasm.c"
+rust = "sys/arch/arm64/arm64/disasm.rs"
+status = "todo"
+notes = "TD6: sys/arch/arm64/conf/files.arm64: \"file arch/arm64/arm64/disasm.c ddb\""
+
+[[file]]
+c = "sys/arch/arm64/arm64/hibernate_machdep.c"
+rust = "sys/arch/arm64/arm64/hibernate_machdep.rs"
+status = "todo"
+notes = "TD6: sys/arch/arm64/conf/files.arm64: \"file arch/arm64/arm64/hibernate_machdep.c hibernate\""
+
+[[file]]
+c = "sys/arch/arm64/arm64/openprom.c"
+rust = "sys/arch/arm64/arm64/openprom.rs"
+status = "todo"
+notes = "TD6: sys/arch/arm64/conf/files.arm64: \"file arch/arm64/arm64/openprom.c openprom needs-flag\""
+
+[[file]]
+c = "sys/arch/arm64/arm64/process_machdep.c"
+rust = "sys/arch/arm64/arm64/process_machdep.rs"
+status = "todo"
+notes = "TD6: sys/arch/arm64/conf/files.arm64: \"file arch/arm64/arm64/process_machdep.c\""
+
+[[file]]
+c = "sys/arch/arm64/dev/acpicpu.c"
+rust = "sys/arch/arm64/dev/acpicpu.rs"
+status = "todo"
+notes = "TD6: sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/acpicpu.c acpicpu\""
+
+[[file]]
+c = "sys/arch/arm64/dev/ampchwm.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: ampchwm(4), Ampere Altra's hardware monitor (ACPI AMPC0005; sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/ampchwm.c ampchwm\"); QEMU has none and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplaudio.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplaudio.c aplaudio\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplcpu.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplcpu.c aplcpu\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/apldart.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/apldart.c apldart\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/apldc.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/apldc.c apldc | aplhidev | apldckbd | apldcms needs-flag\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/apldma.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/apldma.c apldma\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/apldog.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/apldog.c apldog\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplefuse.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplefuse.c aplefuse\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplhidev.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplhidev.c aplhidev | aplkbd | aplms needs-flag\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/apliic.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/apliic.c apliic\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplintc.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplintc.c aplintc\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplmbox.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplmbox.c aplmbox\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplmca.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplmca.c aplmca\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplnco.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplnco.c aplnco\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplns.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplns.c aplns | nvme_ans\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplpcie.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplpcie.c aplpcie\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplpinctrl.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplpinctrl.c aplpinctrl\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplpmgr.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplpmgr.c aplpmgr\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplpmu.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplpmu.c aplpmu\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplpwm.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplpwm.c aplpwm\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplrtk.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplrtk.c aplrtk\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplsart.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplsart.c aplsart | aplns\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplsmc.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplsmc.c aplsmc\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplspi.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplspi.c aplspi\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/aplspmi.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: an Apple silicon driver (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/aplspmi.c aplspmi\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/apm.c"
+rust = "sys/arch/arm64/dev/apm.rs"
+status = "todo"
+notes = "TD6: sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/apm.c apm needs-flag\""
+
+[[file]]
+c = "sys/arch/arm64/dev/bcm2712_mip.c"
+rust = "sys/arch/arm64/dev/bcm2712_mip.rs"
+status = "todo"
+notes = "M17: bcmmip(4), brcm,bcm2712-mip (the Raspberry Pi 5's MSI controller); QEMU's virt has none, real hardware is M17 and the Pi model is the user's pending decision (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/bcm2712_mip.c bcmmip\")"
+
+[[file]]
+c = "sys/arch/arm64/dev/bcm2836_intr.c"
+rust = "sys/arch/arm64/dev/bcm2836_intr.rs"
+status = "todo"
+notes = "M17: bcmintc(4), brcm,bcm2836-armctrl-ic (the Raspberry Pi's legacy interrupt controller); QEMU's virt has none, real hardware is M17 and the Pi model is the user's pending decision (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/bcm2836_intr.c bcmintc\")"
+
+[[file]]
+c = "sys/arch/arm64/dev/rpiclock.c"
+rust = "sys/arch/arm64/dev/rpiclock.rs"
+status = "todo"
+notes = "M17: rpiclock(4), raspberrypi,rp1-clocks (the Raspberry Pi 5's RP1); QEMU's virt has none, real hardware is M17 and the Pi model is the user's pending decision (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/rpiclock.c rpiclock\")"
+
+[[file]]
+c = "sys/arch/arm64/dev/rpigpio.c"
+rust = "sys/arch/arm64/dev/rpigpio.rs"
+status = "todo"
+notes = "M17: rpigpio(4), raspberrypi,rp1-gpio (the Raspberry Pi 5's RP1); QEMU's virt has none, real hardware is M17 and the Pi model is the user's pending decision (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/rpigpio.c rpigpio\")"
+
+[[file]]
+c = "sys/arch/arm64/dev/rpipwm.c"
+rust = "sys/arch/arm64/dev/rpipwm.rs"
+status = "todo"
+notes = "M17: rpipwm(4), raspberrypi,rp1-pwm (the Raspberry Pi 5's RP1); QEMU's virt has none, real hardware is M17 and the Pi model is the user's pending decision (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/rpipwm.c rpipwm\")"
+
+[[file]]
+c = "sys/arch/arm64/dev/rpirtc.c"
+rust = "sys/arch/arm64/dev/rpirtc.rs"
+status = "todo"
+notes = "M17: rpirtc(4), raspberrypi,rpi-rtc (the Raspberry Pi firmware's RTC); QEMU's virt has none, real hardware is M17 and the Pi model is the user's pending decision (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/rpirtc.c rpirtc\")"
+
+[[file]]
+c = "sys/arch/arm64/dev/rpone.c"
+rust = "sys/arch/arm64/dev/rpone.rs"
+status = "todo"
+notes = "M17: rpone(4), the Raspberry Pi 5's RP1 I/O controller; QEMU's virt has none, real hardware is M17 and the Pi model is the user's pending decision (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/rpone.c rpone\")"
+
+[[file]]
+c = "sys/arch/arm64/dev/rtkit.c"
+rust = ""
+status = "skipped"
+notes = "deferred-driver: Apple RTKit, the co-processor protocol the apl* drivers use (sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/rtkit.c rtkit\"); QEMU has no such machine and drivers are outside TD (docs/ROADMAP.md, TD)"
+
+[[file]]
+c = "sys/arch/arm64/dev/smbios.c"
+rust = "sys/arch/arm64/dev/smbios.rs"
+status = "todo"
+notes = "TD6: sys/arch/arm64/conf/files.arm64: \"file arch/arm64/dev/smbios.c smbios\""
+
+[[file]]
+c = "sys/crypto/arc4.c"
+rust = "sys/crypto/arc4.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file crypto/arc4.c\""
+
+[[file]]
+c = "sys/crypto/cmac.c"
+rust = "sys/crypto/cmac.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file crypto/cmac.c wlan\""
+
+[[file]]
+c = "sys/crypto/key_wrap.c"
+rust = "sys/crypto/key_wrap.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file crypto/key_wrap.c wlan\""
+
+[[file]]
+c = "sys/crypto/michael.c"
+rust = "sys/crypto/michael.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file crypto/michael.c wlan\""
+
+[[file]]
+c = "sys/ddb/db_break.c"
+rust = "sys/ddb/db_break.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file ddb/db_break.c ddb\""
+
+[[file]]
+c = "sys/ddb/db_ctf.c"
+rust = "sys/ddb/db_ctf.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file ddb/db_ctf.c ddb\""
+
+[[file]]
+c = "sys/ddb/db_dwarf.c"
+rust = "sys/ddb/db_dwarf.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file ddb/db_dwarf.c ddb\""
+
+[[file]]
+c = "sys/ddb/db_elf.c"
+rust = "sys/ddb/db_elf.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file ddb/db_elf.c ddb\""
+
+[[file]]
+c = "sys/ddb/db_examine.c"
+rust = "sys/ddb/db_examine.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file ddb/db_examine.c ddb\""
+
+[[file]]
+c = "sys/ddb/db_hangman.c"
+rust = "sys/ddb/db_hangman.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file ddb/db_hangman.c ddb\""
+
+[[file]]
+c = "sys/ddb/db_prof.c"
+rust = "sys/ddb/db_prof.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file ddb/db_prof.c ddb & ddbprof & !gprof\""
+
+[[file]]
+c = "sys/ddb/db_rint.c"
+rust = "sys/ddb/db_rint.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file ddb/db_rint.c ddb\""
+
+[[file]]
+c = "sys/ddb/db_watch.c"
+rust = "sys/ddb/db_watch.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file ddb/db_watch.c ddb\""
+
+[[file]]
+c = "sys/dev/cninit.c"
+rust = "sys/dev/cninit.rs"
+status = "todo"
+notes = "TD4: sys/arch/amd64/conf/files.amd64: \"file dev/cninit.c\""
+
+[[file]]
+c = "sys/dev/hotplug.c"
+rust = "sys/dev/hotplug.rs"
+status = "todo"
+notes = "TD2: the unported! sites wait for it (sys/conf/files: \"file dev/hotplug.c hotplug needs-flag\")"
+
+[[file]]
+c = "sys/dev/kcov.c"
+rust = "sys/dev/kcov.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file dev/kcov.c kcov needs-flag\""
+
+[[file]]
+c = "sys/dev/kstat.c"
+rust = "sys/dev/kstat.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file dev/kstat.c kstat needs-flag\""
+
+[[file]]
+c = "sys/dev/ksyms.c"
+rust = "sys/dev/ksyms.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file dev/ksyms.c ksyms needs-flag\""
+
+[[file]]
+c = "sys/dev/radio.c"
+rust = "sys/dev/radio.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file dev/radio.c radio needs-flag\""
+
+[[file]]
+c = "sys/dev/spdmem.c"
+rust = "sys/dev/spdmem.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file dev/spdmem.c spdmem\""
+
+[[file]]
+c = "sys/dev/video.c"
+rust = "sys/dev/video.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file dev/video.c video needs-flag\""
+
+[[file]]
+c = "sys/dev/vscsi.c"
+rust = "sys/dev/vscsi.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file dev/vscsi.c vscsi needs-flag\""
+
+[[file]]
+c = "sys/kern/exec_conf.c"
+rust = "sys/kern/exec_conf.rs"
+status = "todo"
+notes = "TD2: the unported! sites wait for it (sys/conf/files: \"file kern/exec_conf.c\")"
+
+[[file]]
+c = "sys/kern/kern_srp.c"
+rust = "sys/kern/kern_srp.rs"
+status = "todo"
+notes = "TD2: the unported! sites wait for it (sys/conf/files: \"file kern/kern_srp.c\")"
+
+[[file]]
+c = "sys/kern/kern_uuid.c"
+rust = "sys/kern/kern_uuid.rs"
+status = "todo"
+notes = "TD2: the unported! sites wait for it (sys/conf/files: \"file kern/kern_uuid.c\")"
+
+[[file]]
+c = "sys/kern/kern_xcall.c"
+rust = "sys/kern/kern_xcall.rs"
+status = "todo"
+notes = "TD2: the unported! sites wait for it (sys/conf/files: \"file kern/kern_xcall.c xcall needs-flag\")"
+
+[[file]]
+c = "sys/kern/subr_blist.c"
+rust = "sys/kern/subr_blist.rs"
+status = "todo"
+notes = "TD2: the unported! sites wait for it (sys/conf/files: \"file kern/subr_blist.c\")"
+
+[[file]]
+c = "sys/kern/subr_hibernate.c"
+rust = "sys/kern/subr_hibernate.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file kern/subr_hibernate.c hibernate\""
+
+[[file]]
+c = "sys/kern/subr_kubsan.c"
+rust = "sys/kern/subr_kubsan.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file kern/subr_kubsan.c kubsan\""
+
+[[file]]
+c = "sys/kern/subr_poison.c"
+rust = "sys/kern/subr_poison.rs"
+status = "todo"
+notes = "TD2: the unported! sites wait for it (sys/conf/files: \"file kern/subr_poison.c diagnostic\")"
+
+[[file]]
+c = "sys/kern/subr_suspend.c"
+rust = "sys/kern/subr_suspend.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file kern/subr_suspend.c suspend\""
+
+[[file]]
+c = "sys/kern/subr_witness.c"
+rust = "sys/kern/subr_witness.rs"
+status = "todo"
+notes = "TD2: the unported! sites wait for it (sys/conf/files: \"file kern/subr_witness.c witness\")"
+
+[[file]]
+c = "sys/kern/tty_endrun.c"
+rust = "sys/kern/tty_endrun.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file kern/tty_endrun.c endrun needs-flag\""
+
+[[file]]
+c = "sys/kern/tty_msts.c"
+rust = "sys/kern/tty_msts.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file kern/tty_msts.c msts needs-flag\""
+
+[[file]]
+c = "sys/kern/tty_nmea.c"
+rust = "sys/kern/tty_nmea.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file kern/tty_nmea.c nmea needs-flag\""
+
+[[file]]
+c = "sys/lib/libkern/adddi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/anddi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/ashldi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/ashrdi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/bcmp.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: slice equality (==); the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/bcmp.S | lib/libkern/bcmp.c\")"
+
+[[file]]
+c = "sys/lib/libkern/bcopy.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: core::ptr::copy / slice::copy_within; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/bcopy.S | lib/libkern/bcopy.c\")"
+
+[[file]]
+c = "sys/lib/libkern/bzero.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: slice::fill(0) / core::ptr::write_bytes; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/bzero.S | lib/libkern/bzero.c\")"
+
+[[file]]
+c = "sys/lib/libkern/clzdi2.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.sparc64; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/cmpdi2.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/ctzdi2.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.sparc64; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/divdi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/ffs.c"
+rust = "sys/lib/libkern/ffs.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/ffs.S | lib/libkern/ffs.c\"; kern_sig.rs, efifb.rs, agintc.rs, wsmouseinput.rs and udf_vfsops.rs each carry a private ffs, where libkern's one belongs"
+
+[[file]]
+c = "sys/lib/libkern/fls.c"
+rust = "sys/lib/libkern/fls.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/fls.S | lib/libkern/fls.c\"; efifb.rs and agintc.rs each carry a private fls, where libkern's one belongs"
+
+[[file]]
+c = "sys/lib/libkern/flsl.c"
+rust = "sys/lib/libkern/flsl.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/flsl.S | lib/libkern/flsl.c\"; no ported file calls flsl yet, where libkern's one belongs"
+
+[[file]]
+c = "sys/lib/libkern/imax.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: Ord::max; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/imax.S | lib/libkern/imax.c\")"
+
+[[file]]
+c = "sys/lib/libkern/imin.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: Ord::min; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/imin.S | lib/libkern/imin.c\")"
+
+[[file]]
+c = "sys/lib/libkern/iordi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/lmax.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: Ord::max; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/lmax.S | lib/libkern/lmax.c\")"
+
+[[file]]
+c = "sys/lib/libkern/lmin.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: Ord::min; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/lmin.S | lib/libkern/lmin.c\")"
+
+[[file]]
+c = "sys/lib/libkern/lshldi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/lshrdi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/lshrti3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.sparc64; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/max.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: Ord::max; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/max.S | lib/libkern/max.c\")"
+
+[[file]]
+c = "sys/lib/libkern/mcount.c"
+rust = "sys/lib/libkern/mcount.rs"
+status = "todo"
+notes = "TD4: option GPROF, which GENERIC does not set (sys/conf/files: \"file lib/libkern/mcount.c gprof\")"
+
+[[file]]
+c = "sys/lib/libkern/memchr.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: iter().position on a byte slice; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/memchr.S | lib/libkern/memchr.c\")"
+
+[[file]]
+c = "sys/lib/libkern/memcmp.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: slice comparison (Ord::cmp, ==); the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/memcmp.S | lib/libkern/memcmp.c\")"
+
+[[file]]
+c = "sys/lib/libkern/memmove.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: core::ptr::copy / slice::copy_within; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/memmove.S | lib/libkern/memmove.c\")"
+
+[[file]]
+c = "sys/lib/libkern/min.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: Ord::min; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/min.S | lib/libkern/min.c\")"
+
+[[file]]
+c = "sys/lib/libkern/moddi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/muldi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/multi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.sparc64; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/negdi2.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/notdi2.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/qdivrem.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/softfloat.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.alpha, files.m88k, files.mips64; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/strchr.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: iter().position on a byte slice; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/strchr.S | lib/libkern/strchr.c\")"
+
+[[file]]
+c = "sys/lib/libkern/strcmp.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: byte-slice comparison; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/strcmp.S | lib/libkern/strcmp.c\")"
+
+[[file]]
+c = "sys/lib/libkern/strncmp.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: byte-slice comparison of a prefix; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/strncmp.S | lib/libkern/strncmp.c\")"
+
+[[file]]
+c = "sys/lib/libkern/strncpy.c"
+rust = "sys/lib/libkern/strncpy.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/strncpy.S | lib/libkern/strncpy.c\"; cd.rs, sd.rs, vnd.rs, rd.rs, fd.rs, wd.rs, dsdt.rs and cd9660_vfsops.rs each carry a private strncpy, where libkern's one belongs"
+
+[[file]]
+c = "sys/lib/libkern/strnstr.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: slice::windows(n).position; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/strnstr.S | lib/libkern/strnstr.c\")"
+
+[[file]]
+c = "sys/lib/libkern/strrchr.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: iter().rposition on a byte slice; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/strrchr.S | lib/libkern/strrchr.c\")"
+
+[[file]]
+c = "sys/lib/libkern/subdi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/ucmpdi2.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/udivdi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/ulmax.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: Ord::max; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/ulmax.S | lib/libkern/ulmax.c\")"
+
+[[file]]
+c = "sys/lib/libkern/ulmin.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: Ord::min; the C is libkern's fallback for an architecture with no assembly version (sys/conf/files: \"file lib/libkern/arch/${MACHINE_ARCH}/ulmin.S | lib/libkern/ulmin.c\")"
+
+[[file]]
+c = "sys/lib/libkern/umoddi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libkern/xordi3.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, files.m88k, files.powerpc, files.sh; neither sys/conf/files nor files.amd64 nor files.arm64 names it"
+
+[[file]]
+c = "sys/lib/libsa/bootp.c"
+rust = "sys/lib/libsa/bootp.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+
+[[file]]
+c = "sys/lib/libsa/bootparam.c"
+rust = "sys/lib/libsa/bootparam.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+
+[[file]]
+c = "sys/lib/libsa/getfile.c"
+rust = "sys/lib/libsa/getfile.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+
+[[file]]
+c = "sys/lib/libsa/getln.c"
+rust = "sys/lib/libsa/getln.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+
+[[file]]
+c = "sys/lib/libsa/ioctl.c"
+rust = "sys/lib/libsa/ioctl.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+
+[[file]]
+c = "sys/lib/libsa/nfs.c"
+rust = "sys/lib/libsa/nfs.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+
+[[file]]
+c = "sys/lib/libsa/nullfs.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: only sys/lib/libsa/Makefile names it, which no amd64 or arm64 boot program's Makefile uses"
+
+[[file]]
+c = "sys/lib/libsa/rarp.c"
+rust = ""
+status = "skipped"
+notes = "not-applicable: only sys/lib/libsa/Makefile names it, which no amd64 or arm64 boot program's Makefile uses"
+
+[[file]]
+c = "sys/lib/libsa/rpc.c"
+rust = "sys/lib/libsa/rpc.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+
+[[file]]
+c = "sys/lib/libsa/strchr.c"
+rust = ""
+status = "skipped"
+notes = "provided-by-core: arm64 efiboot's Makefile builds it; Rust's slices and core cover it"
+
+[[file]]
+c = "sys/lib/libsa/write.c"
+rust = "sys/lib/libsa/write.rs"
+status = "todo"
+notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+
+[[file]]
+c = "sys/miscfs/fifofs/fifo_vnops.c"
+rust = "sys/miscfs/fifofs/fifo_vnops.rs"
+status = "todo"
+notes = "TD2: the unported! sites wait for it (sys/conf/files: \"file miscfs/fifofs/fifo_vnops.c fifo\")"
+
+[[file]]
+c = "sys/net/af_frame.c"
+rust = "sys/net/af_frame.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/af_frame.c af_frame needs-flag\""
+
+[[file]]
+c = "sys/net/bfd.c"
+rust = "sys/net/bfd.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/bfd.c bfd\""
+
+[[file]]
+c = "sys/net/bridgectl.c"
+rust = "sys/net/bridgectl.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/bridgectl.c bridge\""
+
+[[file]]
+c = "sys/net/bridgestp.c"
+rust = "sys/net/bridgestp.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/bridgestp.c bridge\""
+
+[[file]]
+c = "sys/net/bsd-comp.c"
+rust = "sys/net/bsd_comp.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/bsd-comp.c ppp_bsdcomp\""
+
+[[file]]
+c = "sys/net/if_aggr.c"
+rust = "sys/net/if_aggr.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_aggr.c aggr\""
+
+[[file]]
+c = "sys/net/if_bpe.c"
+rust = "sys/net/if_bpe.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_bpe.c bpe needs-count\""
+
+[[file]]
+c = "sys/net/if_bridge.c"
+rust = "sys/net/if_bridge.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_bridge.c bridge needs-count\""
+
+[[file]]
+c = "sys/net/if_etherbridge.c"
+rust = "sys/net/if_etherbridge.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_etherbridge.c etherbridge\""
+
+[[file]]
+c = "sys/net/if_etherip.c"
+rust = "sys/net/if_etherip.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_etherip.c etherip needs-flag\""
+
+[[file]]
+c = "sys/net/if_gif.c"
+rust = "sys/net/if_gif.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_gif.c gif needs-count\""
+
+[[file]]
+c = "sys/net/if_gre.c"
+rust = "sys/net/if_gre.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_gre.c gre needs-count\""
+
+[[file]]
+c = "sys/net/if_mpe.c"
+rust = "sys/net/if_mpe.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_mpe.c mpe\""
+
+[[file]]
+c = "sys/net/if_mpip.c"
+rust = "sys/net/if_mpip.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_mpip.c mpip\""
+
+[[file]]
+c = "sys/net/if_mpw.c"
+rust = "sys/net/if_mpw.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_mpw.c mpw\""
+
+[[file]]
+c = "sys/net/if_pair.c"
+rust = "sys/net/if_pair.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_pair.c pair\""
+
+[[file]]
+c = "sys/net/if_ppp.c"
+rust = "sys/net/if_ppp.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_ppp.c ppp needs-count\""
+
+[[file]]
+c = "sys/net/if_pppoe.c"
+rust = "sys/net/if_pppoe.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_pppoe.c pppoe needs-flag\""
+
+[[file]]
+c = "sys/net/if_pppx.c"
+rust = "sys/net/if_pppx.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_pppx.c pppx needs-count\""
+
+[[file]]
+c = "sys/net/if_rport.c"
+rust = "sys/net/if_rport.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_rport.c rport\""
+
+[[file]]
+c = "sys/net/if_sec.c"
+rust = "sys/net/if_sec.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_sec.c sec needs-count\""
+
+[[file]]
+c = "sys/net/if_spppsubr.c"
+rust = "sys/net/if_spppsubr.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_spppsubr.c sppp\""
+
+[[file]]
+c = "sys/net/if_tpmr.c"
+rust = "sys/net/if_tpmr.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_tpmr.c tpmr\""
+
+[[file]]
+c = "sys/net/if_trunk.c"
+rust = "sys/net/if_trunk.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_trunk.c trunk\""
+
+[[file]]
+c = "sys/net/if_tun.c"
+rust = "sys/net/if_tun.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_tun.c tun needs-count\""
+
+[[file]]
+c = "sys/net/if_veb.c"
+rust = "sys/net/if_veb.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_veb.c veb\""
+
+[[file]]
+c = "sys/net/if_vether.c"
+rust = "sys/net/if_vether.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_vether.c vether\""
+
+[[file]]
+c = "sys/net/if_vlan.c"
+rust = "sys/net/if_vlan.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_vlan.c vlan needs-count\""
+
+[[file]]
+c = "sys/net/if_vxlan.c"
+rust = "sys/net/if_vxlan.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/if_vxlan.c vxlan\""
+
+[[file]]
+c = "sys/net/pipex.c"
+rust = "sys/net/pipex.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/pipex.c pipex\""
+
+[[file]]
+c = "sys/net/ppp_tty.c"
+rust = "sys/net/ppp_tty.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/ppp_tty.c ppp\""
+
+[[file]]
+c = "sys/net/ppp-deflate.c"
+rust = "sys/net/ppp_deflate.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/ppp-deflate.c ppp_deflate\""
+
+[[file]]
+c = "sys/net/slcompress.c"
+rust = "sys/net/slcompress.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net/slcompress.c ppp\""
+
+[[file]]
+c = "sys/net80211/ieee80211_amrr.c"
+rust = "sys/net80211/ieee80211_amrr.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_amrr.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_crypto_bip.c"
+rust = "sys/net80211/ieee80211_crypto_bip.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_crypto_bip.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_crypto_ccmp.c"
+rust = "sys/net80211/ieee80211_crypto_ccmp.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_crypto_ccmp.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_crypto_tkip.c"
+rust = "sys/net80211/ieee80211_crypto_tkip.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_crypto_tkip.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_crypto_wep.c"
+rust = "sys/net80211/ieee80211_crypto_wep.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_crypto_wep.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_crypto.c"
+rust = "sys/net80211/ieee80211_crypto.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_crypto.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_input.c"
+rust = "sys/net80211/ieee80211_input.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_input.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_ioctl.c"
+rust = "sys/net80211/ieee80211_ioctl.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_ioctl.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_node.c"
+rust = "sys/net80211/ieee80211_node.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_node.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_output.c"
+rust = "sys/net80211/ieee80211_output.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_output.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_pae_input.c"
+rust = "sys/net80211/ieee80211_pae_input.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_pae_input.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_pae_output.c"
+rust = "sys/net80211/ieee80211_pae_output.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_pae_output.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_proto.c"
+rust = "sys/net80211/ieee80211_proto.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_proto.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_ra_vht.c"
+rust = "sys/net80211/ieee80211_ra_vht.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_ra_vht.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_ra.c"
+rust = "sys/net80211/ieee80211_ra.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_ra.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_regdomain.c"
+rust = "sys/net80211/ieee80211_regdomain.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_regdomain.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211_rssadapt.c"
+rust = "sys/net80211/ieee80211_rssadapt.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211_rssadapt.c wlan\""
+
+[[file]]
+c = "sys/net80211/ieee80211.c"
+rust = "sys/net80211/ieee80211.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file net80211/ieee80211.c wlan\""
+
+[[file]]
+c = "sys/netinet/inet_ntop.c"
+rust = "sys/netinet/inet_ntop.rs"
+status = "todo"
+notes = "TD2: the unported! sites wait for it (sys/conf/files: \"file netinet/inet_ntop.c\")"
+
+[[file]]
+c = "sys/netinet/ip_carp.c"
+rust = "sys/netinet/ip_carp.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file netinet/ip_carp.c carp needs-count\""
+
+[[file]]
+c = "sys/netinet/ip_gre.c"
+rust = "sys/netinet/ip_gre.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file netinet/ip_gre.c gre\""
+
+[[file]]
+c = "sys/netinet/ip_mroute.c"
+rust = "sys/netinet/ip_mroute.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file netinet/ip_mroute.c mrouting\""
+
+[[file]]
+c = "sys/netinet6/ip6_mroute.c"
+rust = "sys/netinet6/ip6_mroute.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file netinet6/ip6_mroute.c inet6 & mrouting\""
+
+[[file]]
+c = "sys/netmpls/mpls_input.c"
+rust = "sys/netmpls/mpls_input.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file netmpls/mpls_input.c mpls\""
+
+[[file]]
+c = "sys/netmpls/mpls_output.c"
+rust = "sys/netmpls/mpls_output.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file netmpls/mpls_output.c mpls\""
+
+[[file]]
+c = "sys/netmpls/mpls_proto.c"
+rust = "sys/netmpls/mpls_proto.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file netmpls/mpls_proto.c mpls\""
+
+[[file]]
+c = "sys/netmpls/mpls_raw.c"
+rust = "sys/netmpls/mpls_raw.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file netmpls/mpls_raw.c mpls\""
+
+[[file]]
+c = "sys/netmpls/mpls_shim.c"
+rust = "sys/netmpls/mpls_shim.rs"
+status = "todo"
+notes = "TD5: sys/conf/files: \"file netmpls/mpls_shim.c mpls\""
+
+[[file]]
+c = "sys/scsi/ch.c"
+rust = "sys/scsi/ch.rs"
+status = "todo"
+notes = "TD4: sys/scsi/files.scsi: \"file scsi/ch.c ch needs-flag\""
+
+[[file]]
+c = "sys/scsi/mpath_emc.c"
+rust = "sys/scsi/mpath_emc.rs"
+status = "todo"
+notes = "TD4: sys/scsi/files.scsi: \"file scsi/mpath_emc.c emc\""
+
+[[file]]
+c = "sys/scsi/mpath_hds.c"
+rust = "sys/scsi/mpath_hds.rs"
+status = "todo"
+notes = "TD4: sys/scsi/files.scsi: \"file scsi/mpath_hds.c hds\""
+
+[[file]]
+c = "sys/scsi/mpath_rdac.c"
+rust = "sys/scsi/mpath_rdac.rs"
+status = "todo"
+notes = "TD4: sys/scsi/files.scsi: \"file scsi/mpath_rdac.c rdac\""
+
+[[file]]
+c = "sys/scsi/mpath_sym.c"
+rust = "sys/scsi/mpath_sym.rs"
+status = "todo"
+notes = "TD4: sys/scsi/files.scsi: \"file scsi/mpath_sym.c sym\""
+
+[[file]]
+c = "sys/scsi/mpath.c"
+rust = "sys/scsi/mpath.rs"
+status = "todo"
+notes = "TD4: sys/conf/files: \"file scsi/mpath.c mpath needs-flag\""
+
+[[file]]
+c = "sys/scsi/safte.c"
+rust = "sys/scsi/safte.rs"
+status = "todo"
+notes = "TD4: sys/scsi/files.scsi: \"file scsi/safte.c safte\""
+
+[[file]]
+c = "sys/scsi/ses.c"
+rust = "sys/scsi/ses.rs"
+status = "todo"
+notes = "TD4: sys/scsi/files.scsi: \"file scsi/ses.c ses\""
+
+[[file]]
+c = "sys/scsi/st.c"
+rust = "sys/scsi/st.rs"
+status = "todo"
+notes = "TD4: sys/scsi/files.scsi: \"file scsi/st.c st needs-flag\""
+
+[[file]]
+c = "sys/scsi/uk.c"
+rust = "sys/scsi/uk.rs"
+status = "todo"
+notes = "TD4: sys/scsi/files.scsi: \"file scsi/uk.c uk needs-flag\""
+
+[[file]]
+c = "sys/uvm/uvm_device.c"
+rust = "sys/uvm/uvm_device.rs"
+status = "todo"
+notes = "TD2: the unported! sites wait for it (sys/conf/files: \"file uvm/uvm_device.c\")"
+
+[[file]]
+c = "sys/uvm/uvm_swap_encrypt.c"
+rust = "sys/uvm/uvm_swap_encrypt.rs"
+status = "todo"
+notes = "TD2: the unported! sites wait for it (sys/conf/files: \"file uvm/uvm_swap_encrypt.c uvm_swap_encrypt\")"
