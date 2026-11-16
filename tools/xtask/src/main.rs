@@ -270,6 +270,7 @@ fn run(args: &[String]) -> Result<()> {
     boot::set_smp(smp_flag(&argv)?);
     boot::set_memory(memory_flag(&argv)?);
     boot::set_accel_hvf(accel_flag(&argv)?);
+    boot::set_cpu_model(cpu_flag(&argv)?);
     if argv.first() == Some(&"smoke") {
         boot::set_smoke_timeout(timeout_flag(&argv)?);
     }
@@ -578,6 +579,26 @@ fn accel_flag(args: &[&str]) -> Result<bool> {
         Some("hvf") => Ok(true),
         Some(other) => Err(format!("--accel {other}: only `hvf` is known").into()),
     }
+}
+
+/// `--cpu MODEL` (qemu, smoke): QEMU's CPU model for an arm64 guest under TCG, e.g.
+/// `neoverse-n2` or `neoverse-n2,sve=off` (`boot::set_cpu_model`). amd64 keeps its `qemu64`,
+/// and under `--accel hvf` the CPU is the host's.
+fn cpu_flag(args: &[&str]) -> Result<Option<String>> {
+    let Some(model) = optional_flag(args, "--cpu") else {
+        return Ok(None);
+    };
+    if optional_flag(args, "--arch") == Some("amd64") {
+        return Err("--cpu: arm64 guests only".into());
+    }
+    if optional_flag(args, "--accel") == Some("hvf") {
+        return Err("--cpu: not with --accel hvf, where the CPU is the host's".into());
+    }
+    let plain = |c: char| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | ',' | '=' | '.');
+    if model.is_empty() || model.starts_with('-') || !model.chars().all(plain) {
+        return Err(format!("--cpu {model}: expected a QEMU CPU model such as neoverse-n2").into());
+    }
+    Ok(Some(model.to_string()))
 }
 
 /// `smoke --timeout SECS`: the run's whole time limit in seconds (1 to 86400) in place of
@@ -1110,6 +1131,17 @@ mod tests {
         assert!(accel_flag(&["--arch", "arm64", "--accel", "hvf"]).unwrap());
         assert!(accel_flag(&["--arch", "amd64", "--accel", "hvf"]).is_err());
         assert!(accel_flag(&["--accel", "kvm"]).is_err());
+        assert_eq!(cpu_flag(&["--arch", "arm64"]).unwrap(), None);
+        assert_eq!(
+            cpu_flag(&["--arch", "arm64", "--cpu", "neoverse-n2,sve=off"])
+                .unwrap()
+                .as_deref(),
+            Some("neoverse-n2,sve=off")
+        );
+        assert!(cpu_flag(&["--arch", "amd64", "--cpu", "max"]).is_err());
+        assert!(cpu_flag(&["--arch", "arm64", "--accel", "hvf", "--cpu", "max"]).is_err());
+        assert!(cpu_flag(&["--cpu", "-device"]).is_err());
+        assert!(cpu_flag(&["--cpu", "a b"]).is_err());
         assert_eq!(timeout_flag(&[]).unwrap(), None);
         assert_eq!(timeout_flag(&["--timeout", "14400"]).unwrap(), Some(14_400));
         for bad in ["0", "86401", "soon"] {

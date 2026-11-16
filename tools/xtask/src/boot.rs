@@ -279,6 +279,28 @@ pub(crate) fn accel_hvf() -> bool {
     ACCEL_HVF.get().copied().unwrap_or(false)
 }
 
+/// The CPU QEMU emulates for an arm64 guest under TCG unless `--cpu` names another.
+const ARM64_CPU: &str = "cortex-a72";
+
+/// `--cpu MODEL` (qemu, smoke): the CPU model an arm64 guest gets under TCG instead of
+/// [`ARM64_CPU`] (set once by `main`). A Cortex-A72 has no SVE, no BTI and no pointer
+/// authentication, so code that only runs on a newer core (`cpu_init`'s SVE setup, the
+/// kernel's BTI enforcement) needs another model to be reached: `neoverse-n2` has all three.
+static CPU_MODEL: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+
+/// Records `--cpu MODEL`.
+pub(crate) fn set_cpu_model(model: Option<String>) {
+    let _ = CPU_MODEL.set(model);
+}
+
+/// The CPU model of this run's arm64 TCG guests.
+fn cpu_model() -> &'static str {
+    CPU_MODEL
+        .get()
+        .and_then(|m| m.as_deref())
+        .unwrap_or(ARM64_CPU)
+}
+
 /// `--timeout SECS` of a `smoke` (set once by `main`): its whole time limit, which
 /// `$EMIBSD_TIMEOUT_SCALE` then scales like the default's.
 static SMOKE_LIMIT: std::sync::OnceLock<Duration> = std::sync::OnceLock::new();
@@ -848,11 +870,12 @@ pub(crate) fn qemu_command(
                 "virtio-blk-device"
             };
             // TD1 (`--accel hvf`): Apple's Hypervisor.framework runs the guest on the host's
-            // cores, the CPU model is then the host's; otherwise TCG emulates a Cortex-A72.
+            // cores, the CPU model is then the host's; otherwise TCG emulates a Cortex-A72,
+            // or what `--cpu` names.
             if accel_hvf() {
                 cmd.args(["-M", &machine, "-accel", "hvf", "-cpu", "host"]);
             } else {
-                cmd.args(["-M", &machine, "-cpu", "cortex-a72"]);
+                cmd.args(["-M", &machine, "-cpu", cpu_model()]);
             }
             // M16g: the boot image as a USB stick (`distrib.rs`); no CD on arm64.
             match removable_boot_args(boot_medium(), image) {

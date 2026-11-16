@@ -26,7 +26,10 @@ paths:
   `userland/selfhost.rs`). `--memory SIZE` (qemu, smoke, smoke2; 256M..16G) replaces
   `boot::VM_MEMORY` (512M); `smoke --timeout SECS` replaces `boot::SMOKE_TIMEOUT` (180 s),
   still scaled, and `smoke-all`'s watchdog reads it; `--accel hvf` (arm64 qemu and smoke)
-  runs the guest under Hypervisor.framework for the build VMs, used by no recipe of `smokes`.
+  runs the guest under Hypervisor.framework for the build VMs, used by no recipe of `smokes`;
+  `--cpu MODEL` (arm64 qemu and smoke, TCG only) replaces the emulated Cortex-A72, e.g.
+  `a64fx` for a CPU with SVE (`smoke-sve`) or `neoverse-n2` for SVE, BTI and pointer
+  authentication.
 - External tools (`qemu-system-*`, Limine binaries, EDK2 firmware) are located at runtime via
   `brew --prefix <formula>` or `$PATH`, with an error that names the missing formula and points to
   `docs/SETUP.md`. Never hardcode `/opt/homebrew` or `/usr/local`. Exception: `userland`'s
