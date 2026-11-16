@@ -57,12 +57,52 @@
 //!
 //! Upstream: sys/sys/kernel.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. The header only declares globals that `conf/param.c` (`hz`, `tick`,
-//! `tick_nsec`, `utc_offset`: `conf/param.rs`) and `kern_clock.c` (`ticks`, `stathz`, `profhz`)
-//! define; the one value it defines itself is [`HZ`]. `hostname`, `domainname` and `hostid` are
-//! defined in `kern/kern_sysctl.rs`, where the C defines them.
+//! Status: `ported`. The header defines one value, [`HZ`], and declares twelve globals,
+//! each of which is defined where the C defines it:
+//!
+//! | `<sys/kernel.h>` | defined in | here |
+//! |---|---|---|
+//! | `hostid`, `hostname`, `hostnamelen`, `domainname`, `domainnamelen` | `kern/kern_sysctl.c` | `kern/kern_sysctl.rs`: `HOSTID`, `HOSTNAME`, `HOSTNAMELEN`, `DOMAINNAME`, `DOMAINNAMELEN` |
+//! | `utc_offset`, `tick`, `tick_nsec`, `hz` | `conf/param.c` | `conf/param.rs`: `UTC_OFFSET`, `TICK`, `TICK_NSEC`, `HZ` |
+//! | `ticks`, `stathz`, `profhz` | `kern/kern_clock.c` | `kern/kern_clock.rs`: `TICKS`, `STATHZ`, `PROFHZ` |
+//!
+//! ## Deviations
+//!
+//! - An `extern` declaration has no counterpart in Rust: a user names the static's module.
 
 /// `HZ`: the default system clock frequency, in ticks per second, when the kernel
 /// configuration does not set one.
 pub const HZ: i32 = 100;
 /* </CODE> */
+
+/* <TESTS> */
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "needs OPENBSD_SRC (just test-ref)"]
+    fn hz_matches_the_c_header() {
+        let defs = crate::reftest::defines("sys/sys/kernel.h");
+        assert_eq!(crate::reftest::int(&defs, "HZ"), Some(HZ as i64));
+    }
+
+    /// The globals the header declares exist where the table in the module docs says.
+    #[test]
+    fn the_declared_globals_are_defined() {
+        use core::sync::atomic::Ordering::Relaxed;
+        let _ = crate::conf::param::HZ.load(Relaxed);
+        let _ = crate::conf::param::TICK.load(Relaxed);
+        let _ = crate::conf::param::TICK_NSEC.load(Relaxed);
+        let _ = crate::conf::param::UTC_OFFSET.load(Relaxed);
+        let _ = &crate::kern::kern_clock::TICKS;
+        let _ = &crate::kern::kern_clock::STATHZ;
+        let _ = &crate::kern::kern_clock::PROFHZ;
+        let _ = &crate::kern::kern_sysctl::HOSTID;
+        let _ = &crate::kern::kern_sysctl::HOSTNAME;
+        let _ = &crate::kern::kern_sysctl::HOSTNAMELEN;
+        let _ = &crate::kern::kern_sysctl::DOMAINNAME;
+        let _ = &crate::kern::kern_sysctl::DOMAINNAMELEN;
+    }
+}
+/* </TESTS> */

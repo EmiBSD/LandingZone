@@ -478,10 +478,10 @@ notes = "ttydefchars is always defined (TTYDEFCHARS); CTRL is ctrl"
 [[file]]
 c = "sys/sys/kernel.h"
 rust = "sys/sys/kernel.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "636f853e729216c440d5fb40057c88ba1e8a3937"
-notes = "M2: HZ only; hostname/hostnamelen/domainname/domainnamelen/hostid are defined in kern_sysctl.rs (where the C defines them), the extern ints live where they are defined (conf/param.c, kern_clock.c)"
+notes = "HZ; the twelve globals the header declares are defined where the C defines them: hostid/hostname/hostnamelen/domainname/domainnamelen in kern_sysctl.rs, utc_offset/tick/tick_nsec/hz in conf/param.rs, ticks/stathz/profhz in kern_clock.rs (TD1: the table is in the module docs, with a test that names each)"
 
 [[file]]
 c = "sys/conf/param.c"
