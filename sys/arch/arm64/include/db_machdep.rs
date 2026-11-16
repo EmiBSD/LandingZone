@@ -49,14 +49,19 @@
 //!
 //! Upstream: sys/arch/arm64/include/db_machdep.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M4 ports `db_regs_t`, `PC_REGS`/`SET_PC_REGS`, the breakpoint
-//! instruction, the single-step bit helpers and the `IS_BREAKPOINT_TRAP`/
-//! `IS_WATCHPOINT_TRAP` tests; M11c `db_expr_t` and the `inst_*` classifiers (which the C
-//! marks "ALL BROKEN!!!": they are never true). `DB_MACHINE_COMMANDS` is defined: the table
-//! is `arm64/db_interface.rs`'s. The `DDB_STATE_*` values are here (the multiprocessor
-//! entry). The entry points this header declares
-//! (`db_ktrap`, `db_machine_init`) live in `arm64/db_interface.rs`; what `ddb/` itself needs
-//! is the `machine::DbMachdep` contract.
+//! Status: `ported`. `db_expr_t`, `db_regs_t`, `PC_REGS`/`SET_PC_REGS`, the breakpoint
+//! instruction, the single-step bit helpers, the `IS_BREAKPOINT_TRAP`/`IS_WATCHPOINT_TRAP`
+//! tests, the `inst_*` classifiers (which the C marks "ALL BROKEN!!!": they are never true)
+//! and the `DDB_STATE_*` values of the multiprocessor entry. What the header declares is
+//! defined in `arm64/db_interface.rs`, as in the C: `ddb_regs` (`DDB_REGS`), `db_ktrap` and
+//! `db_machine_init`, and the table `DB_MACHINE_COMMANDS` announces. What `ddb/` itself
+//! needs of a machine is the `machine::DbMachdep` contract.
+//!
+//! ## Deviations
+//! - The function-like macros are `fn`s with lower-case names; `DDB_REGS` (`&ddb_regs`) has
+//!   no counterpart, a user borrows the static.
+//! - `DbAddr` (`vaddr_t`) is kept for ddb's signatures; the header has had no `db_addr_t`
+//!   since ddb took `vaddr_t`.
 
 use crate::arch::arm64::include::armreg::{EXCP_BRK, EXCP_WATCHPT_EL1, INSN_SIZE, PSR_SS};
 use crate::arch::arm64::include::frame::Trapframe;

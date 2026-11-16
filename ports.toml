@@ -1670,10 +1670,10 @@ notes = "kern_sig.c: sig_atomic_t, struct sigcontext (ABI layout; AbiPod)"
 [[file]]
 c = "sys/arch/arm64/include/db_machdep.h"
 rust = "sys/arch/arm64/include/db_machdep.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "42d11165b0e086f4a670e969de3e7ea0aeaf8e6a"
-notes = "M4: db_regs_t, PC_REGS/SET_PC_REGS, BKPT_*, db_clear/set_single_step, IS_BREAKPOINT_TRAP/IS_WATCHPOINT_TRAP; M11c: db_expr_t (DbExpr = i64, and DbAddr = usize), the inst_* classifiers (never true, as the C's 'ALL BROKEN' macros); DB_MACHINE_COMMANDS is the machine table in db_interface.rs; DDB_STATE_NOT_RUNNING/RUNNING/EXITING; the ddb-wide contract is sys/machine/db_machdep.rs"
+notes = "db_expr_t (DbExpr = i64, and DbAddr = usize), db_regs_t, PC_REGS/SET_PC_REGS, BKPT_*, db_clear/set_single_step, IS_BREAKPOINT_TRAP/IS_WATCHPOINT_TRAP, the inst_* classifiers (never true, as the C's 'ALL BROKEN' macros), DDB_STATE_NOT_RUNNING/RUNNING/EXITING; ddb_regs, db_ktrap, db_machine_init and the DB_MACHINE_COMMANDS table are db_interface.rs; the ddb-wide contract is sys/machine/db_machdep.rs (TD1: read again whole, nothing missing)"
 
 [[file]]
 c = "sys/arch/arm64/arm64/exception.S"
