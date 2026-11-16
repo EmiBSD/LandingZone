@@ -59,14 +59,22 @@
 //!
 //! Upstream: sys/arch/amd64/include/segments.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M4 ports the selectors, the descriptor types, the gate and
-//! segment type numbers and the GDT/IDT layout; `idt_vec_alloc_range` and the user selector
-//! checks are used from M6.
+//! Status: `ported`, the whole header: the selectors and their macros, the four descriptors,
+//! the system and memory segment types, the protection exception code bits, the IDT's and the
+//! GDT's layout and the user selector checks. The functions and the tables the kernel half
+//! declares are `amd64/machdep.rs`'s: `setgate`, `unsetgate`, `setregion`,
+//! `set_sys_segment`, `set_mem_segment`, `idt_vec_alloc`, `idt_vec_alloc_range`,
+//! `idt_vec_set`, `idt_vec_free`, `cpu_init_idt` and `idt` (`IDT`, which is `early_idt` too:
+//! one table from the first trap on).
 //!
 //! ## Deviations
 //! - The C's bit-field structs are one or two `u64` words here, with `const fn` builders that
 //!   place each field where the hardware reads it; `GDT_ADDR_MEM`/`GDT_ADDR_SYS` are index
 //!   helpers over the GDT's words.
+//! - Eight macros are not declared, because the C cannot expand them either
+//!   (`docs/EXTERNAL_BUGS.md`, EXT-232): `IDXDYNSEL` and `GDYNSEL` name a `DYNSEL_START`
+//!   that nothing defines, and `ISMEMSDP`, `IS286GDP`, `IS386GDP`, `ISGDP`, `ISSDP` and
+//!   `ISSYSSDP` read a `d_type` member that no descriptor has.
 
 // Selectors
 

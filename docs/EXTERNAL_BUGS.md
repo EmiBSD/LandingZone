@@ -269,6 +269,7 @@ means EmiBSD's code has it too ("Bugs the port reproduces").
 | EXT-226 | `sys/dev/rnd.c:659` | `random_start` reads kernel text through a misaligned `u_int32_t *` (amd64) | — (the kernel's own link) | cosmetic | reproduced | read unaligned | open |
 | EXT-229 | `sys/arch/arm64/include/armreg.h:813` | `MAIR_ATTR_MASK(idx)` expands to `(0xff << ((n)* 8))`: `n` is not its parameter | — (the macro has no user) | cosmetic | read | `mair_attr_mask(idx)` shifts by `idx` | open |
 | EXT-231 | `sys/arch/amd64/include/specialreg.h:1540` | `SVM_INTERCEPT_DR3_READ` is `(1UL << 2)`, the bit of `SVM_INTERCEPT_DR2_READ` | — (the constant has no user) | cosmetic | read | `SVM_INTERCEPT_DR3_READ` is `1 << 3` | open |
+| EXT-232 | `sys/arch/amd64/include/segments.h:75` | eight macros cannot be expanded: `IDXDYNSEL` and `GDYNSEL` name an undefined `DYNSEL_START`, the six `IS*DP` read a `d_type` member no descriptor has | — (the macros have no user) | cosmetic | read | the eight are not declared | open |
 
 ## Entries (EXT-1 to EXT-8, EXT-192 to EXT-197)
 
@@ -811,6 +812,25 @@ Every C line in this and the following sections is at the pin 3ce1f3f79392, unde
   header's value, so a pin that fixes it is noticed.
 - Severity: cosmetic.
 - Fix: `(1UL << 3)`.
+
+### EXT-232: eight macros of amd64's `segments.h` cannot be expanded
+
+- Where: `sys/arch/amd64/include/segments.h:75`, `:79` and `:210-228` at 3ce1f3f79392.
+- What: `IDXDYNSEL(s)` (75) and `GDYNSEL(s,r)` (79) use `DYNSEL_START`, which nothing in
+  `sys/arch/amd64` or the machine-independent tree defines (the dynamic part of the GDT
+  they indexed is gone). `ISMEMSDP(s)`, `IS286GDP(s)` and `IS386GDP(s)` (210-219) read
+  `s->d_type`, and `ISGDP`, `ISSDP` and `ISSYSSDP` (222-228) are built on them; the
+  descriptors of this header name their type `sd_type` (`struct sys_segment_descriptor`,
+  `struct mem_segment_descriptor`) or `gd_type` (`struct gate_descriptor`), and none has a
+  `d_type` member.
+- Reach: none. Nothing uses the eight macros (`grep -rn` over `sys/` outside the other
+  machines' own `segments.h` finds only these definitions); a first user would get a
+  compile error.
+- Verified: read.
+- Port's handling: `sys/arch/amd64/include/segments.rs` does not declare them (a deviation
+  listed in the file).
+- Severity: cosmetic.
+- Fix: remove the eight macros.
 
 ### EXT-227: an address lifetime past INT_MAX seconds rearms the expiry timer every tick
 

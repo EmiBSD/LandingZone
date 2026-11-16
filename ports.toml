@@ -1536,10 +1536,10 @@ notes = "struct x86_64_tss, repr(C, packed), size checked"
 [[file]]
 c = "sys/arch/amd64/include/segments.h"
 rust = "sys/arch/amd64/include/segments.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "dd1f108033561141c4e3dd2ce9327367e75e0f02"
-notes = "M4: SEL_*, ISPL/ISLDT/IDXSEL/GSEL/GSYSSEL/LSEL, USERMODE/KERNELMODE, the GDT layout (NGDT_*, SYSSEL_START, GDT_SIZE, G*_SEL, GDT_ADDR_MEM/SYS), the descriptors as u64 packers (sys/mem segment, gate, region), SDT_*, SEGEX_*, NIDT/NRSVIDT; the bit-field structs are replaced by pack() builders (docs/C_TO_RUST.md); the LDT selectors and the gdt/ldt helpers that need processes are M6"
+notes = "the whole header: SEL_*, ISPL/ISLDT/IDXSEL/GSEL/GSYSSEL/LSEL, USERMODE/KERNELMODE, the GDT layout (NGDT_*, SYSSEL_START, GDT_SIZE, GDT_SYS_OFFSET, G*_SEL, GDT_ADDR_MEM/SYS), the four descriptors as u64 packers (sys and mem segment, gate, region; the bit-field structs are replaced by pack() builders, docs/C_TO_RUST.md), SDT_*, SEGEX_*, NIDT/NRSVIDT, VALID_USER_CSEL/DSEL; the functions and tables the kernel half declares are amd64/machdep.rs's (setgate, unsetgate, setregion, set_sys_segment, set_mem_segment, idt_vec_alloc, idt_vec_alloc_range, idt_vec_set, idt_vec_free, cpu_init_idt, idt). Not declared: IDXDYNSEL, GDYNSEL, ISMEMSDP, IS286GDP, IS386GDP, ISGDP, ISSDP, ISSYSSDP, which the C cannot expand either (an undefined DYNSEL_START, a d_type member no descriptor has: EXT-232)"
 
 [[file]]
 c = "sys/arch/amd64/include/cpu.h"
