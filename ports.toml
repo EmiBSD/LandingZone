@@ -856,11 +856,11 @@ notes = "M2: struct callframe; M4: struct trapframe, intrframe, iretq_frame, FRA
 [[file]]
 c = "sys/arch/amd64/include/vmparam.h"
 rust = "sys/arch/amd64/include/vmparam.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "38488e75c0b9b7d562f2f980aafac3686ff877cd"
 deps = ["sys/arch/amd64/include/param.h"]
-notes = "M2: VM_MIN/MAX_ADDRESS, VM_MAXUSER_ADDRESS, VM_MIN/MAX_KERNEL_ADDRESS; physical segments, page-queue and pmap parameters are M3; M6-b: USRSTACK, MAXTSIZ/DFLDSIZ/MAXDSIZ/BRKSIZ/DFLSSIZ/MAXSSIZ, STACKGAP_RANDOM, VM_MIN_STACK_ADDRESS through machine::vmparam; M10a: USRIOSIZE and VM_PHYS_SIZE (the physio map), USRIOSIZE in the reference-backed test"
+notes = "the whole header: the user limits, SHMMAXPGS, USRIOSIZE, the address bounds, VM_MIN_STACK_ADDRESS, VM_PIE_MIN_ADDR/VM_PIE_MAX_ADDR (TD1: uvm_map_pie drew from uvm_map.c's default range, VM_MAXUSER_ADDRESS / 4, where amd64 defines 0x200000000000; now through machine::VmParam), VM_PHYS_SIZE and the physical segment policy; VM_PHYSSEG_NOADD is a bool"
 
 [[file]]
 c = "sys/arch/amd64/amd64/conf.c"

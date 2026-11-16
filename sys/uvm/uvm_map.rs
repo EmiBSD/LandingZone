@@ -2221,10 +2221,11 @@ pub fn uvm_map_remap_as_stack(p: &Proc, addr: usize, sz: usize) -> Result<(), Er
     uvm_mapanon(map, &mut start, len, 0, flags)
 }
 
-/// `VM_PIE_MAX_ADDR` (the default).
-const VM_PIE_MAX_ADDR: usize = <Machine as VmParam>::VM_MAXUSER_ADDRESS / 4;
-/// `VM_PIE_MIN_ADDR` (the default).
-const VM_PIE_MIN_ADDR: usize = <Machine as VmParam>::VM_MIN_ADDRESS;
+/// `VM_PIE_MAX_ADDR`: the machine's, or the C's default here, `VM_MAXUSER_ADDRESS / 4` (the
+/// contract carries the `#ifndef`).
+const VM_PIE_MAX_ADDR: usize = <Machine as VmParam>::VM_PIE_MAX_ADDR;
+/// `VM_PIE_MIN_ADDR`: the machine's, or the default, `VM_MIN_ADDRESS`.
+const VM_PIE_MIN_ADDR: usize = <Machine as VmParam>::VM_PIE_MIN_ADDR;
 /// `VM_PIE_MIN_ALIGN` (the default).
 const VM_PIE_MIN_ALIGN: usize = PAGE_SIZE;
 

@@ -55,11 +55,17 @@
 //!
 //! Upstream: sys/arch/amd64/include/vmparam.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M2 needs the kernel/user boundary for `ddb`'s `INKERNEL`, M3 the
-//! physical segment policy, M6 the user limits (`MAXTSIZ`, `DFLDSIZ`, `MAXDSIZ`, `BRKSIZ`,
-//! `DFLSSIZ`, `MAXSSIZ`, `STACKGAP_RANDOM`, `USRSTACK`, `VM_MIN_STACK_ADDRESS`);
-//! M10a (physio) `USRIOSIZE` and `VM_PHYS_SIZE`; `SHMMAXPGS` and the `VM_FREELIST_*` are
-//! not there yet.
+//! Status: `ported`. The whole header: the user limits (`USRSTACK`, `MAXTSIZ`, `DFLDSIZ`,
+//! `MAXDSIZ`, `BRKSIZ`, `DFLSSIZ`, `MAXSSIZ`, `STACKGAP_RANDOM`), `SHMMAXPGS`, `USRIOSIZE`,
+//! the user and kernel address bounds, `VM_MIN_STACK_ADDRESS`, the range `uvm_map_pie`
+//! draws a PIE executable's address from (`VM_PIE_MIN_ADDR`, `VM_PIE_MAX_ADDR`: amd64
+//! defines its own, where most machines take `uvm_map.c`'s defaults), `VM_PHYS_SIZE` and
+//! the physical segment policy. Generic code reads them through `machine::VmParam`.
+//!
+//! ## Deviations
+//! - `VM_PHYSSEG_NOADD`, which the C defines empty and tests with `#ifdef`, is a `bool`.
+//! - The `#ifndef` around the limits a kernel configuration may override is not carried:
+//!   GENERIC overrides none.
 
 use crate::arch::amd64::include::param::PAGE_SIZE;
 use crate::uvm::uvm_page::VM_PSTRAT_BIGFIRST;
@@ -90,12 +96,18 @@ pub const DFLSSIZ: usize = 2 * 1024 * 1024;
 pub const MAXSSIZ: usize = 32 * 1024 * 1024;
 /// `STACKGAP_RANDOM`.
 pub const STACKGAP_RANDOM: usize = 256 * 1024;
+/// `SHMMAXPGS`: size of shared memory map, in pages (`conf/param.c`'s `SHMMAX` and `SHMALL`).
+pub const SHMMAXPGS: usize = 8192;
 /// `VM_MIN_STACK_ADDRESS`.
 pub const VM_MIN_STACK_ADDRESS: usize = 0x0000_6000_0000_0000;
 /// `VM_MIN_KERNEL_ADDRESS`: the start of the kernel address space (the direct map).
 pub const VM_MIN_KERNEL_ADDRESS: usize = 0xffff_8000_0000_0000;
 /// `VM_MAX_KERNEL_ADDRESS`: the end of the kernel's own virtual space.
 pub const VM_MAX_KERNEL_ADDRESS: usize = 0xffff_8080_0000_0000;
+/// `VM_PIE_MIN_ADDR`: the lowest address `uvm_map_pie` gives a PIE executable.
+pub const VM_PIE_MIN_ADDR: usize = VM_MIN_ADDRESS;
+/// `VM_PIE_MAX_ADDR`: the end of that range.
+pub const VM_PIE_MAX_ADDR: usize = 0x2000_0000_0000;
 /// `VM_PHYS_SIZE`: virtual size (bytes) of the physio submap (`phys_map`).
 pub const VM_PHYS_SIZE: usize = USRIOSIZE * PAGE_SIZE;
 /// `VM_PHYSSEG_MAX`: how many physical memory segments `uvm_page_physload` accepts (actually
@@ -124,6 +136,9 @@ mod tests {
             ("VM_PHYSSEG_MAX", VM_PHYSSEG_MAX as i64),
             ("USRIOSIZE", USRIOSIZE as i64),
             ("VM_MIN_STACK_ADDRESS", VM_MIN_STACK_ADDRESS as i64),
+            ("VM_PIE_MAX_ADDR", VM_PIE_MAX_ADDR as i64),
+            ("SHMMAXPGS", SHMMAXPGS as i64),
+            ("STACKGAP_RANDOM", STACKGAP_RANDOM as i64),
         ];
         for (name, value) in ours {
             assert_eq!(crate::reftest::int(&defs, name), Some(*value), "{name}");

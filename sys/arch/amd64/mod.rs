@@ -364,6 +364,8 @@ impl VmParam for Machine {
     const MAXSSIZ: usize = include::vmparam::MAXSSIZ;
     const STACKGAP_RANDOM: usize = include::vmparam::STACKGAP_RANDOM;
     const VM_MIN_STACK_ADDRESS: usize = include::vmparam::VM_MIN_STACK_ADDRESS;
+    const VM_PIE_MIN_ADDR: usize = include::vmparam::VM_PIE_MIN_ADDR;
+    const VM_PIE_MAX_ADDR: usize = include::vmparam::VM_PIE_MAX_ADDR;
 }
 
 impl Pmap for Machine {

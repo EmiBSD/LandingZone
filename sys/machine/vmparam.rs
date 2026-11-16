@@ -59,5 +59,11 @@ pub trait VmParam {
     const STACKGAP_RANDOM: usize;
     /// `VM_MIN_STACK_ADDRESS`: the lowest address the stack may be placed at.
     const VM_MIN_STACK_ADDRESS: usize;
+    /// `VM_PIE_MIN_ADDR`: the lowest load address `uvm_map_pie` gives a PIE executable.
+    /// `uvm_map.c`'s default for a machine that does not define it.
+    const VM_PIE_MIN_ADDR: usize = Self::VM_MIN_ADDRESS;
+    /// `VM_PIE_MAX_ADDR`: the end of that range. `uvm_map.c`'s default for a machine that
+    /// does not define it; amd64 does.
+    const VM_PIE_MAX_ADDR: usize = Self::VM_MAXUSER_ADDRESS / 4;
 }
 /* </CODE> */
