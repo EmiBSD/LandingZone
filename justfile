@@ -2448,18 +2448,21 @@ build-up:
 # passes (`build-up` makes `bsd.up`). Since M13 amd64's processor comes from the MADT as the
 # boot processor (`apid 0 (boot processor)`, as OpenBSD's `bsd.sp` prints it), no longer as
 # the `(uniprocessor)` mainbus attached without tables. Part of `smoke`.
-# TD1 (2026-11-16): a processor with SVE. `cpu_init`'s SVE setup wrote ZCR_EL1 with FP still
-# trapped at EL1, so every such CPU took "FP exception in kernel" while it attached, as
-# OpenBSD 8.0 does (docs/EXTERNAL_BUGS.md, EXT-230); no smoke saw it, their Cortex-A72 has no
-# SVE. arm64 only, on QEMU's `a64fx` (`--cpu`): SVE, and neither BTI nor pointer
-# authentication, on which the init stand-in stops at its signals step (seen on neoverse-n2
-# and under hvf; not understood yet, docs/STATUS.md). The MP kernel attaches every CPU, SVE
-# is in the feature line, and the init stand-in runs to its end. Part of `smoke`.
+# TD1 (2026-11-16): a processor newer than the Cortex-A72 every other smoke boots: QEMU's
+# neoverse-n2 (`--cpu`), with SVE, BTI and pointer authentication. arm64 only. Two things
+# only such a CPU shows. `cpu_init`'s SVE setup wrote ZCR_EL1 with FP still trapped at EL1,
+# so every CPU with SVE took "FP exception in kernel" while it attached, as OpenBSD 8.0 does
+# (docs/EXTERNAL_BUGS.md, EXT-230). And the kernel enforces BTI on a program whose ELF has no
+# PT_OPENBSD_NOBTCFI header: the init stand-in, built without landing pads, lacked the header
+# (init/init.ld) and stopped at its signals step, for ever, on such a CPU and under hvf. The
+# MP kernel attaches every CPU, SVE2 is in the feature line, and the init stand-in runs to
+# its end, signals included. Part of `smoke`.
 smoke-sve: (build-arm64 "--features qemu,multiprocessor") build-init-arm64
-    {{xtask}} smoke {{reject}} --reject "FP exception in kernel" {{smp}} --arch arm64 --cpu a64fx \
+    {{xtask}} smoke {{reject}} --reject "FP exception in kernel" {{smp}} --arch arm64 --cpu neoverse-n2 \
         --kernel target/{{arm64}}/debug/bsd --ramdisk none \
-        --expect "bsd: booted on arm64" --expect "cpu0 at mainbus0 mpidr 0: " --expect ",SVE," \
-        --expect "cpu{{aps}} at mainbus0 mpidr {{aps}}: " --expect "selftest: {{ncpu}} cpus running" \
+        --expect "bsd: booted on arm64" --expect "cpu0 at mainbus0 mpidr 0: ARM Neoverse N2" \
+        --expect "cpu0: SVE2," --expect "cpu{{aps}} at mainbus0 mpidr {{aps}}: " \
+        --expect "selftest: {{ncpu}} cpus running" \
         --expect "init: signals ok" --expect "init: processes ok" \
         --expect "init exited with status 0 (signal 0)"
 

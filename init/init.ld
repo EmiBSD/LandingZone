@@ -5,6 +5,14 @@ ENTRY(_start)
  * syscalls is PT_OPENBSD_SYSCALLS (0x65a3dbe9): the system call pin table the kernel's
  * exec reads into ps_pin (pin_check refuses a system call from anywhere else). Its
  * section is allocated, so it also sits in the rodata segment.
+ *
+ * nobtcfi is PT_OPENBSD_NOBTCFI (0x65a3dbe8), an empty header: this program is built for the
+ * bare-metal target and has no branch-target landing pads, so the kernel must not enforce
+ * BTI (arm64) or IBT (amd64) on it. build.rs passes `-z nobtcfi` for the same reason, but a
+ * PHDRS command lists every header there is and the linker adds none of its own, so until
+ * 2026-11-16 the header was missing: on a CPU with BTI the signal trampoline's `blr` into a
+ * handler without `bti c` faulted, and pid 1, which the resulting SIGILL cannot kill,
+ * faulted again for ever.
  */
 PHDRS
 {
@@ -13,6 +21,7 @@ PHDRS
     note     PT_NOTE;
     syscalls 0x65a3dbe9;
     data     PT_LOAD;
+    nobtcfi  0x65a3dbe8;
 }
 
 SECTIONS
