@@ -52,11 +52,18 @@
 //!
 //! Upstream: sys/sys/resource.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M5 ports the constants, `struct rusage`, `struct rlimit` and
-//! `struct loadavg`; `dosetrlimit`, `donice` and `dogetrusage` are `kern_resource.c` (M6).
+//! Status: `ported`. The priorities (`PRIO_*`), `struct rusage` with the `RUSAGE_*`
+//! selectors, the limits (`RLIMIT_*`, `RLIM_*`, `struct rlimit`) and `struct loadavg`. What
+//! the kernel half declares is defined where the C defines it: `averunnable` in
+//! `kern/sched_bsd.rs` (`AVERUNNABLE`), `dosetrlimit`, `donice` and `dogetrusage` in
+//! `kern/kern_resource.rs`. The userland prototypes (`getpriority(2)` and the rest) are
+//! not kernel material.
 //!
 //! ## Deviations
 //! - `struct rusage`'s counters are `Cell`s: the owning thread bumps them (`ru_nvcsw++`).
+//! - `ru_first` and `ru_last`, the two field aliases `ruadd` uses to walk the counters as an
+//!   array of `long`, have no counterpart: `ruadd` names the fields from `ru_ixrss` through
+//!   `ru_nivcsw`.
 
 use core::cell::Cell;
 

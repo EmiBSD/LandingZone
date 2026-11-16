@@ -2262,11 +2262,11 @@ notes = "M5: struct refcnt, REFCNT_INITIALIZER, the DT_REFCNT_IDX_* values; the 
 [[file]]
 c = "sys/sys/resource.h"
 rust = "sys/sys/resource.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "9ca4bb6fc9234b89e3cd067dfef973be8d4392fc"
 deps = ["sys/sys/time.h"]
-notes = "M5: PRIO_*, RUSAGE_*, struct rusage (Cells), RLIMIT_*/RLIM_*, struct rlimit, struct loadavg; dosetrlimit/donice/dogetrusage are kern_resource.c (M6); M7a-3b: Rusage::copy_from (the struct assignment) and to_bytes (the C layout for copyout)"
+notes = "PRIO_*, RUSAGE_*, struct rusage (Cells), RLIMIT_*/RLIM_*, struct rlimit, struct loadavg; averunnable is sched_bsd.rs, dosetrlimit/donice/dogetrusage kern_resource.rs; ru_first/ru_last have no counterpart (ruadd names the fields) (TD1: read again whole, nothing missing)"
 
 [[file]]
 c = "sys/sys/ucred.h"
