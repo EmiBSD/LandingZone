@@ -449,20 +449,11 @@ mod tests {
         let th = assert_defines!(defs;
         TH_FIN, TH_SYN, TH_RST, TH_PUSH, TH_ACK, TH_URG, TH_ECE, TH_CWR);
         assert_complete(&defs, "TH_", &th);
-        let mut opt = assert_defines!(defs;
+        // `TCPOPT_TSTAMP_HDR` and `TCPOPT_SACK_PERMIT_HDR` continue on a second line.
+        let opt = assert_defines!(defs;
         TCPOPT_EOL, TCPOPT_NOP, TCPOPT_MAXSEG, TCPOPT_WINDOW, TCPOPT_SACK_PERMITTED,
-        TCPOPT_SACK, TCPOPT_TIMESTAMP, TCPOPT_SIGNATURE, TCPOPT_SACK_HDR);
-        // `TCPOPT_TSTAMP_HDR` and `TCPOPT_SACK_PERMIT_HDR` continue on a second line, which the
-        // define reader does not follow; `option_words` checks their values.
-        assert_eq!(
-            defs.get("TCPOPT_TSTAMP_HDR").map(|v| v.as_str()),
-            Some("\\")
-        );
-        assert_eq!(
-            defs.get("TCPOPT_SACK_PERMIT_HDR").map(|v| v.as_str()),
-            Some("\\")
-        );
-        opt.extend(["TCPOPT_TSTAMP_HDR", "TCPOPT_SACK_PERMIT_HDR"]);
+        TCPOPT_SACK, TCPOPT_TIMESTAMP, TCPOPT_SIGNATURE, TCPOPT_SACK_HDR, TCPOPT_TSTAMP_HDR,
+        TCPOPT_SACK_PERMIT_HDR);
         assert_complete(&defs, "TCPOPT_", &opt);
         let len = assert_defines!(defs;
         TCPOLEN_MAXSEG, TCPOLEN_WINDOW, TCPOLEN_SACK_PERMITTED, TCPOLEN_SACK,

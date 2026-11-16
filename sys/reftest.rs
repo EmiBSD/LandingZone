@@ -50,6 +50,13 @@ pub(crate) fn openbsd_src() -> PathBuf {
 pub(crate) fn defines(rel: &str) -> BTreeMap<String, String> {
     let path = openbsd_src().join(rel);
     let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    parse_defines(&text)
+}
+
+/// The defines of a header's `text` ([`defines`]). A line that ends in a backslash goes on
+/// in the next one, as the preprocessor reads it.
+pub(crate) fn parse_defines(text: &str) -> BTreeMap<String, String> {
+    let text = text.replace("\\\n", " ");
     let mut out = BTreeMap::new();
     for line in text.lines() {
         let Some(rest) = line.trim_start().strip_prefix('#') else {
@@ -86,7 +93,7 @@ fn strip_comment(s: &str) -> &str {
 }
 
 fn eval(defs: &BTreeMap<String, String>, expr: &str, depth: u32) -> Option<i64> {
-    if depth > 16 {
+    if depth > 32 {
         return None;
     }
     let e = strip_parens(expr.trim());
@@ -248,6 +255,31 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect()
+    }
+
+    #[test]
+    fn a_define_may_run_over_lines() {
+        let d = parse_defines(
+            "#define A 0x1 /* one */\n#define\tB\t(A | \\\n\t\t 0x2 | \\\n\t\t 0x4)\n\
+             #define F(x) \\\n\t((x) + 1)\n#define C B\n",
+        );
+        assert_eq!(d.len(), 3);
+        assert_eq!(int(&d, "A"), Some(1));
+        assert_eq!(int(&d, "B"), Some(7));
+        assert_eq!(int(&d, "C"), Some(7));
+    }
+
+    #[test]
+    fn a_long_chain_of_names_is_evaluated() {
+        let mut pairs = std::vec::Vec::new();
+        let mut all = String::new();
+        for i in 0..12 {
+            pairs.push((std::format!("BIT{i}"), std::format!("(1 << {i})")));
+            all += &std::format!("{}BIT{i}", if i == 0 { "(" } else { " | " });
+        }
+        pairs.push(("ALL".to_string(), all + ")"));
+        let d: BTreeMap<String, String> = pairs.into_iter().collect();
+        assert_eq!(int(&d, "ALL"), Some(0xfff));
     }
 
     #[test]
