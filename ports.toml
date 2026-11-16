@@ -1228,7 +1228,7 @@ notes = "M3: the levels; M4: IST_* (with the arm64 extra trigger types), SOFTINT
 [[file]]
 c = "sys/uvm/uvm_param.h"
 rust = "sys/uvm/uvm_param.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "d0fe8090eb1a3efe343912318ea1b80ae68ec14c"
 deps = [
@@ -1236,7 +1236,7 @@ deps = [
     "sys/arch/amd64/include/vmparam.h",
     "sys/arch/arm64/include/vmparam.h",
 ]
-notes = "page arithmetic (atop/ptoa/round_page/trunc_page) and the page-size constants; the VM_* sysctl names live in uvmexp.rs; the MIN/MAX address constants are machine::VmParam"
+notes = "the whole header: DEFAULT_PAGE_SIZE, the page arithmetic (atop/ptoa/round_page/trunc_page, const fns with typed conveniences on Paddr/Vaddr/Vsize) and VM_KERNEL_SPACE_SIZE; boolean_t/TRUE/FALSE are bool; the VM_* sysctl names live in uvmexp.rs, where <uvm/uvmexp.h> defines them (TD1: read again whole, nothing missing)"
 
 [[file]]
 c = "sys/uvm/uvm_pmap.h"

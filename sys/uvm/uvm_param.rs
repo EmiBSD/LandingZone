@@ -81,6 +81,10 @@
 //!
 //! Upstream: sys/uvm/uvm_param.h @ 3ce1f3f79392
 //!
+//! Status: `ported`. The whole header: `DEFAULT_PAGE_SIZE`, the page arithmetic (`atop`,
+//! `ptoa`, `round_page`, `trunc_page`) and `VM_KERNEL_SPACE_SIZE`, from the machine's
+//! `<machine/vmparam.h>` bounds as the C computes it when the machine does not define it.
+//!
 //! ## Deviations
 //! - `boolean_t`, `TRUE` and `FALSE` are `bool`.
 //! - `atop`, `ptoa`, `round_page` and `trunc_page` are `const fn`s on `usize` (page numbers and
@@ -182,6 +186,16 @@ mod tests {
         assert_eq!(Vaddr::new(0x1001).round_page(), Vaddr::new(0x2000));
         assert_eq!(Vsize::new(0x1001).round_page().atop(), 2);
         const _: () = assert!(VM_KERNEL_SPACE_SIZE > 0);
+    }
+
+    #[test]
+    #[ignore = "needs OPENBSD_SRC (just test-ref)"]
+    fn default_page_size_matches_the_c_header() {
+        let defs = crate::reftest::defines("sys/uvm/uvm_param.h");
+        assert_eq!(
+            crate::reftest::int(&defs, "DEFAULT_PAGE_SIZE"),
+            Some(DEFAULT_PAGE_SIZE as i64)
+        );
     }
 }
 /* </TESTS> */
