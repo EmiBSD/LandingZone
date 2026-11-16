@@ -400,6 +400,21 @@ terminfo's entries), which the Mac's file system cannot hold. A build of the use
 EmiBSD (the old TD1b: `selfhost-userland`, the build tools in the base, `base.ffs` and
 `smoke-buildtools`, added and removed on the same day) is Userland's.
 
+The same disk runs `ci` inside EmiBSD (`just smoke-selfhost-ci`, 2026-11-16): `/src/ci.sh`
+(`CI_SH` in `selfhost.rs`) runs, in the chroot and with the native toolchain, the steps of
+`just ci` that fit there for arm64 and for the host, which is EmiBSD itself: `cargo fmt
+--check`, the arm64 and host clippy lines, the three `test` lines (so the kernel's host
+tests, `sys/arch/host`, run on the kernel under test) and the kernel and init builds. The
+smokes (QEMU), amd64's half (the native arm64 tree has no amd64 target) and what reads the
+reference tree (`check-ports`, `check-syscalls`, `test-ref`) stay on the Mac, where `just
+ci` remains the definition of green. Three things it needed: the kernel exports
+`__guard_local` only when it is the kernel (a host test binary linked on EmiBSD gets one
+from `crtbegin.o`); `smoke-all`'s watchdog lists a process tree from one `ps -ax`
+(OpenBSD's `ps -p` takes one pid, macOS's a list); and the VM has 12 GiB, since two rustc
+of the kernel crate do not fit in 6 while there is no swap (TD3). `selfhost --rev REV`
+(`EMIBSD_SELFHOST_REV`) puts another commit's tree on the disk, e.g. `git stash create`'s
+for work that is not committed yet.
+
 Every OpenBSD file compiled or included is classified by licence into `licences.txt`;
 LibreSSL's two licences are named `OpenSSL` and `SSLeay` there (accepted by the user on
 2026-10-03), not counted as BSD-4-Clause.

@@ -422,6 +422,7 @@ fn run(args: &[String]) -> Result<()> {
                     tarball: Path::new(flag(rest, "--userland")?),
                     sha256: flag(rest, "--userland-sha256")?,
                 },
+                optional_flag(rest, "--rev").unwrap_or("HEAD"),
             )
         }
         ["comp", rest @ ..] => {

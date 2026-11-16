@@ -20,7 +20,7 @@
 //! The self-hosting disk (TDk, TD1a until 2026-11-15): what `just smoke-selfhost-kernel`
 //! boots to build this repository's kernel inside EmiBSD with DevTools' native toolchain.
 //!
-//! `cargo xtask selfhost --arch A --userland TAR --userland-sha256 HEX` makes
+//! `cargo xtask selfhost --arch A --userland TAR --userland-sha256 HEX [--rev REV]` makes
 //! `target/selfhost/<arch>/selfhost.ffs`, an ffs image of:
 //! - the base system: the `base` and `comp` sets of the Userland repository's release (TD0,
 //!   the user's decision of 2026-11-15: this repository is the kernel and takes the userland
@@ -32,10 +32,12 @@
 //!   volume ([`Staging`]): the sets hold names that differ only in case (`/usr/bin/Mail`
 //!   and `mail`, `/usr/sbin/ZZZ` and `zzz`, terminfo's entries), which the Mac's own file
 //!   system cannot hold;
-//! - `/src/lz`: this repository's `HEAD` (`git archive`), with every crate of `Cargo.lock`
-//!   vendored (`cargo vendor --locked`, offline: the crates come from the host's cargo cache,
-//!   never the network), `/src/cg/config.toml` pointing cargo at them, and `/src/build.sh`,
-//!   the build the smoke runs in a chroot;
+//! - `/src/lz`: this repository's `HEAD` (`git archive`; `--rev REV` takes another commit,
+//!   e.g. `git stash create`'s, to build a tree that is not committed yet), with every
+//!   crate of `Cargo.lock` vendored (`cargo vendor --locked`, offline: the crates come from
+//!   the host's cargo cache, never the network), `/src/cg/config.toml` pointing cargo at
+//!   them, `/src/build.sh`, the build `smoke-selfhost-kernel` runs in a chroot, and
+//!   `/src/ci.sh`, `smoke-selfhost-ci`'s ([`CI_SH`]);
 //! - room to build: the image is the tree times 5/4 plus [`BUILD_ROOM`].
 //!
 //! The image is made afresh on every run, by OpenBSD's makefs(8) built for the Mac with
@@ -74,6 +76,53 @@ k=target/aarch64-emibsd-none-softfloat/debug/bsd
 n=$(llvm-readelf -h $k 2>/dev/null | grep -cE 'AArch64|EXEC')
 echo "lz-elf-$n"
 echo "lz-build-rc-$rc"
+"#;
+
+/// What `smoke-selfhost-ci` runs in the chroot as `/src/ci.sh`: the steps of `just ci` that
+/// fit inside EmiBSD, for arm64 and for the host (which is EmiBSD there), in `ci`'s order.
+/// Left out: amd64's half (the native arm64 tree has no amd64 target), the smokes (they
+/// boot QEMU), and `check-ports`, `check-syscalls` and `test-ref` (they read the reference
+/// tree, which is not on the disk). Each step's output goes to `/src/ci-<step>.log`, its
+/// last lines and `lz-ci-<step>-rc-<status>` to the console; every step runs whatever the
+/// one before did, and the last line, `lz-ci-rc-<N>`, counts the steps that failed. The
+/// xtask tests need `lo0` configured (the recipe does it) and sh, sleep, ps and kill.
+const CI_SH: &str = r#"#!/bin/ksh
+# The steps of `just ci` that fit inside EmiBSD (arm64 and the host), in the chroot.
+export HOME=/tmp CARGO_HOME=/src/cg CARGO_INCREMENTAL=0
+export CARGO_TARGET_AARCH64_EMIBSD_NONE_SOFTFLOAT_LINKER=/usr/bin/ld.lld
+export EMIBSD_BUILD=0 SOURCE_DATE_EPOCH=0 EMIBSD_BUILD_HOST=emibsd
+export EMIBSD_LLVM_BIN=/usr/bin
+ulimit -d $(ulimit -H -d)
+cd /src/lz || exit 9
+T="--target aarch64-emibsd-none-softfloat"
+W="-- -D warnings"
+C="--offline -j ${JOBS:-4}"
+short() { typeset -L110 l; while IFS= read -r l; do print -r -- "$l"; done; }
+bad=0
+step() {
+    n=$1; shift
+    s=$(date +%s)
+    "$@" > /src/ci-$n.log 2>&1
+    rc=$?
+    tail -n 4 /src/ci-$n.log | short
+    echo "lz-ci-$n-rc-$rc in $(($(date +%s) - s)) s"
+    [ $rc -eq 0 ] || bad=$((bad + 1))
+}
+step fmt cargo fmt --all -- --check
+step clippy-kernel cargo clippy $C -p bsd $T --features qemu $W
+step clippy-mp cargo clippy $C -p bsd $T --features qemu,multiprocessor $W
+step clippy-init cargo clippy $C -p init $T $W
+step clippy-host cargo clippy $C -p libkern -p libz -p bsd -p xtask $W
+step clippy-boot cargo clippy $C -p libsa -p boot -p efi $W
+step clippy-boot-arm64 cargo clippy $C -p libsa -p boot -p efi $T $W
+step clippy-efiboot cargo clippy $C -p efiboot-arm64 $T $W
+step test cargo test $C -p libkern -p libz -p bsd -p xtask
+step test-boot cargo test $C -p libsa -p boot -p efi
+step test-efiboot cargo test $C -p efiboot-arm64
+step build cargo build $C -p bsd $T --features qemu,multiprocessor
+step build-up cargo build $C -p bsd $T
+step build-init cargo build $C -p init $T
+echo "lz-ci-rc-$bad"
 "#;
 
 /// The cargo configuration of the chroot: the vendored crates, no progress bars on a serial
@@ -316,7 +365,7 @@ fn make_image(
 }
 
 /// `cargo xtask selfhost` (module docs).
-pub(crate) fn selfhost(root: &Path, arch: Arch, userland: Pinned<'_>) -> Result<()> {
+pub(crate) fn selfhost(root: &Path, arch: Arch, userland: Pinned<'_>, rev: &str) -> Result<()> {
     // OpenBSD's makefs(8) for the Mac with the ownership shim, as the install media get it:
     // built here if it is missing or its shim changed, and nothing else of `userland` with it.
     let makefs = super::with_ctx(root, arch, ramdisk::build_makefs)?;
@@ -332,7 +381,7 @@ pub(crate) fn selfhost(root: &Path, arch: Arch, userland: Pinned<'_>) -> Result<
         fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
     }
     run(Command::new("sh").arg("-c").arg(format!(
-        "git -C '{}' archive --format=tar HEAD | tar -xf - -C '{}'",
+        "git -C '{}' archive --format=tar '{rev}' | tar -xf - -C '{}'",
         root.display(),
         lz.display()
     )))?;
@@ -343,6 +392,7 @@ pub(crate) fn selfhost(root: &Path, arch: Arch, userland: Pinned<'_>) -> Result<
         .stdout(Stdio::null()))?;
     fs::write(cg.join("config.toml"), CARGO_CONFIG)?;
     write_mode(&src.join("build.sh"), BUILD_SH, 0o755)?;
+    write_mode(&src.join("ci.sh"), CI_SH, 0o755)?;
     make_image(&makefs, &out, &rootdir, &owners, "selfhost.ffs", BUILD_ROOM)
 }
 
@@ -378,6 +428,10 @@ mod tests {
             assert!(BUILD_SH.contains(marker), "{marker}");
         }
         assert!(BUILD_SH.lines().all(|l| l.len() < 128));
+        for marker in ["lz-ci-$n-rc-$rc", "lz-ci-rc-$bad", "ulimit -d", "step fmt "] {
+            assert!(CI_SH.contains(marker), "{marker}");
+        }
+        assert!(CI_SH.lines().all(|l| l.len() < 128));
         assert!(CARGO_CONFIG.contains("directory = \"/src/lz/vendor\""));
     }
 

@@ -3306,13 +3306,49 @@ selfhost_script := disk_login + " --reject 'panic:' --reject 'Bad system call' "
     "--expect 'sh-mnt-42' --expect 'sh-dev-42' --expect 'rustc 1.99.1' --expect 'rsv-rc-0' " + \
     "--expect 'cargo 1.99.1' --expect 'cgv-rc-0' --expect 'lz-elf-2' --expect 'lz-build-rc-0'"
 
-smoke-selfhost-kernel: (build-arm64 "--features qemu,multiprocessor")
-    @{{ramdisks}} || { echo "smoke-selfhost-kernel: no ramdisk image; run just userland first"; exit 1; }
-    {{xtask}} selfhost --arch arm64 --userland "{{selfhost_userland}}" --userland-sha256 {{selfhost_userland_sha256}}
+# The self-hosting disk of `smoke-selfhost-kernel` and `smoke-selfhost-ci`, made afresh:
+# `selfhost.ffs` and its copy for the VM. `selfhost_rev` (EMIBSD_SELFHOST_REV) is the commit
+# whose tree goes on it, `HEAD` by default; `EMIBSD_SELFHOST_REV=$(git stash create)` takes
+# the working tree as it is, not committed yet.
+selfhost_rev := env("EMIBSD_SELFHOST_REV", "HEAD")
+
+selfhost-disk:
+    @{{ramdisks}} || { echo "selfhost-disk: no ramdisk image; run just userland first"; exit 1; }
+    {{xtask}} selfhost --arch arm64 --userland "{{selfhost_userland}}" --userland-sha256 {{selfhost_userland_sha256}} \
+        --rev "{{selfhost_rev}}"
     mkdir -p "${EMIBSD_RUN_DIR:-target}" && rm -f "${EMIBSD_RUN_DIR:-target}/disk-arm64-selfhost.img" && \
         cp -c target/selfhost/arm64/selfhost.ffs "${EMIBSD_RUN_DIR:-target}/disk-arm64-selfhost.img"
+
+smoke-selfhost-kernel: (build-arm64 "--features qemu,multiprocessor") selfhost-disk
     {{xtask}} smoke {{reject}} --accel hvf --smp 4 --memory 6G --timeout {{selfhost_timeout}} --arch arm64 \
         --kernel target/{{arm64}}/debug/bsd --expect-ramdisk --until-seen --disk-set selfhost {{selfhost_script}}
+
+# `ci` inside EmiBSD (2026-11-16): on the same disk and in the same chroot, /src/ci.sh runs
+# the steps of `just ci` that fit there with the comp set's native toolchain, for arm64 and
+# for the host, which is EmiBSD itself: `cargo fmt --check`, every arm64 and host clippy line
+# of `clippy`, `test`'s three lines (the kernel's host tests run on the kernel under test),
+# and the kernel and init builds (tools/xtask/src/userland/selfhost.rs, `CI_SH`). Not there:
+# amd64's half (the native tree has no amd64 target), the smokes (QEMU) and what reads the
+# reference tree (`check-ports`, `check-syscalls`, `test-ref`); `just ci` on the Mac stays
+# the definition of green. Each step prints `lz-ci-<step>-rc-<status>` and the script goes
+# on; its last line counts the failed steps, and `lz-ci-rc-0` is the criterion. 12 GiB: two
+# rustc of the kernel crate at once (the library and its tests) do not fit in 6 without
+# swap, and the kernel kills them (SIGKILL on a fault with no memory, as OpenBSD does).
+# lo0 gets its address first, for xtask's tests that bind a port. Not in `smokes`, as
+# `smoke-selfhost-kernel`.
+selfhost_ci_script := disk_login + " --reject 'panic:' --reject 'Bad system call' " + \
+    "--reject 'lz-ci-rc-1' --reject 'lz-ci-rc-2' --reject 'lz-ci-rc-3' --reject 'lz-ci-rc-4' --reject 'lz-ci-rc-5' " + \
+    "--reject 'lz-ci-rc-6' --reject 'lz-ci-rc-7' --reject 'lz-ci-rc-8' --reject 'lz-ci-rc-9' " + \
+    "--send-after '# ' --send 'mount /dev/sd0a /mnt && echo sh-mnt-$((40+2))\\n' " + \
+    "--send-after 'sh-mnt-42' --send 'mkdir -p /mnt/dev && cp -Rp /dev/null /dev/zero /dev/urandom /mnt/dev/ && echo sh-dev-$((40+2))\\n' " + \
+    "--send-after 'sh-dev-42' --send 'ifconfig lo0 inet 127.0.0.1 && echo sh-lo-$((40+2))\\n' " + \
+    "--send-after 'sh-lo-42' --send 'JOBS=" + selfhost_jobs + " /usr/sbin/chroot /mnt /src/ci.sh\\n' " + \
+    "--expect 'sh-mnt-42' --expect 'sh-dev-42' --expect 'sh-lo-42' --expect 'lz-ci-fmt-rc-0' " + \
+    "--expect 'lz-ci-test-rc-0' --expect 'lz-ci-build-rc-0' --expect 'lz-ci-rc-0'"
+
+smoke-selfhost-ci: (build-arm64 "--features qemu,multiprocessor") selfhost-disk
+    {{xtask}} smoke {{reject}} --accel hvf --smp 4 --memory 12G --timeout {{selfhost_timeout}} --arch arm64 \
+        --kernel target/{{arm64}}/debug/bsd --expect-ramdisk --until-seen --disk-set selfhost {{selfhost_ci_script}}
 
 # --- the comp set (M14) --------------------------------------------------------------
 

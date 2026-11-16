@@ -21,7 +21,9 @@ paths:
   `gnu/llvm` by its build glue, `userland/comp.rs`; outside `ci`, `just comp`). `selfhost` (TDk, TD1a until 2026-11-15: `smoke-selfhost-kernel`'s disk, the base and comp sets of the Userland
   repository's release (TD0: no userland of this repository's; since Userland 2026.11.6 comp
   carries DevTools' native LLVM and Rust), the release tarball checked against its pin in
-  the justfile, and `HEAD` with its crates vendored offline; `userland/selfhost.rs`). `--memory SIZE` (qemu, smoke, smoke2; 256M..16G) replaces
+  the justfile, and `HEAD` (or `--rev REV`) with its crates vendored offline, `/src/build.sh`
+  and `/src/ci.sh`, what `smoke-selfhost-ci` runs: `ci`'s arm64 and host steps inside EmiBSD;
+  `userland/selfhost.rs`). `--memory SIZE` (qemu, smoke, smoke2; 256M..16G) replaces
   `boot::VM_MEMORY` (512M); `smoke --timeout SECS` replaces `boot::SMOKE_TIMEOUT` (180 s),
   still scaled, and `smoke-all`'s watchdog reads it; `--accel hvf` (arm64 qemu and smoke)
   runs the guest under Hypervisor.framework for the build VMs, used by no recipe of `smokes`.
