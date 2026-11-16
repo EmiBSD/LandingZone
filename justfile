@@ -3272,31 +3272,27 @@ diff-openbsd: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--fea
 
 # TDk (TD1a until 2026-11-15): this repository's kernel built inside EmiBSD by DevTools'
 # native toolchain (D-0009), the milestone's criterion (docs/ROADMAP.md). `cargo xtask
-# selfhost` makes the native disk (the Userland repository's released base and comp sets,
-# not a userland of this repository's (TD0), then DevTools' native LLVM and Rust,
-# each checked against its pin below, and this tree's HEAD with its crates vendored;
-# tools/xtask/src/userland/selfhost.rs); the smoke boots the MP kernel with it as sd0
-# (`--disk-set selfhost`), mounts it on /mnt, gives it /dev/null, /dev/zero and /dev/urandom,
-# and in a chroot(8) checks rustc and cargo, then runs /src/build.sh: `cargo build --offline
-# -p bsd --target aarch64-emibsd-none-softfloat --features qemu,multiprocessor`, whose
-# `lz-build-rc-0` and `lz-elf-2` (the native llvm-readelf finds AArch64 and EXEC in the `bsd`
-# it made) are the criterion. Each marker is printed by the guest, never typed (`$?`,
-# `$((40+2))`), and any step's nonzero status is rejected. arm64 only: DevTools' amd64 native
-# pair is not proved yet. -smp 4 and 6 GiB, under TCG (the build takes about half an hour): not
-# `--accel hvf` yet, because DevTools' native rustc and cargo 1.99.1+emibsd.5 have no BTI
-# landing pads and no PT_OPENBSD_NOBTCFI, so on a host CPU with BTI the kernel's BTCFI kills
-# them with SIGILL as OpenBSD's would (docs/EXTERNAL_BUGS.md, EXT-228); the limit is
-# `selfhost_timeout` seconds; `selfhost_jobs` is cargo's -j (EMIBSD_SELFHOST_JOBS). Not in `smokes`: it needs `just userland` (the
-# ramdisk the VM boots, and the host makefs), Userland's release in `selfhost_userland` and
-# DevTools' tarballs in `selfhost_dist`, each pinned below to the released files.
-selfhost_userland := env("USERLAND_RELEASE", env("HOME") / "devel/emibsd/OS/target/userland/2026.11.4/userland-2026.11.4-arm64")
-selfhost_base_sha256 := "55a02eea54eb123a9f02fae6436941cbd33df21a2c05e7b2ef723241404fa9a2"
-selfhost_comp_sha256 := "d9efc6ea1be971b680f6b7db2b4137e299a25e141685d4725083a2709a0b5b53"
-selfhost_dist := env("DEVTOOLS_DIST", env("HOME") / "devel/emibsd/DevTools/dist")
-selfhost_llvm := "llvm-23.1.4+emibsd.6-aarch64-emibsd-emibsd8.0-arm64.tar.zst"
-selfhost_llvm_sha256 := "a778ef6d3dcf281e9a9d71e1565de9315beb7814e1fcf9a1e42c502dc2986aab"
-selfhost_rust := "rust-1.99.1+emibsd.5-aarch64-emibsd-emibsd-arm64.tar.zst"
-selfhost_rust_sha256 := "2b7ec9abfd2bfffbb14f7e1d510699899f411d124192882f429a4ea69effc0cc"
+# selfhost` makes the native disk: the base and comp sets of the Userland repository's
+# release, not a userland of this repository's (TD0), the release tarball checked against
+# its pin below, and this tree's HEAD with its crates vendored
+# (tools/xtask/src/userland/selfhost.rs). Since Userland 2026.11.6 the comp set carries
+# DevTools' native LLVM and Rust (its MANIFEST names them: llvm-23.1.4+emibsd.7,
+# rust-1.99.1+emibsd.6), so nothing of DevTools' is laid over the sets here. The smoke boots
+# the MP kernel with the disk as sd0 (`--disk-set selfhost`), mounts it on /mnt, gives it
+# /dev/null, /dev/zero and /dev/urandom, and in a chroot(8) checks rustc and cargo, then runs
+# /src/build.sh: `cargo build --offline -p bsd --target aarch64-emibsd-none-softfloat
+# --features qemu,multiprocessor`, whose `lz-build-rc-0` and `lz-elf-2` (the native
+# llvm-readelf finds AArch64 and EXEC in the `bsd` it made) are the criterion. Each marker is
+# printed by the guest, never typed (`$?`, `$((40+2))`), and any step's nonzero status is
+# rejected. arm64 only: DevTools' amd64 native pair is not proved yet. -smp 4 and 6 GiB,
+# under Hypervisor.framework (`--accel hvf`, the Mac's own CPU, which has BTI): the native
+# Rust carries BTI landing pads since 1.99.1+emibsd.6 (docs/EXTERNAL_BUGS.md, EXT-228; the
+# run was on TCG while it had none). The limit is `selfhost_timeout` seconds;
+# `selfhost_jobs` is cargo's -j (EMIBSD_SELFHOST_JOBS). Not in `smokes`: it needs
+# `just userland` (the ramdisk the VM boots, and the host makefs) and Userland's release
+# tarball, `selfhost_userland`, pinned below.
+selfhost_userland := env("USERLAND_DIST", env("HOME") / "devel/emibsd/Userland/dist") / "userland-2026.11.6-arm64.tar.zst"
+selfhost_userland_sha256 := "1a642b0c7c0d582e1a02966d814f954907fdaea9c5a753f785399f38f82a3cf9"
 selfhost_timeout := env("EMIBSD_SELFHOST_TIMEOUT", "21600")
 selfhost_jobs := env("EMIBSD_SELFHOST_JOBS", "4")
 selfhost_script := disk_login + " --reject 'panic:' --reject 'Bad system call' " + \
@@ -3312,14 +3308,10 @@ selfhost_script := disk_login + " --reject 'panic:' --reject 'Bad system call' "
 
 smoke-selfhost-kernel: (build-arm64 "--features qemu,multiprocessor")
     @{{ramdisks}} || { echo "smoke-selfhost-kernel: no ramdisk image; run just userland first"; exit 1; }
-    {{xtask}} selfhost --arch arm64 \
-        --base "{{selfhost_userland}}/base80.tar.zst" --base-sha256 {{selfhost_base_sha256}} \
-        --comp "{{selfhost_userland}}/comp80.tar.zst" --comp-sha256 {{selfhost_comp_sha256}} \
-        --llvm "{{selfhost_dist}}/{{selfhost_llvm}}" --llvm-sha256 {{selfhost_llvm_sha256}} \
-        --rust "{{selfhost_dist}}/{{selfhost_rust}}" --rust-sha256 {{selfhost_rust_sha256}}
+    {{xtask}} selfhost --arch arm64 --userland "{{selfhost_userland}}" --userland-sha256 {{selfhost_userland_sha256}}
     mkdir -p "${EMIBSD_RUN_DIR:-target}" && rm -f "${EMIBSD_RUN_DIR:-target}/disk-arm64-selfhost.img" && \
         cp -c target/selfhost/arm64/selfhost.ffs "${EMIBSD_RUN_DIR:-target}/disk-arm64-selfhost.img"
-    {{xtask}} smoke {{reject}} --smp 4 --memory 6G --timeout {{selfhost_timeout}} --arch arm64 \
+    {{xtask}} smoke {{reject}} --accel hvf --smp 4 --memory 6G --timeout {{selfhost_timeout}} --arch arm64 \
         --kernel target/{{arm64}}/debug/bsd --expect-ramdisk --until-seen --disk-set selfhost {{selfhost_script}}
 
 # --- the comp set (M14) --------------------------------------------------------------

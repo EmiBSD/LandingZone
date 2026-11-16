@@ -388,9 +388,11 @@ and `lib/libedit` (`LIBRARIES` in `userland.rs`, the code in `userland/libraries
 
 The self-hosting disk (TDk, `cargo xtask selfhost`, `userland/selfhost.rs`) is not made
 from this userland: since TD0 (the user's decision of 2026-11-15: this repository is the
-kernel, the userland is the Userland repository's) it unpacks Userland's released `base`
-and `comp` sets, pinned by sha256 in the justfile, with the owners and modes of their tar
-headers, and lays DevTools' native LLVM and Rust over them. The tree is staged on a
+kernel, the userland is the Userland repository's) it unpacks the `base` and `comp` sets
+of Userland's release, whose tarball is pinned by sha256 in the justfile, with the owners
+and modes of their tar headers. Since Userland 2026.11.6 the `comp` set carries DevTools'
+native LLVM and Rust, so xtask lays nothing of DevTools' over them (until then it laid the
+two native tarballs, pinned too). The tree is staged on a
 case-sensitive APFS volume (a sparse image that `hdiutil` makes and attaches under
 `target/selfhost/<arch>/` and xtask detaches and removes when it is done): the sets hold
 names that differ only in case (`/usr/bin/Mail` and `mail`, `/usr/sbin/ZZZ` and `zzz`,

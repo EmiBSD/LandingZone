@@ -870,9 +870,10 @@ lstat_device(const char *path, struct stat *sb)
  * Ownership: every file is root:wheel, and the table in $EMIBSD_OWNERS (lines of
  * "mode uid gid /path") overrides the mode, owner and group of the paths it lists. The
  * paths makefs gives lstat are $EMIBSD_STAGING/./dir/name; both sides are reduced to their
- * components, without the "." ones.
+ * components, without the "." ones. MAXATTR holds the self-hosting disk's table: Userland
+ * 2026.11.6's base and comp sets have 14,934 entries.
  */
-#define MAXATTR 8192
+#define MAXATTR 65536
 #define MAXPATHLEN_ATTR 256
 
 static struct attr {

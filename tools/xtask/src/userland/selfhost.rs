@@ -20,28 +20,26 @@
 //! The self-hosting disk (TDk, TD1a until 2026-11-15): what `just smoke-selfhost-kernel`
 //! boots to build this repository's kernel inside EmiBSD with DevTools' native toolchain.
 //!
-//! `cargo xtask selfhost --arch A --base TAR --base-sha256 HEX --comp TAR --comp-sha256 HEX
-//! --llvm TAR --llvm-sha256 HEX --rust TAR --rust-sha256 HEX` makes
+//! `cargo xtask selfhost --arch A --userland TAR --userland-sha256 HEX` makes
 //! `target/selfhost/<arch>/selfhost.ffs`, an ffs image of:
-//! - the base system: the Userland repository's released `base` and `comp` sets (TD0, the
-//!   user's decision of 2026-11-15: this repository is the kernel and takes the userland
-//!   Userland makes, it does not build one for the VM), each checked against its pin in the
-//!   justfile and unpacked unmodified, the owners and modes of their tar headers kept in the
-//!   image; their libc++ headers and clang resource directory, if any, are removed, since
-//!   DevTools' LLVM replaces them as a whole. The tree is staged on a case-sensitive APFS
+//! - the base system: the `base` and `comp` sets of the Userland repository's release (TD0,
+//!   the user's decision of 2026-11-15: this repository is the kernel and takes the userland
+//!   Userland makes, it does not build one for the VM). The release tarball is checked
+//!   against its pin in the justfile and its two sets are unpacked unmodified, the owners
+//!   and modes of their tar headers kept in the image. Since Userland 2026.11.6 its `comp`
+//!   carries DevTools' native LLVM and Rust (`aarch64-emibsd-emibsd8.0`; D-0009, D-0010,
+//!   D-0012), so nothing is laid over the sets. The tree is staged on a case-sensitive APFS
 //!   volume ([`Staging`]): the sets hold names that differ only in case (`/usr/bin/Mail`
 //!   and `mail`, `/usr/sbin/ZZZ` and `zzz`, terminfo's entries), which the Mac's own file
 //!   system cannot hold;
-//! - DevTools' native LLVM, then Rust (`aarch64-emibsd-emibsd8.0`; D-0009, D-0010): each
-//!   tarball checked against its pin, holding one top directory, its `usr/` laid over the
-//!   base unmodified;
 //! - `/src/lz`: this repository's `HEAD` (`git archive`), with every crate of `Cargo.lock`
 //!   vendored (`cargo vendor --locked`, offline: the crates come from the host's cargo cache,
 //!   never the network), `/src/cg/config.toml` pointing cargo at them, and `/src/build.sh`,
 //!   the build the smoke runs in a chroot;
 //! - room to build: the image is the tree times 5/4 plus [`BUILD_ROOM`].
 //!
-//! The image is made afresh on every run, by `userland`'s host makefs.
+//! The image is made afresh on every run, by OpenBSD's makefs(8) built for the Mac with
+//! `ramdisk.rs`'s ownership shim (`ramdisk::build_makefs`, the one host tool built here).
 
 use super::*;
 
@@ -55,7 +53,7 @@ const BUILD_ROOM: u64 = 8 << 30;
 /// so the smoke's expectations cannot be met by an echoed command line. `JOBS` is cargo's
 /// `-j` (the recipe passes it).
 const BUILD_SH: &str = r#"#!/bin/ksh
-# TDk: builds LandingZone's arm64 kernel with DevTools' native toolchain, in the chroot.
+# TDk: builds LandingZone's arm64 kernel with the comp set's native toolchain, in the chroot.
 export HOME=/tmp CARGO_HOME=/src/cg CARGO_INCREMENTAL=0
 export CARGO_TARGET_AARCH64_EMIBSD_NONE_SOFTFLOAT_LINKER=/usr/bin/ld.lld
 export EMIBSD_BUILD=0 SOURCE_DATE_EPOCH=0 EMIBSD_BUILD_HOST=emibsd
@@ -90,6 +88,9 @@ directory = "/src/lz/vendor"
 progress.when = "never"
 color = "never"
 "#;
+
+/// The version in the names of the release's sets (`base80.tar.zst`): EmiBSD 8.0.
+const SETS_VERSION: &str = "80";
 
 /// macOS's disk image tool (`/usr/bin/hdiutil`).
 const HDIUTIL: &str = "/usr/bin/hdiutil";
@@ -145,59 +146,70 @@ impl Drop for Staging {
     }
 }
 
-/// A pinned tarball for [`selfhost`] (a DevTools toolchain or a Userland set): its path and
-/// the sha256 it is pinned to.
+/// A pinned tarball for [`selfhost`] (the Userland repository's release): its path and the
+/// sha256 it is pinned to.
 pub(crate) struct Pinned<'a> {
     pub(crate) tarball: &'a Path,
     pub(crate) sha256: &'a str,
 }
 
-/// The Userland repository's released sets [`selfhost`] starts from.
-pub(crate) struct Sets<'a> {
-    pub(crate) base: Pinned<'a>,
-    pub(crate) comp: Pinned<'a>,
-}
-
-/// The base of the self-hosting disk, made in `staging`'s `root`: Userland's `base` and
-/// `comp` sets unpacked in that order, without the libc++ headers and clang resource
-/// directory DevTools' LLVM brings whole (module docs). Returns the root and the ownership
-/// table of the sets' entries (`owners.txt`, the makefs shim's `mode uid gid path` lines).
-fn base_root(out: &Path, staging: &Staging, sets: &Sets<'_>) -> Result<(PathBuf, PathBuf)> {
+/// The base of the self-hosting disk, made in `staging`'s `root`: the `base` and `comp` sets
+/// of the Userland release `userland` (checked against its pin; one top directory holding
+/// `base80.tar.zst` and `comp80.tar.zst`), unpacked in that order. Returns the root and the
+/// ownership table of the sets' entries (`owners.txt`, the makefs shim's `mode uid gid path`
+/// lines).
+fn base_root(out: &Path, staging: &Staging, userland: &Pinned<'_>) -> Result<(PathBuf, PathBuf)> {
     let rootdir = staging.mount.join("root");
     let unpack = out.join("unpack");
     if unpack.exists() {
         fs::remove_dir_all(&unpack).map_err(|e| format!("{}: {e}", unpack.display()))?;
     }
     fs::create_dir_all(&rootdir).map_err(|e| format!("{}: {e}", rootdir.display()))?;
+    check_sha256(userland.tarball, userland.sha256)?;
+    let release = unpack.join("release");
+    fs::create_dir_all(&release).map_err(|e| format!("{}: {e}", release.display()))?;
+    run(Command::new("sh").arg("-c").arg(format!(
+        "zstd -dcq '{}' | tar -xf - -C '{}'",
+        userland.tarball.display(),
+        release.display()
+    )))?;
+    let tops: Vec<PathBuf> = fs::read_dir(&release)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .collect();
+    let [top] = tops.as_slice() else {
+        return Err(format!(
+            "{}: expected one top directory, found {}",
+            userland.tarball.display(),
+            tops.len()
+        )
+        .into());
+    };
     let mut table = String::new();
-    for (what, pin) in [("base", &sets.base), ("comp", &sets.comp)] {
-        table.push_str(&lay_set(out, &rootdir, what, pin)?);
-    }
-    for stale in ["usr/include/c++", "usr/lib/clang"] {
-        let d = rootdir.join(stale);
-        if d.exists() {
-            fs::remove_dir_all(&d).map_err(|e| format!("{}: {e}", d.display()))?;
+    for what in ["base", "comp"] {
+        let set = top.join(format!("{what}{SETS_VERSION}.tar.zst"));
+        if !set.is_file() {
+            return Err(format!("{}: no {}", userland.tarball.display(), set.display()).into());
         }
+        table.push_str(&lay_set(out, &rootdir, what, &set)?);
     }
+    fs::remove_dir_all(&release).map_err(|e| format!("{}: {e}", release.display()))?;
     let owners = out.join("owners.txt");
     fs::write(&owners, table).map_err(|e| format!("{}: {e}", owners.display()))?;
     Ok((rootdir, owners))
 }
 
-/// Unpacks the set `pin` (a zstd-compressed ustar archive of paths `./...`, checked against
-/// its pin) into `rootdir` and returns the ownership table of its entries.
-fn lay_set(out: &Path, rootdir: &Path, what: &str, pin: &Pinned<'_>) -> Result<String> {
-    check_sha256(pin.tarball, pin.sha256)?;
+/// Unpacks the set `set` (a zstd-compressed ustar archive of paths `./...`, from the release
+/// [`base_root`] checked) into `rootdir` and returns the ownership table of its entries.
+fn lay_set(out: &Path, rootdir: &Path, what: &str, set: &Path) -> Result<String> {
     let dir = out.join("unpack");
-    fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let tar = dir.join(format!("{what}.tar"));
     run(Command::new("sh").arg("-c").arg(format!(
         "zstd -dcq '{}' > '{}'",
-        pin.tarball.display(),
+        set.display(),
         tar.display()
     )))?;
     let bytes = fs::read(&tar).map_err(|e| format!("{}: {e}", tar.display()))?;
-    let table = set_owners(&bytes).map_err(|e| format!("{}: {e}", pin.tarball.display()))?;
+    let table = set_owners(&bytes).map_err(|e| format!("{}: {e}", set.display()))?;
     run(Command::new("tar")
         .arg("-xf")
         .arg(&tar)
@@ -205,12 +217,12 @@ fn lay_set(out: &Path, rootdir: &Path, what: &str, pin: &Pinned<'_>) -> Result<S
         .arg(rootdir))?;
     // The sets hold directories their owner cannot read (`/var/spool/ftp/hidden`, 0111) and
     // files nobody can write; the staged tree is the user's, who must read all of it and
-    // lay the toolchains over it. The image gets every entry's own mode from the table.
+    // write the source beside it. The image gets every entry's own mode from the table.
     run(Command::new("chmod").args(["-R", "u+rwX"]).arg(rootdir))?;
     fs::remove_file(&tar).map_err(|e| format!("{}: {e}", tar.display()))?;
     println!(
         "  {what}: {} ({} entries)",
-        pin.tarball.display(),
+        set.display(),
         table.lines().count()
     );
     Ok(table)
@@ -266,48 +278,6 @@ fn c_str(field: &[u8]) -> &str {
     std::str::from_utf8(&field[..end]).unwrap_or("")
 }
 
-/// `userland`'s makefs(8), built for the Mac.
-fn makefs_of(root: &Path, arch: Arch) -> PathBuf {
-    root.join("target/userland")
-        .join(arch.name())
-        .join("host/bin/makefs")
-}
-
-/// Lays the DevTools tarball `pin` (checked against its pin; one top directory holding
-/// `usr/`) over `rootdir/usr`, unpacking it in `out/unpack/<what>`.
-fn lay_tarball(out: &Path, rootdir: &Path, what: &str, pin: &Pinned<'_>) -> Result<()> {
-    check_sha256(pin.tarball, pin.sha256)?;
-    let dir = out.join("unpack").join(what);
-    fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    run(Command::new("sh").arg("-c").arg(format!(
-        "zstd -dcq '{}' | tar -xf - -C '{}'",
-        pin.tarball.display(),
-        dir.display()
-    )))?;
-    let tops: Vec<PathBuf> = fs::read_dir(&dir)?
-        .filter_map(|e| e.ok().map(|e| e.path()))
-        .collect();
-    let [top] = tops.as_slice() else {
-        return Err(format!(
-            "{}: expected one top directory, found {}",
-            pin.tarball.display(),
-            tops.len()
-        )
-        .into());
-    };
-    let usr = top.join("usr");
-    if !usr.is_dir() {
-        return Err(format!("{}: no usr/ under {}", pin.tarball.display(), top.display()).into());
-    }
-    // `cp -R usr/. root/usr/` merges into the existing directories.
-    run(Command::new("cp")
-        .arg("-R")
-        .arg(usr.join("."))
-        .arg(rootdir.join("usr")))?;
-    println!("  {what}: {}", top.display());
-    Ok(())
-}
-
 /// Writes `text` to `path` with `mode`.
 fn write_mode(path: &Path, text: &str, mode: u32) -> Result<()> {
     use std::os::unix::fs::PermissionsExt as _;
@@ -317,10 +287,9 @@ fn write_mode(path: &Path, text: &str, mode: u32) -> Result<()> {
 }
 
 /// The ffs image `out/<name>` of `rootdir`, the tree times 5/4 plus `room` bytes, by
-/// `userland`'s makefs with the ownership table `owners`.
+/// the host `makefs` with the ownership table `owners`.
 fn make_image(
-    root: &Path,
-    arch: Arch,
+    makefs: &Path,
     out: &Path,
     rootdir: &Path,
     owners: &Path,
@@ -333,7 +302,7 @@ fn make_image(
     ramdisk::write_if_changed(&disktab, &ramdisk::disktab_entry(size / 512))?;
     let image = out.join(name);
     let _ = fs::remove_file(&image);
-    run(Command::new(makefs_of(root, arch))
+    run(Command::new(makefs)
         .args(["-t", "ffs", "-T", &ramdisk::TIMESTAMP.to_string()])
         .env("EMIBSD_DISKTAB", &disktab)
         .env("EMIBSD_OWNERS", owners)
@@ -347,26 +316,14 @@ fn make_image(
 }
 
 /// `cargo xtask selfhost` (module docs).
-pub(crate) fn selfhost(
-    root: &Path,
-    arch: Arch,
-    sets: Sets<'_>,
-    llvm: Pinned<'_>,
-    rust: Pinned<'_>,
-) -> Result<()> {
-    if !makefs_of(root, arch).is_file() {
-        return Err(format!(
-            "{}: missing; run `just userland`",
-            makefs_of(root, arch).display()
-        )
-        .into());
-    }
+pub(crate) fn selfhost(root: &Path, arch: Arch, userland: Pinned<'_>) -> Result<()> {
+    // OpenBSD's makefs(8) for the Mac with the ownership shim, as the install media get it:
+    // built here if it is missing or its shim changed, and nothing else of `userland` with it.
+    let makefs = super::with_ctx(root, arch, ramdisk::build_makefs)?;
     let out = root.join("target/selfhost").join(arch.name());
     fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
     let staging = Staging::attach(&out)?;
-    let (rootdir, owners) = base_root(&out, &staging, &sets)?;
-    lay_tarball(&out, &rootdir, "llvm", &llvm)?;
-    lay_tarball(&out, &rootdir, "rust", &rust)?;
+    let (rootdir, owners) = base_root(&out, &staging, &userland)?;
     // The source, its crates and the build.
     let src = rootdir.join("src");
     let lz = src.join("lz");
@@ -386,15 +343,7 @@ pub(crate) fn selfhost(
         .stdout(Stdio::null()))?;
     fs::write(cg.join("config.toml"), CARGO_CONFIG)?;
     write_mode(&src.join("build.sh"), BUILD_SH, 0o755)?;
-    make_image(
-        root,
-        arch,
-        &out,
-        &rootdir,
-        &owners,
-        "selfhost.ffs",
-        BUILD_ROOM,
-    )
+    make_image(&makefs, &out, &rootdir, &owners, "selfhost.ffs", BUILD_ROOM)
 }
 
 /// Refuses `file` unless its SHA-256, by the host's `shasum`, is `want` (lowercase hex).

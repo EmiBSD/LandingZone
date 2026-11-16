@@ -85,7 +85,7 @@ means EmiBSD's code has it too ("Bugs the port reproduces").
 | EXT-73 | `sys/scsi/cd.c:1409` | `cd_play_tracks` indexes the TOC with a user track | user | wrong result | read | fixed | open |
 | EXT-223 | `usr.sbin/makefs/msdos.c:143` | makefs exits 0 when the FAT cannot be made, leaving an image of zeros | user | wrong result | reproduced | `distrib.rs` checks the boot sector | open |
 | EXT-224 | `usr.sbin/makefs/msdos/mkfs_msdos.c:763` | with `sectors_per_track` and `drive_heads` both given, the image's size is never taken | user | wrong result | reproduced | `distrib.rs` gives `drive_heads` only | open |
-| EXT-228 | DevTools' native Rust 1.99.1+emibsd.5 (arm64) | `rustc` and `cargo` have no BTI landing pads and no `PT_OPENBSD_NOBTCFI`: SIGILL on a CPU with BTI | user | crash | reproduced | `smoke-selfhost-kernel` stays on TCG (cortex-a72, no BTI) | open |
+| EXT-228 | DevTools' native Rust 1.99.1+emibsd.5 (arm64) | `rustc` and `cargo` have no BTI landing pads and no `PT_OPENBSD_NOBTCFI`: SIGILL on a CPU with BTI | user | crash | reproduced | none since the pin moved to 1.99.1+emibsd.6: `smoke-selfhost-kernel` is back on `--accel hvf` | fixed upstream (`rust-1.99.1+emibsd.6`, DevTools' D-0011) |
 | EXT-158 | `sys/dev/wscons/wsemul_vt100.c:1087` | eleventh CSI argument touches `args[10]` | user | cosmetic | read | fixed | open |
 | EXT-160 | `sys/dev/rasops/rasops8.c:136` | glyph rows read 4 bytes past the font | user | cosmetic | read | fixed | open |
 | EXT-46 | `sys/ntfs/ntfs_compr.c:98` | 4 KB blocks written into a smaller unit buffer | device | memory corruption | read | panics instead | open |
@@ -3002,10 +3002,18 @@ for the host shims of `tools/xtask/src/userland/ramdisk.rs`.
   and `ld.lld --version` answer and exit 0; `cargo --version`, `rustc --version` and
   `rustc -vV` print `Illegal instruction` and exit 132. The exception class was not read
   (no core file: `coredump` is an `unported!` stub).
-- Port's handling: `just smoke-selfhost-kernel` runs without `--accel hvf` (TCG), as when
-  TDk was met; to be put back when DevTools publishes a Rust that runs under BTCFI.
+- Port's handling: `just smoke-selfhost-kernel` ran without `--accel hvf` (TCG), as when
+  TDk was met, until the fix; it is back on `--accel hvf` since 2026-11-16.
 - Severity: crash (the toolchain does not start).
 - Fix (DevTools): link the native tree's executables with `-z nobtcfi`, and have its rustc
   do the same by default for the programs it links for its emibsd targets (build scripts
   run inside EmiBSD), or build std and the tools with BTI.
+- Fixed: `rust-1.99.1+emibsd.6` (DevTools' decision D-0011, patch 0006, the user's request
+  of 2026-11-15): for `aarch64-emibsd-emibsd` rustc emits BTI with `pac-ret` by default and
+  std is built so. Checked on 2026-11-16 with the native Rust that Userland 2026.11.6's
+  `comp` set carries (`llvm-23.1.4+emibsd.7`, `rust-1.99.1+emibsd.6`), QEMU `-accel hvf
+  -cpu host` on the same Apple M3 Pro: in the chroot `rustc --version` and `cargo
+  --version` answer and exit 0, and `cargo build --offline -p bsd` ends with
+  `lz-build-rc-0` and `lz-elf-2` (cargo's `Finished ... in 1m 52s`, the smoke ok in
+  122.8 s; under TCG the build took 30 minutes).
 
