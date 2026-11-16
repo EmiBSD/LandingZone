@@ -85,6 +85,7 @@ means EmiBSD's code has it too ("Bugs the port reproduces").
 | EXT-73 | `sys/scsi/cd.c:1409` | `cd_play_tracks` indexes the TOC with a user track | user | wrong result | read | fixed | open |
 | EXT-223 | `usr.sbin/makefs/msdos.c:143` | makefs exits 0 when the FAT cannot be made, leaving an image of zeros | user | wrong result | reproduced | `distrib.rs` checks the boot sector | open |
 | EXT-224 | `usr.sbin/makefs/msdos/mkfs_msdos.c:763` | with `sectors_per_track` and `drive_heads` both given, the image's size is never taken | user | wrong result | reproduced | `distrib.rs` gives `drive_heads` only | open |
+| EXT-228 | DevTools' native Rust 1.99.1+emibsd.5 (arm64) | `rustc` and `cargo` have no BTI landing pads and no `PT_OPENBSD_NOBTCFI`: SIGILL on a CPU with BTI | user | crash | reproduced | `smoke-selfhost-kernel` stays on TCG (cortex-a72, no BTI) | open |
 | EXT-158 | `sys/dev/wscons/wsemul_vt100.c:1087` | eleventh CSI argument touches `args[10]` | user | cosmetic | read | fixed | open |
 | EXT-160 | `sys/dev/rasops/rasops8.c:136` | glyph rows read 4 bytes past the font | user | cosmetic | read | fixed | open |
 | EXT-46 | `sys/ntfs/ntfs_compr.c:98` | 4 KB blocks written into a smaller unit buffer | device | memory corruption | read | panics instead | open |
@@ -2979,3 +2980,32 @@ for the host shims of `tools/xtask/src/userland/ramdisk.rs`.
 - Severity: hang / lost process.
 - Fix (cargo): skip the uplift when the artifact is fresh and the destination matches, or
   copy to a temporary name and rename over the destination.
+
+### EXT-228: DevTools' native rustc and cargo die of SIGILL on a CPU with BTI
+
+- Where: `rust-1.99.1+emibsd.5-aarch64-emibsd-emibsd-arm64.tar.zst` (DevTools' release, sha256
+  `2b7ec9ab...`), `usr/bin/rustc` and `usr/bin/cargo`.
+- What: neither binary has the GNU property `aarch64 feature: BTI` nor a
+  `PT_OPENBSD_NOBTCFI` program header (0x65a3dbe8; `llvm-readelf -l -n` prints
+  `OPENBSD_NOBTCFI`, and Userland's `<sys/exec_elf.h>` names the same number
+  `PT_EMIBSD_NOBTCFI`), and their code has almost no
+  `bti` instructions (4 in the first 200,000 lines of cargo's disassembly; `ld.lld` of
+  `llvm-23.1.4+emibsd.6` has 1,091 there, and it and `clang` carry `BTI, PAC`). The kernel
+  enforces BTI on every executable mapping of a process whose executable has no
+  such header, as OpenBSD's does (`sys/kern/exec_elf.c`, `EXEC_NOBTCFI`;
+  `sys/kern/exec_elf.rs:1179`), so the first indirect branch into Rust code faults.
+  OpenBSD's ports link Rust with `-z nobtcfi` (`USE_NOBTCFI` in `lang/rust`).
+- Reach: any CPU with BTI. Not seen under TCG, where xtask's arm64 CPU is `cortex-a72`.
+- Verified: reproduced 2026-11-15, QEMU `-accel hvf -cpu host` on an Apple M3 Pro
+  (`hw.optional.arm.FEAT_BTI: 1`), the disk of `cargo xtask selfhost` (Userland 2026.11.4's
+  base and comp, DevTools' native LLVM and Rust), in a chroot: `/bin/ls`, `cc --version`
+  and `ld.lld --version` answer and exit 0; `cargo --version`, `rustc --version` and
+  `rustc -vV` print `Illegal instruction` and exit 132. The exception class was not read
+  (no core file: `coredump` is an `unported!` stub).
+- Port's handling: `just smoke-selfhost-kernel` runs without `--accel hvf` (TCG), as when
+  TDk was met; to be put back when DevTools publishes a Rust that runs under BTCFI.
+- Severity: crash (the toolchain does not start).
+- Fix (DevTools): link the native tree's executables with `-z nobtcfi`, and have its rustc
+  do the same by default for the programs it links for its emibsd targets (build scripts
+  run inside EmiBSD), or build std and the tools with BTI.
+

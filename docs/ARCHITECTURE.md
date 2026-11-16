@@ -406,41 +406,16 @@ the Mac from its sources and `lib/libutil/ohash.c`, `LDSTATIC` empty (a Mach-O p
 never static) and the yacc shim force-included (`HOST_RULE_TOOLS`); the constants it prints
 do not depend on the machine.
 
-TD1b's second step (2026-11-15) runs those Makefiles inside EmiBSD: `cargo xtask
-selfhost-userland` makes a disk of the selfhost base, DevTools' native LLVM and a copy of the
-pin's sources in `/usr/src`, and `just smoke-selfhost-userland` boots it under hvf and builds
-in a chroot with the base's make(1) and `share/mk`, following `/usr/src/Makefile`'s do-build
-(`userland/selfhost.rs`). What the build met added `ctags`, `hexdump` (with `od`), `rpcgen`,
-`mandoc` and `mktemp` to `TD1B`: libc's `tags` target, fdisk's and disklabel's embedded
-manuals, librpcsvc's sources, and lorder(1), without whose mktemp every static library is
-archived empty. The disk's `/etc` holds OpenBSD's stock `master.passwd`, `group` and arm64
-`login.conf` (make obj as root works as the `build` user, `bsd.obj.mk`), and `build.sh` lays
-`etc/mtree/4.4BSD.dist` and runs `ldconfig /usr/lib`, as the installer and `/etc/rc` do.
-The compiler keeps its own triple (the user's decision: "mi vendor es emibsd"), as in the
-Userland repository's `world.py`:
-- DevTools' native clang is `aarch64-emibsd-emibsd8.0`: it predefines `__EmiBSD__` and not
-  `__OpenBSD__`, links with the system's start files, `/usr/libexec/ld.so` and compiler-rt's
-  builtins, makes executables PIE, and gives lld the base system's `--undefined-version` and
-  `--ignore-function-address-equality` (its patch 0007). `/etc/mk.conf` sets no `--target`.
-- So the sources are made to say `__EmiBSD__`: xtask renames every `__OpenBSD__` in the
-  disk's copy of `/usr/src` (32 files), as `world.py` does in its copy (the user's decision
-  of 2026-11-04); `reference/` is only read. The base's own headers in `/usr/include` come
-  from the cross build on the Mac, made with `__OpenBSD__`; `make includes` from the renamed
-  copy cannot replace them all (include's loop stops at libcrypto, whose `obj_mac.h` needs
-  perl), and `openssl/bio.h`'s fallback three-argument `__bounded__` then breaks
-  `<stdio.h>` in libfido2, iked, isakmpd, dig and snmp, so the same rename is applied to
-  those six LibreSSL headers on the disk. DevTools' libc++ headers already name both macros.
-  The Mac's cross build keeps `<arch>-unknown-openbsd` (`userland.rs`), an open question.
-- What the base system's clang does by default and DevTools' does not is given back in
-  `/etc/clang-defaults.cfg`, read by `CC`, `CXX`, `CPP` and `HOSTCC`, each option checked by
-  building without it: `-Wno-pointer-sign` (OpenBSD's clang makes `-Wpointer-sign`
-  `DefaultIgnore`; librthread, libssl, libtls, openssl, ssh and ld.so fail under `-Werror`)
-  and `-Wno-error=unused-but-set-global` (LLVM 23's diagnostic, which the pin's clang does
-  not have; ssh's `sshd-auth.c` fails). `mk.conf` sets `STACK_PROTECTOR=`, which only
-  ld.so's Makefile reads: DevTools' clang emits the stack protector where OpenBSD's relies
-  on retguard, and ld.so needs its stubs (`__stack_smash_handler`).
-- What is left is the user's: lib/libcrypto runs `/usr/bin/perl` (`gnu/usr.bin/perl` is not
-  in the clone), and usr.bin/bgplg needs readline (`gnu/lib`, not in the clone).
+The self-hosting disk (TDk, `cargo xtask selfhost`, `userland/selfhost.rs`) is not made
+from this userland: since TD0 (the user's decision of 2026-11-15: this repository is the
+kernel, the userland is the Userland repository's) it unpacks Userland's released `base`
+and `comp` sets, pinned by sha256 in the justfile, with the owners and modes of their tar
+headers, and lays DevTools' native LLVM and Rust over them. The tree is staged on a
+case-sensitive APFS volume (a sparse image that `hdiutil` makes and attaches under
+`target/selfhost/<arch>/` and xtask detaches and removes when it is done): the sets hold
+names that differ only in case (`/usr/bin/Mail` and `mail`, `/usr/sbin/ZZZ` and `zzz`,
+terminfo's entries), which the Mac's file system cannot hold. A build of the userland inside
+EmiBSD (the old TD1b's `selfhost-userland`, added and removed the same day) is Userland's.
 
 Every OpenBSD file compiled or included is classified by licence into `licences.txt`;
 LibreSSL's two licences are named `OpenSSL` and `SSLeay` there (accepted by the user on

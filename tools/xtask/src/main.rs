@@ -415,28 +415,21 @@ fn run(args: &[String]) -> Result<()> {
         }
         ["selfhost", rest @ ..] => {
             let arch = boot::Arch::parse(flag(rest, "--arch")?)?;
+            let pinned = |what: &str| -> Result<userland::selfhost::Pinned<'_>> {
+                Ok(userland::selfhost::Pinned {
+                    tarball: Path::new(flag(rest, &format!("--{what}"))?),
+                    sha256: flag(rest, &format!("--{what}-sha256"))?,
+                })
+            };
             userland::selfhost::selfhost(
                 &root,
                 arch,
-                userland::selfhost::Pinned {
-                    tarball: Path::new(flag(rest, "--llvm")?),
-                    sha256: flag(rest, "--llvm-sha256")?,
+                userland::selfhost::Sets {
+                    base: pinned("base")?,
+                    comp: pinned("comp")?,
                 },
-                userland::selfhost::Pinned {
-                    tarball: Path::new(flag(rest, "--rust")?),
-                    sha256: flag(rest, "--rust-sha256")?,
-                },
-            )
-        }
-        ["selfhost-userland", rest @ ..] => {
-            let arch = boot::Arch::parse(flag(rest, "--arch")?)?;
-            userland::selfhost::selfhost_userland(
-                &root,
-                arch,
-                userland::selfhost::Pinned {
-                    tarball: Path::new(flag(rest, "--llvm")?),
-                    sha256: flag(rest, "--llvm-sha256")?,
-                },
+                pinned("llvm")?,
+                pinned("rust")?,
             )
         }
         ["comp", rest @ ..] => {

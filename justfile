@@ -3311,11 +3311,12 @@ diff-openbsd: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--fea
         { echo "diff-openbsd: no difftest in target/userland; run just userland first"; exit 1; }
     EMIBSD_RUN_DIR=${EMIBSD_RUN_DIR:-target/diff-openbsd} {{xtask}} diff-openbsd {{smp4}}
 
-# --- self-hosting (TD1) ------------------------------------------------------------------
+# --- self-hosting (TDk) -----------------------------------------------------------------
 
-# TD1a: this repository's kernel built inside EmiBSD by DevTools' native toolchain (D-0009),
-# the milestone's criterion (docs/ROADMAP.md). `cargo xtask selfhost` makes the native disk
-# (comp's staging root with userland's shared libraries, DevTools' native LLVM then Rust,
+# TDk (TD1a until 2026-11-15): this repository's kernel built inside EmiBSD by DevTools'
+# native toolchain (D-0009), the milestone's criterion (docs/ROADMAP.md). `cargo xtask
+# selfhost` makes the native disk (the Userland repository's released base and comp sets,
+# not a userland of this repository's (TD0), then DevTools' native LLVM and Rust,
 # each checked against its pin below, and this tree's HEAD with its crates vendored;
 # tools/xtask/src/userland/selfhost.rs); the smoke boots the MP kernel with it as sd0
 # (`--disk-set selfhost`), mounts it on /mnt, gives it /dev/null, /dev/zero and /dev/urandom,
@@ -3324,9 +3325,16 @@ diff-openbsd: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--fea
 # `lz-build-rc-0` and `lz-elf-2` (the native llvm-readelf finds AArch64 and EXEC in the `bsd`
 # it made) are the criterion. Each marker is printed by the guest, never typed (`$?`,
 # `$((40+2))`), and any step's nonzero status is rejected. arm64 only: DevTools' amd64 native
-# pair is not proved yet. -smp 4 and 6 GiB, under TCG: the build takes hours, so the limit is
-# `selfhost_timeout` seconds; `selfhost_jobs` is cargo's -j (EMIBSD_SELFHOST_JOBS). Not in `smokes`: it needs `just comp`, `just userland` and
-# DevTools' tarballs in `selfhost_dist` (pinned to the released ones).
+# pair is not proved yet. -smp 4 and 6 GiB, under TCG (the build takes about half an hour): not
+# `--accel hvf` yet, because DevTools' native rustc and cargo 1.99.1+emibsd.5 have no BTI
+# landing pads and no PT_OPENBSD_NOBTCFI, so on a host CPU with BTI the kernel's BTCFI kills
+# them with SIGILL as OpenBSD's would (docs/EXTERNAL_BUGS.md, EXT-228); the limit is
+# `selfhost_timeout` seconds; `selfhost_jobs` is cargo's -j (EMIBSD_SELFHOST_JOBS). Not in `smokes`: it needs `just userland` (the
+# ramdisk the VM boots, and the host makefs), Userland's release in `selfhost_userland` and
+# DevTools' tarballs in `selfhost_dist`, each pinned below to the released files.
+selfhost_userland := env("USERLAND_RELEASE", env("HOME") / "devel/emibsd/OS/target/userland/2026.11.4/userland-2026.11.4-arm64")
+selfhost_base_sha256 := "55a02eea54eb123a9f02fae6436941cbd33df21a2c05e7b2ef723241404fa9a2"
+selfhost_comp_sha256 := "d9efc6ea1be971b680f6b7db2b4137e299a25e141685d4725083a2709a0b5b53"
 selfhost_dist := env("DEVTOOLS_DIST", env("HOME") / "devel/emibsd/DevTools/dist")
 selfhost_llvm := "llvm-23.1.4+emibsd.6-aarch64-emibsd-emibsd8.0-arm64.tar.zst"
 selfhost_llvm_sha256 := "a778ef6d3dcf281e9a9d71e1565de9315beb7814e1fcf9a1e42c502dc2986aab"
@@ -3345,53 +3353,11 @@ selfhost_script := disk_login + " --reject 'panic:' --reject 'Bad system call' "
     "--expect 'sh-mnt-42' --expect 'sh-dev-42' --expect 'rustc 1.99.1' --expect 'rsv-rc-0' " + \
     "--expect 'cargo 1.99.1' --expect 'cgv-rc-0' --expect 'lz-elf-2' --expect 'lz-build-rc-0'"
 
-# TD1b: the base system's programs built inside EmiBSD by the base's make(1), the pin's
-# share/mk and DevTools' native clang with its own triple (aarch64-emibsd-emibsd8.0), as
-# `make build` builds them (docs/ROADMAP.md). `cargo xtask selfhost-userland` makes the disk
-# (the selfhost base and native LLVM, a copy of the pin's sources in /usr/src with
-# __OpenBSD__ renamed __EmiBSD__, OpenBSD's stock /etc/master.passwd and group for make
-# obj's `build` user, /etc/mk.conf with the compile defaults of the base system's clang
-# (/etc/clang-defaults.cfg) and STACK_PROTECTOR, an empty /usr/obj, /td1b/build.sh;
-# tools/xtask/src/userland/selfhost.rs); the smoke boots the MP kernel under hvf with it as
-# sd0, mounts it, gives it /dev's null, zero, random and fd nodes, and in a chroot(8) runs
-# `build.sh ls` (mtree(8) lays 4.4BSD.dist's hierarchy, as etc/Makefile does, then
-# `make obj && make` in bin/ls, then the ls it made: `ul-ls-out-...` and
-# `ul-ls-run-rc-0`), then each step of `selfhost_ul_steps`: a directory (make obj, then make
-# as the build user in each SUBDIR, listing `ul-ok-`/`ul-FAIL-` lines, then make at the top:
-# `ul-<dir>-rc-0`), or `build` (make build's do-build for lib, bin, sbin, usr.bin and
-# libexec: share/mk, make includes, each SUBDIR built and installed). Every
-# marker is printed by the guest; `halt -p` ends the VM after the last step, whatever it
-# printed (rejects are judged when the VM stops). arm64 only; not in `smokes` (it needs `just comp`, `just
-# userland`, DevTools' native LLVM tarball and macOS's Hypervisor.framework).
-selfhost_ul_timeout := env("EMIBSD_SELFHOST_UL_TIMEOUT", "7200")
-selfhost_ul_steps := env("EMIBSD_SELFHOST_UL_STEPS", "bin")
-selfhost_ul_script := disk_login + " --reject 'panic:' --reject 'Bad system call' " + \
-    "--reject '-rc-1' --reject '-rc-2' --reject '-rc-3' --reject '-rc-4' --reject '-rc-5' " + \
-    "--reject '-rc-6' --reject '-rc-7' --reject '-rc-8' --reject '-rc-9' " + \
-    "--send-after '# ' --send 'mount /dev/sd0a /mnt && echo ul-mnt-$((40+2))\\n' " + \
-    "--send-after 'ul-mnt-42' --send 'mkdir -p /mnt/dev && cp -Rp /dev/null /dev/zero /dev/random /dev/urandom /dev/fd /dev/stdin /dev/stdout /dev/stderr /dev/tty /mnt/dev/ && echo ul-dev-$((40+2))\\n' " + \
-    "--send-after 'ul-dev-42' --send 'JOBS=4 /usr/sbin/chroot /mnt /td1b/build.sh ls\\n' " + \
-    "--expect 'ul-mnt-42' --expect 'ul-dev-42' --expect 'ul-mtree-rc-0' --expect 'ul-ls-rc-0' " + \
-    "--expect 'ul-ls-out-/usr/share/mk/sys.mk' --expect 'ul-ls-run-rc-0'"
-
-smoke-selfhost-userland: (build-arm64 "--features qemu,multiprocessor")
-    @test -f target/userland/arm64/ramdisk.ffs || { echo "smoke-selfhost-userland: no arm64 ramdisk image; run just userland first"; exit 1; }
-    @test -d target/comp/arm64/root/usr/lib || { echo "smoke-selfhost-userland: no comp root; run just comp first"; exit 1; }
-    {{xtask}} selfhost-userland --arch arm64 \
-        --llvm "{{selfhost_dist}}/{{selfhost_llvm}}" --llvm-sha256 {{selfhost_llvm_sha256}}
-    mkdir -p "${EMIBSD_RUN_DIR:-target}" && rm -f "${EMIBSD_RUN_DIR:-target}/disk-arm64-ul.img" && \
-        cp -c target/selfhost-userland/arm64/userland.ffs "${EMIBSD_RUN_DIR:-target}/disk-arm64-ul.img"
-    set --; last="ul-ls-rc-"; for s in {{selfhost_ul_steps}}; do t=$(echo $s | tr / -); \
-        set -- "$@" --send-after "$last" --send "JOBS=4 /usr/sbin/chroot /mnt /td1b/build.sh $s\n" \
-        --expect "ul-$t-rc-0"; last="ul-$t-rc-"; done; \
-        set -- "$@" --send-after "$last" --send "halt -p\n"; \
-    {{xtask}} smoke {{reject}} --accel hvf --smp 4 --memory 6G --timeout {{selfhost_ul_timeout}} --status 0 --arch arm64 \
-        --kernel target/{{arm64}}/debug/bsd --expect-ramdisk --until-seen --disk-set ul {{selfhost_ul_script}} "$@"
-
 smoke-selfhost-kernel: (build-arm64 "--features qemu,multiprocessor")
     @{{ramdisks}} || { echo "smoke-selfhost-kernel: no ramdisk image; run just userland first"; exit 1; }
-    @test -d target/comp/arm64/root/usr/lib || { echo "smoke-selfhost-kernel: no comp root; run just comp first"; exit 1; }
     {{xtask}} selfhost --arch arm64 \
+        --base "{{selfhost_userland}}/base80.tar.zst" --base-sha256 {{selfhost_base_sha256}} \
+        --comp "{{selfhost_userland}}/comp80.tar.zst" --comp-sha256 {{selfhost_comp_sha256}} \
         --llvm "{{selfhost_dist}}/{{selfhost_llvm}}" --llvm-sha256 {{selfhost_llvm_sha256}} \
         --rust "{{selfhost_dist}}/{{selfhost_rust}}" --rust-sha256 {{selfhost_rust_sha256}}
     mkdir -p "${EMIBSD_RUN_DIR:-target}" && rm -f "${EMIBSD_RUN_DIR:-target}/disk-arm64-selfhost.img" && \

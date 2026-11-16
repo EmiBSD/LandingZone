@@ -17,16 +17,21 @@
 /* </LICENSES> */
 
 /* <CODE> */
-//! The self-hosting disk (TD1a): what `just smoke-selfhost-kernel` boots to build this
-//! repository's kernel inside EmiBSD with DevTools' native toolchain.
+//! The self-hosting disk (TDk, TD1a until 2026-11-15): what `just smoke-selfhost-kernel`
+//! boots to build this repository's kernel inside EmiBSD with DevTools' native toolchain.
 //!
-//! `cargo xtask selfhost --arch A --llvm TAR --llvm-sha256 HEX --rust TAR --rust-sha256 HEX`
-//! makes `target/selfhost/<arch>/selfhost.ffs`, an ffs image of:
-//! - the base: a clone of `userland`'s root (`/bin/ksh` and the tools `build.sh` runs) with
-//!   `comp`'s staging root (libc, crt, ld.so, the headers) laid over it, its libc++ headers
-//!   and clang resource directory removed (DevTools' LLVM replaces them as a whole), and the
-//!   shared libraries of `userland`'s root laid over again, so libcrypto and libssl are this
-//!   tree's (native cargo loads them);
+//! `cargo xtask selfhost --arch A --base TAR --base-sha256 HEX --comp TAR --comp-sha256 HEX
+//! --llvm TAR --llvm-sha256 HEX --rust TAR --rust-sha256 HEX` makes
+//! `target/selfhost/<arch>/selfhost.ffs`, an ffs image of:
+//! - the base system: the Userland repository's released `base` and `comp` sets (TD0, the
+//!   user's decision of 2026-11-15: this repository is the kernel and takes the userland
+//!   Userland makes, it does not build one for the VM), each checked against its pin in the
+//!   justfile and unpacked unmodified, the owners and modes of their tar headers kept in the
+//!   image; their libc++ headers and clang resource directory, if any, are removed, since
+//!   DevTools' LLVM replaces them as a whole. The tree is staged on a case-sensitive APFS
+//!   volume ([`Staging`]): the sets hold names that differ only in case (`/usr/bin/Mail`
+//!   and `mail`, `/usr/sbin/ZZZ` and `zzz`, terminfo's entries), which the Mac's own file
+//!   system cannot hold;
 //! - DevTools' native LLVM, then Rust (`aarch64-emibsd-emibsd8.0`; D-0009, D-0010): each
 //!   tarball checked against its pin, holding one top directory, its `usr/` laid over the
 //!   base unmodified;
@@ -36,27 +41,7 @@
 //!   the build the smoke runs in a chroot;
 //! - room to build: the image is the tree times 5/4 plus [`BUILD_ROOM`].
 //!
-//! The image is made afresh on every run, by the same makefs as `comp.ffs`.
-//!
-//! `cargo xtask selfhost-userland --arch A --llvm TAR --llvm-sha256 HEX` (TD1b) makes
-//! `target/selfhost-userland/<arch>/userland.ffs`, what `just smoke-selfhost-userland` boots
-//! to build the base system's own programs and libraries with the base's make(1), the pin's
-//! `share/mk` and DevTools' native clang, as `make build` does:
-//! - the same base and DevTools' native LLVM (no Rust);
-//! - `/etc`: the ramdisk's, with OpenBSD's stock `master.passwd`, `group` and arm64
-//!   `login.conf` (`etc/` of the pin) and their databases, since `make obj` run as root
-//!   makes the object directories as the `build` user of the `wobj` group (`bsd.obj.mk`);
-//! - [`MK_CONF`] as `/etc/mk.conf`: the compilers keep their own triple,
-//!   `aarch64-emibsd-emibsd8.0`, which predefines `__EmiBSD__` (the user's decision; no
-//!   `--target`), and read [`CLANG_CFG`], what the base system's clang does by default and
-//!   DevTools' does not;
-//! - `/usr/src`: a copy of the pin's [`USR_SRC`] directories in which every `__OpenBSD__`
-//!   is renamed `__EmiBSD__`, as the Userland repository's `world.py` does in its copy
-//!   (the user's decision of 2026-11-04: the userland is compiled with `__EmiBSD__` alone);
-//!   the reference tree is only read. `sys/` goes without the drm driver's sources (its
-//!   headers stay), half a gigabyte no userland Makefile reads;
-//! - `/usr/obj` (`build:wobj`, 0770, as OpenBSD's mtree makes it), `/td1b/build.sh` (the
-//!   steps the smoke runs, [`UL_BUILD_SH`]), and [`UL_BUILD_ROOM`] of free space.
+//! The image is made afresh on every run, by `userland`'s host makefs.
 
 use super::*;
 
@@ -70,7 +55,7 @@ const BUILD_ROOM: u64 = 8 << 30;
 /// so the smoke's expectations cannot be met by an echoed command line. `JOBS` is cargo's
 /// `-j` (the recipe passes it).
 const BUILD_SH: &str = r#"#!/bin/ksh
-# TD1a: builds LandingZone's arm64 kernel with DevTools' native toolchain, in the chroot.
+# TDk: builds LandingZone's arm64 kernel with DevTools' native toolchain, in the chroot.
 export HOME=/tmp CARGO_HOME=/src/cg CARGO_INCREMENTAL=0
 export CARGO_TARGET_AARCH64_EMIBSD_NONE_SOFTFLOAT_LINKER=/usr/bin/ld.lld
 export EMIBSD_BUILD=0 SOURCE_DATE_EPOCH=0 EMIBSD_BUILD_HOST=emibsd
@@ -106,271 +91,179 @@ progress.when = "never"
 color = "never"
 "#;
 
-/// One DevTools tarball for [`selfhost`]: its path and the sha256 it is pinned to.
+/// macOS's disk image tool (`/usr/bin/hdiutil`).
+const HDIUTIL: &str = "/usr/bin/hdiutil";
+
+/// The case-sensitive volume the disk's tree is staged on (module docs): a sparse APFS image
+/// `out/staging.sparseimage` attached at `out/staging`, without ownership and out of the
+/// Finder's sight. Dropping it detaches the volume and removes the image, so nothing stays
+/// attached after `selfhost` returns, whether it worked or not.
+struct Staging {
+    image: PathBuf,
+    mount: PathBuf,
+}
+
+impl Staging {
+    /// Makes the image afresh and attaches it. A run that was killed leaves its volume
+    /// attached: that one is detached first.
+    fn attach(out: &Path) -> Result<Staging> {
+        let staging = Staging {
+            image: out.join("staging.sparseimage"),
+            mount: out.join("staging"),
+        };
+        staging.detach();
+        fs::create_dir_all(&staging.mount)
+            .map_err(|e| format!("{}: {e}", staging.mount.display()))?;
+        run(Command::new(HDIUTIL)
+            .args(["create", "-quiet", "-type", "SPARSE", "-size", "64g"])
+            .args(["-fs", "Case-sensitive APFS", "-volname", "emibsd-selfhost"])
+            .arg(&staging.image))?;
+        run(Command::new(HDIUTIL)
+            .args(["attach", "-quiet", "-nobrowse", "-mountpoint"])
+            .arg(&staging.mount)
+            .arg(&staging.image))?;
+        Ok(staging)
+    }
+
+    /// Detaches the volume if it is attached, and removes the image and the mount point.
+    fn detach(&self) {
+        if self.mount.is_dir() {
+            let _ = Command::new(HDIUTIL)
+                .args(["detach", "-quiet", "-force"])
+                .arg(&self.mount)
+                .stderr(Stdio::null())
+                .status();
+            let _ = fs::remove_dir(&self.mount);
+        }
+        let _ = fs::remove_file(&self.image);
+    }
+}
+
+impl Drop for Staging {
+    fn drop(&mut self) {
+        self.detach();
+    }
+}
+
+/// A pinned tarball for [`selfhost`] (a DevTools toolchain or a Userland set): its path and
+/// the sha256 it is pinned to.
 pub(crate) struct Pinned<'a> {
     pub(crate) tarball: &'a Path,
     pub(crate) sha256: &'a str,
 }
 
-/// Free space for TD1b's builds inside the VM: the object trees of libc (static, profiled
-/// and shared, with `-g`) and of `bin`, `sbin`, `usr.bin` and `libexec`.
-const UL_BUILD_ROOM: u64 = 6 << 30;
-
-/// `/etc/mk.conf` of the TD1b disk, read by `bsd.own.mk` after `sys.mk`'s defaults. The
-/// compilers are `sys.mk`'s own (`cc`, `c++`, `cpp`: DevTools' native clang) with their
-/// default triple, `aarch64-emibsd-emibsd8.0`: it predefines `__EmiBSD__`, links with the
-/// system's start files, `/usr/libexec/ld.so` and compiler-rt's builtins, gives lld the
-/// base system's link defaults (`--undefined-version`, `--ignore-function-address-equality`)
-/// and makes executables PIE, all in its driver. The sources test `__EmiBSD__` because
-/// `/usr/src` is the renamed copy (module docs). Every compiler, `HOSTCC` too, reads
-/// [`CLANG_CFG`]. `STACK_PROTECTOR` (read by ld.so's Makefile alone) builds ld.so's
-/// stack-protector stubs: the base system's clang guards aarch64's returns with retguard
-/// and emits no stack protector, DevTools' clang protects the stack by default (strong,
-/// `__guard_local` and `__stack_smash_handler`), so ld.so takes the branch its Makefile
-/// has for the architectures that use the protector, as `world.py` and the cross build
-/// (`shlib.rs`) do; without it ld.so's link fails on `__stack_smash_handler`.
-const MK_CONF: &str = "\
-# /etc/mk.conf of EmiBSD's TD1b build disk (cargo xtask selfhost-userland).
-# The compilers keep their own triple, aarch64-emibsd-emibsd8.0 (__EmiBSD__);
-# /usr/src is the pin's with __OpenBSD__ renamed __EmiBSD__, as Userland's
-# world.py does. /etc/clang-defaults.cfg holds what the base system's clang
-# does by default and DevTools' does not.
-EMIBSD_CFG=\t--config=/etc/clang-defaults.cfg
-CC=\t\tcc ${EMIBSD_CFG}
-CXX=\t\tc++ ${EMIBSD_CFG}
-CPP=\t\tcpp ${EMIBSD_CFG}
-HOSTCC=\t\t${CC}
-# DevTools' clang emits the stack protector where the base system's relies on
-# retguard: ld.so then needs its own stubs, which its Makefile builds when
-# STACK_PROTECTOR is set.
-STACK_PROTECTOR=
-";
-
-/// `/etc/clang-defaults.cfg`, a clang configuration file (`--config`, its options before
-/// the command line's): what the base system's clang does by default and DevTools' does
-/// not, the same compile defaults as `world.py`'s `COMPILE_DEFAULTS` where the build needs
-/// them: each is here because `make build` inside EmiBSD failed without it. The others of
-/// `world.py` are not needed: nothing failed on an implicit declaration
-/// (`-Wno-error=implicit-function-declaration`, `implicit-int`), and DWARF 2
-/// (`-fdebug-default-version=2`) is for its reproducible sets, not for a build.
-///
-/// - `-Wno-pointer-sign`: the pin's clang makes `-Wpointer-sign` `DefaultIgnore`
-///   (`gnu/llvm/clang/include/clang/Basic/DiagnosticSemaKinds.td`, the diagnostic
-///   `ext_typecheck_convert_incompatible_pointer_sign`); upstream's, and so DevTools', is
-///   on, and what builds with `-Werror` then fails on `char *` passed as `uint8_t *`:
-///   librthread, libssl, libtls, usr.bin/openssl, usr.bin/ssh (`mux.c`) and ld.so. The
-///   cross build turns it off where `-Werror` is (`userland.rs`, `WERROR_DEFAULTS`).
-/// - `-Wno-error=unused-but-set-global`: LLVM 23's clang warns about a static global that
-///   is set and never read (`-Wunused-but-set-global`, in `-Wunused`); the pin's clang has
-///   no such diagnostic (its `Sema::DiagnoseUnusedButSetDecl`,
-///   `gnu/llvm/clang/lib/Sema/SemaDecl.cpp`, sees function-local variables only), so
-///   `usr.bin/ssh`, built with `-Wunused -Werror`, fails on `sshd-auth.c`'s `saved_argv`
-///   and `have_agent` (lines 122 and 126 at the pin). A plain `-Wno-unused-but-set-global`
-///   here would not do: the Makefile's later `-Wunused` turns the group on again, while
-///   `-Wno-error=` survives a later `-Werror`. The warning is still printed; locals keep
-///   `-Wunused-but-set-variable` as an error.
-const CLANG_CFG: &str = "\
-# What the base system's clang does by default and DevTools' clang does not
-# (cargo xtask selfhost-userland). It ignores -Wpointer-sign by default
-# (DiagnosticSemaKinds.td); it does not diagnose set-but-unread static
-# globals, which LLVM 23 does (-Wno-error=, which a Makefile's later
-# -Wunused -Werror does not undo).
--Wno-pointer-sign
--Wno-error=unused-but-set-global
-";
-
-/// The pin's directories copied to `/usr/src` (relative to the reference tree): what
-/// `make build` reads for `include`, `lib`, `bin`, `sbin`, `usr.bin` and `libexec`
-/// (`share/mk` too, though the base installs it, with `share/Makefile.inc` for its
-/// `BINDIR`; `etc` for the stock files above;
-/// `usr.sbin` for the sources usr.bin's at(1), crontab(1) and ypwhich(1) share with
-/// cron(8) and ypserv(8)).
-const USR_SRC: &[&str] = &[
-    "Makefile",
-    "share/Makefile.inc",
-    "share/mk",
-    "include",
-    "lib",
-    "bin",
-    "sbin",
-    "usr.bin",
-    "libexec",
-    "sys",
-    "etc",
-    "usr.sbin",
-];
-
-/// What the guest runs in the chroot as `/td1b/build.sh STEP`, STEP one of `ls` (the
-/// criterion: `bin/ls` by its own Makefile, then the program it made runs), `build`
-/// (`/usr/src/Makefile`'s `do-build` for TD1b's directories: share/mk installed, `make
-/// includes`, then `lib`, `bin`, `sbin`, `usr.bin` and `libexec` built as the `build`
-/// user and installed), or a directory of `/usr/src` (`bin`, `lib/libc`, ...): `make
-/// obj`, then `make` in each of its `SUBDIR`s as the `build` user (what `bsd.subdir.mk`
-/// does, one at a time so that every failure is listed), then `make` at the top. Each build's output goes to `/td1b/log/`; the tail of
-/// a failed one to the console. Every line stays under arm64's 128-byte console limit and
-/// every marker is printed, never typed. `JOBS` is make's `-j`.
-const UL_BUILD_SH: &str = r#"#!/bin/ksh
-# TD1b: OpenBSD's programs built by the base's make(1) and share/mk, in the chroot.
-export PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME=/root
-ulimit -d $(ulimit -H -d)
-umask 022
-set -o pipefail
-short() { typeset -L110 l; while IFS= read -r l; do print -r -- "$l"; done; }
-J=${JOBS:-4}
-step=$1
-tag=$(echo $step | tr / -)
-L=/td1b/log
-mkdir -p $L
-s=$(date +%s)
-# The hierarchy OpenBSD's install makes (etc/Makefile's distribution target): su(1)
-# unveils /var/run/dev.db, whose directory must exist.
-mtree -qdef /usr/src/etc/mtree/4.4BSD.dist -p / -U >$L/mtree.log 2>&1
-echo "ul-mtree-rc-$?"
-# The run-time link editor's hints, which /etc/rc makes at boot (`ldconfig -R` rescans
-# them).
-ldconfig /usr/lib >$L/ldconfig.log 2>&1
-echo "ul-hints-rc-$?"
-# Each SUBDIR of the tree $1 by itself, so that every failure is listed: make as
-# the build user (bsd.subdir.mk's loop), then, with $2 = install, make install as root,
-# as `make build` does; NOMAN=1 for libraries, as do-build.
-tree() {
-	typeset d=$1 t=$(echo $1 | tr / -) n=0 f=0 sd
-	cd /usr/src/$d || return 9
-	make obj >$L/$t-obj.log 2>&1
-	echo "ul-$t-obj-rc-$?"
-	for sd in $(make -V SUBDIR); do
-		n=$((n + 1))
-		(cd $sd && su $B -c "exec make -j$J" && if [ "$2" = install ]; then
-			$NM make install; fi) >$L/$t-$sd.log 2>&1
-		if [ $? -eq 0 ]; then
-			echo "ul-ok-$d/$sd"
-		else
-			f=$((f + 1))
-			echo "ul-FAIL-$d/$sd"
-			tail -n 15 $L/$t-$sd.log | short
-		fi
-	done
-	echo "ul-$t-subdirs-$((n - f))-of-$n"
-	return $f
+/// The Userland repository's released sets [`selfhost`] starts from.
+pub(crate) struct Sets<'a> {
+    pub(crate) base: Pinned<'a>,
+    pub(crate) comp: Pinned<'a>,
 }
-# One command $2... with its output in $L/$1.log: its rc marker, and its tail if it fails.
-step1() {
-	typeset n=$1
-	shift
-	"$@" >$L/$n.log 2>&1
-	typeset r=$?
-	echo "ul-$n-rc-$r"
-	[ $r -eq 0 ] || tail -n 15 $L/$n.log | short
-}
-B=build
-case $step in
-build)
-	# /usr/src/Makefile's do-build for TD1b's directories: share/mk, the headers
-	# (`make includes`), the libraries (built, installed, ldconfig -R), then bin,
-	# sbin, usr.bin and libexec, each built and installed.
-	# `make obj` first, as release(8) runs it before `make build`. `make includes`
-	# runs whatever `make prereq` says, so that one missing generator (libcrypto's
-	# perl) does not hide what follows; both are reported.
-	step1 mk-install eval 'cd /usr/src/share/mk && make install'
-	step1 obj eval 'for o in include lib; do (cd /usr/src/$o && make obj); done'
-	step1 prereq eval "cd /usr/src/include && su $B -c 'exec make prereq'"
-	step1 includes eval 'cd /usr/src/include && make includes'
-	NM="env NOMAN=1"
-	tree lib install
-	rc=$?
-	NM=
-	/sbin/ldconfig -R
-	echo "ul-ldconfig-rc-$?"
-	for d in bin sbin usr.bin libexec; do
-		tree $d install
-		rc=$((rc + $?))
-	done
-	;;
-ls)
-	cd /usr/src/bin/ls || exit 9
-	{ make obj && make -j$J; } 2>&1 | tee $L/ls.log | short
-	rc=$?
-	echo "ul-ls-out-$(/usr/obj/bin/ls/ls -d /usr/share/mk/sys.mk)"
-	./obj/ls -l / >/dev/null
-	echo "ul-ls-run-rc-$?"
-	;;
-*)
-	tree $step
-	(cd /usr/src/$step && su $B -c "exec make -j$J") 2>&1 | tee $L/$tag.log |
-	    tail -n 15 | short
-	rc=$?
-	;;
-esac
-e=$(date +%s)
-echo "ul-$tag-secs-$((e - s))"
-echo "ul-$tag-rc-$rc"
-"#;
 
-/// The base of every self-hosting disk, made afresh in `out/root`: a clone of `userland`'s
-/// root, `comp`'s staging root laid over it without its libc++ headers and clang resource
-/// directory, and `userland`'s shared libraries laid over again (module docs). Returns the
-/// root and comp's ownership table.
-fn base_root(root: &Path, arch: Arch, out: &Path) -> Result<(PathBuf, PathBuf)> {
-    let comp_root = root.join("target/comp").join(arch.name()).join("root");
-    let comp_owners = root
-        .join("target/comp")
-        .join(arch.name())
-        .join("owners.txt");
-    if !comp_root.join("usr/lib").is_dir() || !comp_owners.is_file() {
-        return Err(format!("{}: missing; run `just comp`", comp_root.display()).into());
+/// The base of the self-hosting disk, made in `staging`'s `root`: Userland's `base` and
+/// `comp` sets unpacked in that order, without the libc++ headers and clang resource
+/// directory DevTools' LLVM brings whole (module docs). Returns the root and the ownership
+/// table of the sets' entries (`owners.txt`, the makefs shim's `mode uid gid path` lines).
+fn base_root(out: &Path, staging: &Staging, sets: &Sets<'_>) -> Result<(PathBuf, PathBuf)> {
+    let rootdir = staging.mount.join("root");
+    let unpack = out.join("unpack");
+    if unpack.exists() {
+        fs::remove_dir_all(&unpack).map_err(|e| format!("{}: {e}", unpack.display()))?;
     }
-    let user_lib = root
-        .join("target/userland")
-        .join(arch.name())
-        .join("root/usr/lib");
-    if !makefs_of(root, arch).is_file() || !user_lib.is_dir() {
-        return Err(format!(
-            "{}: missing; run `just userland`",
-            makefs_of(root, arch).display()
-        )
-        .into());
+    fs::create_dir_all(&rootdir).map_err(|e| format!("{}: {e}", rootdir.display()))?;
+    let mut table = String::new();
+    for (what, pin) in [("base", &sets.base), ("comp", &sets.comp)] {
+        table.push_str(&lay_set(out, &rootdir, what, pin)?);
     }
-    let rootdir = out.join("root");
-    for d in [&out.join("unpack"), &rootdir] {
-        if d.exists() {
-            fs::remove_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
-        }
-    }
-    fs::create_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))?;
-    // The base system (/bin/ksh and the tools build.sh runs), an APFS clone of userland's
-    // root (seconds, no space until written), with comp's root (libc, crt, ld.so, the
-    // headers) laid over it.
-    let user_root = root.join("target/userland").join(arch.name()).join("root");
-    run(Command::new("cp").arg("-Rc").arg(&user_root).arg(&rootdir))?;
-    run(Command::new("cp")
-        .arg("-R")
-        .arg(comp_root.join("."))
-        .arg(&rootdir))?;
     for stale in ["usr/include/c++", "usr/lib/clang"] {
         let d = rootdir.join(stale);
         if d.exists() {
             fs::remove_dir_all(&d).map_err(|e| format!("{}: {e}", d.display()))?;
         }
     }
-    // The base system's shared libraries as `userland` last built them (libcrypto, libssl).
-    let mut libs = 0;
-    for e in fs::read_dir(&user_lib).map_err(|e| format!("{}: {e}", user_lib.display()))? {
-        let p = e?.path();
-        let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if name.starts_with("lib") && name.contains(".so.") {
-            let to = rootdir.join("usr/lib").join(name);
-            let _ = fs::remove_file(&to);
-            fs::copy(&p, &to).map_err(|e| format!("{}: {e}", to.display()))?;
-            libs += 1;
-        }
-    }
-    println!(
-        "  base: {} ({libs} shared libraries from userland)",
-        comp_root.display()
-    );
     let owners = out.join("owners.txt");
-    fs::copy(&comp_owners, &owners).map_err(|e| format!("{}: {e}", owners.display()))?;
+    fs::write(&owners, table).map_err(|e| format!("{}: {e}", owners.display()))?;
     Ok((rootdir, owners))
+}
+
+/// Unpacks the set `pin` (a zstd-compressed ustar archive of paths `./...`, checked against
+/// its pin) into `rootdir` and returns the ownership table of its entries.
+fn lay_set(out: &Path, rootdir: &Path, what: &str, pin: &Pinned<'_>) -> Result<String> {
+    check_sha256(pin.tarball, pin.sha256)?;
+    let dir = out.join("unpack");
+    fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let tar = dir.join(format!("{what}.tar"));
+    run(Command::new("sh").arg("-c").arg(format!(
+        "zstd -dcq '{}' > '{}'",
+        pin.tarball.display(),
+        tar.display()
+    )))?;
+    let bytes = fs::read(&tar).map_err(|e| format!("{}: {e}", tar.display()))?;
+    let table = set_owners(&bytes).map_err(|e| format!("{}: {e}", pin.tarball.display()))?;
+    run(Command::new("tar")
+        .arg("-xf")
+        .arg(&tar)
+        .arg("-C")
+        .arg(rootdir))?;
+    // The sets hold directories their owner cannot read (`/var/spool/ftp/hidden`, 0111) and
+    // files nobody can write; the staged tree is the user's, who must read all of it and
+    // lay the toolchains over it. The image gets every entry's own mode from the table.
+    run(Command::new("chmod").args(["-R", "u+rwX"]).arg(rootdir))?;
+    fs::remove_file(&tar).map_err(|e| format!("{}: {e}", tar.display()))?;
+    println!(
+        "  {what}: {} ({} entries)",
+        pin.tarball.display(),
+        table.lines().count()
+    );
+    Ok(table)
+}
+
+/// The `mode uid gid path` lines of every entry of the ustar archive `tar`, from its headers
+/// (the permission bits of `mode`, the numeric owner and group, the name with its `prefix`,
+/// `./` turned into `/`). Unpacked by a user, the files are the user's; makefs gives them the
+/// set's owners and modes back from this table.
+fn set_owners(tar: &[u8]) -> Result<String> {
+    let mut lines = String::new();
+    let mut at = 0;
+    while let Some(h) = tar.get(at..at + 512) {
+        if h.iter().all(|&b| b == 0) {
+            break;
+        }
+        let size = octal(&h[124..136])?;
+        let mode = octal(&h[100..108])? & 0o7777;
+        let (uid, gid) = (octal(&h[108..116])?, octal(&h[116..124])?);
+        let name = c_str(&h[..100]);
+        let prefix = if h[257..262] == *b"ustar" {
+            c_str(&h[345..500])
+        } else {
+            ""
+        };
+        let full = if prefix.is_empty() {
+            name.to_string()
+        } else {
+            format!("{prefix}/{name}")
+        };
+        let path = full.trim_start_matches('.').trim_end_matches('/');
+        if !path.is_empty() {
+            lines.push_str(&format!("{mode:o} {uid} {gid} {path}\n"));
+        }
+        let blocks = usize::try_from(size.div_ceil(512)).map_err(|_| "entry too large")?;
+        at += 512 * (1 + blocks);
+    }
+    Ok(lines)
+}
+
+/// A tar header's octal number field: digits padded with spaces or NULs.
+fn octal(field: &[u8]) -> Result<u64> {
+    let text = c_str(field).trim();
+    if text.is_empty() {
+        return Ok(0);
+    }
+    u64::from_str_radix(text, 8).map_err(|e| format!("tar header field `{text}`: {e}").into())
+}
+
+/// A NUL-terminated (or full) header field as text.
+fn c_str(field: &[u8]) -> &str {
+    let end = field.iter().position(|&b| b == 0).unwrap_or(field.len());
+    std::str::from_utf8(&field[..end]).unwrap_or("")
 }
 
 /// `userland`'s makefs(8), built for the Mac.
@@ -454,9 +347,24 @@ fn make_image(
 }
 
 /// `cargo xtask selfhost` (module docs).
-pub(crate) fn selfhost(root: &Path, arch: Arch, llvm: Pinned<'_>, rust: Pinned<'_>) -> Result<()> {
+pub(crate) fn selfhost(
+    root: &Path,
+    arch: Arch,
+    sets: Sets<'_>,
+    llvm: Pinned<'_>,
+    rust: Pinned<'_>,
+) -> Result<()> {
+    if !makefs_of(root, arch).is_file() {
+        return Err(format!(
+            "{}: missing; run `just userland`",
+            makefs_of(root, arch).display()
+        )
+        .into());
+    }
     let out = root.join("target/selfhost").join(arch.name());
-    let (rootdir, owners) = base_root(root, arch, &out)?;
+    fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
+    let staging = Staging::attach(&out)?;
+    let (rootdir, owners) = base_root(&out, &staging, &sets)?;
     lay_tarball(&out, &rootdir, "llvm", &llvm)?;
     lay_tarball(&out, &rootdir, "rust", &rust)?;
     // The source, its crates and the build.
@@ -486,159 +394,6 @@ pub(crate) fn selfhost(root: &Path, arch: Arch, llvm: Pinned<'_>, rust: Pinned<'
         &owners,
         "selfhost.ffs",
         BUILD_ROOM,
-    )
-}
-
-/// The macro the base system's compiler predefines, and EmiBSD's in its place.
-const OPENBSD_MACRO: &[u8] = b"__OpenBSD__";
-const EMIBSD_MACRO: &[u8] = b"__EmiBSD__";
-
-/// `text` with every `__OpenBSD__` renamed `__EmiBSD__`, or `None` when it names none.
-fn renamed_macro(text: &[u8]) -> Option<Vec<u8>> {
-    let mut out = Vec::with_capacity(text.len());
-    let mut rest = text;
-    let mut found = false;
-    while let Some(at) = rest
-        .windows(OPENBSD_MACRO.len())
-        .position(|w| w == OPENBSD_MACRO)
-    {
-        out.extend_from_slice(&rest[..at]);
-        out.extend_from_slice(EMIBSD_MACRO);
-        rest = &rest[at + OPENBSD_MACRO.len()..];
-        found = true;
-    }
-    out.extend_from_slice(rest);
-    found.then_some(out)
-}
-
-/// Renames `__OpenBSD__` to `__EmiBSD__` in `path`, a regular file, or in every regular
-/// file under it, a directory, never descending into the names in `skip` (relative to
-/// `path`), as `world.py`'s `tree` step does in its copy: DevTools' clang predefines
-/// `__EmiBSD__` alone (the user's decision of 2026-11-04). Only the disk's copies are
-/// given, never the reference tree. Symbolic links are left alone. A file rewritten in
-/// place keeps its mode; an APFS clone then gets its own blocks. Returns how many files
-/// changed.
-fn rename_openbsd_macro(path: &Path, skip: &[&str]) -> Result<usize> {
-    let kind = fs::symlink_metadata(path)
-        .map_err(|e| format!("{}: {e}", path.display()))?
-        .file_type();
-    if kind.is_file() {
-        let text = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        return Ok(match renamed_macro(&text) {
-            Some(new) => {
-                fs::write(path, new).map_err(|e| format!("{}: {e}", path.display()))?;
-                1
-            }
-            None => 0,
-        });
-    }
-    if !kind.is_dir() {
-        return Ok(0);
-    }
-    let mut n = 0;
-    for entry in fs::read_dir(path).map_err(|e| format!("{}: {e}", path.display()))? {
-        let entry = entry.map_err(|e| format!("{}: {e}", path.display()))?;
-        if skip.iter().any(|s| entry.file_name() == *s) {
-            continue;
-        }
-        n += rename_openbsd_macro(&entry.path(), &[])?;
-    }
-    Ok(n)
-}
-
-/// `cargo xtask selfhost-userland` (module docs).
-pub(crate) fn selfhost_userland(root: &Path, arch: Arch, llvm: Pinned<'_>) -> Result<()> {
-    let out = root.join("target/selfhost-userland").join(arch.name());
-    let (rootdir, owners) = base_root(root, arch, &out)?;
-    lay_tarball(&out, &rootdir, "llvm", &llvm)?;
-    let src = openbsd_src(root)?;
-    // /usr/src: APFS clones of the pin's directories (the reference is only read).
-    let usr_src = rootdir.join("usr/src");
-    for dir in USR_SRC {
-        let from = src.join(dir);
-        let to = usr_src.join(dir);
-        let parent = to.parent().ok_or("/usr/src has no parent")?;
-        fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
-        run(Command::new("cp").arg("-Rc").arg(&from).arg(&to))?;
-    }
-    // The drm driver's sources are 0.5 GiB no userland Makefile reads; its headers stay.
-    let drm = usr_src.join("sys/dev/pci/drm");
-    run(Command::new("find")
-        .arg(&drm)
-        .args(["-type", "f", "!", "-name", "*.h", "-delete"]))?;
-    let renamed = rename_openbsd_macro(&usr_src, &[])?;
-    // The base's own headers in /usr/include were installed by the cross build on the Mac,
-    // which compiles with `__OpenBSD__`: the six of LibreSSL that test it (`openssl/bio.h`
-    // defines a three-argument `__bounded__` when it is not set, which then breaks
-    // `<stdio.h>`'s four-argument use in every program that includes both) get the same
-    // rename, as `make includes` from the renamed copy would install them; it cannot,
-    // since libcrypto's `includes` needs /usr/bin/perl for `obj_mac.h`, and include's loop
-    // stops there. DevTools' libc++ headers (`c++/`) are DevTools' and name both macros
-    // already.
-    let headers = rename_openbsd_macro(&rootdir.join("usr/include"), &["c++"])?;
-    println!("  /usr/include: __OpenBSD__ renamed __EmiBSD__ in {headers} headers");
-    println!(
-        "  /usr/src: {} of {}; __OpenBSD__ renamed __EmiBSD__ in {renamed} files",
-        USR_SRC.join(" "),
-        src.display()
-    );
-    // /etc: the ramdisk's, with OpenBSD's stock users, groups and login classes.
-    let etc = rootdir.join("etc");
-    let ramdisk_etc = root
-        .join("target/userland")
-        .join(arch.name())
-        .join("ramdisk-root/etc");
-    run(Command::new("cp").arg("-R").arg(&ramdisk_etc).arg(&etc))?;
-    for (from, to) in [
-        ("etc/master.passwd", "master.passwd"),
-        ("etc/group", "group"),
-        (
-            &*format!("etc/etc.{}/login.conf", arch.name()),
-            "login.conf",
-        ),
-    ] {
-        let p = etc.join(to);
-        let _ = fs::remove_file(&p);
-        fs::copy(src.join(from), &p).map_err(|e| format!("{}: {e}", p.display()))?;
-    }
-    for f in ["passwd", "pwd.db", "spwd.db"] {
-        let _ = fs::remove_file(etc.join(f));
-    }
-    let pwd_mkdb = root
-        .join("target/userland")
-        .join(arch.name())
-        .join("host/bin/pwd_mkdb");
-    passwd::make_databases(&pwd_mkdb, &etc)?;
-    write_mode(&etc.join("mk.conf"), MK_CONF, 0o644)?;
-    write_mode(&etc.join("clang-defaults.cfg"), CLANG_CFG, 0o644)?;
-    for d in ["tmp", "var/tmp", "var/empty", "root", "usr/obj", "td1b"] {
-        let p = rootdir.join(d);
-        fs::create_dir_all(&p).map_err(|e| format!("{}: {e}", p.display()))?;
-    }
-    write_mode(&rootdir.join("td1b/build.sh"), UL_BUILD_SH, 0o755)?;
-    // Owners and modes beyond comp's: OpenBSD's mtree (`etc/mtree/4.4BSD.dist`) gives
-    // /usr/obj to build:wobj 0770; spwd.db is root:_shadow 0640, as pwd_mkdb(8) makes it.
-    let mut table =
-        fs::read_to_string(&owners).map_err(|e| format!("{}: {e}", owners.display()))?;
-    for line in [
-        "1777 0 0 /tmp",
-        "1777 0 0 /var/tmp",
-        "770 21 21 /usr/obj",
-        "600 0 0 /etc/master.passwd",
-        "640 0 65 /etc/spwd.db",
-    ] {
-        table.push_str(line);
-        table.push('\n');
-    }
-    fs::write(&owners, table).map_err(|e| format!("{}: {e}", owners.display()))?;
-    make_image(
-        root,
-        arch,
-        &out,
-        &rootdir,
-        &owners,
-        "userland.ffs",
-        UL_BUILD_ROOM,
     )
 }
 
@@ -677,95 +432,44 @@ mod tests {
         assert!(CARGO_CONFIG.contains("directory = \"/src/lz/vendor\""));
     }
 
-    #[test]
-    fn userland_script_prints_its_markers_and_fits_the_console() {
-        for marker in [
-            "ul-ls-out-",
-            "ul-ls-run-rc-$?",
-            "ul-$tag-rc-$rc",
-            "ul-$tag-secs-",
-            "ul-$t-obj-rc-$?",
-            "ul-FAIL-$d/$sd",
-            "ul-$t-subdirs-",
-            "ul-$n-rc-$r",
-            "ul-hints-rc-$?",
-            "ul-ldconfig-rc-$?",
-            "step1 mk-install ",
-            "step1 includes ",
-            "ul-mtree-rc-$?",
-            "ulimit -d",
+    /// A ustar header block for `name` (split into `prefix` when given).
+    fn header(prefix: &str, name: &str, mode: u32, uid: u32, gid: u32, size: usize) -> Vec<u8> {
+        let mut h = vec![0u8; 512];
+        h[..name.len()].copy_from_slice(name.as_bytes());
+        for (at, text) in [
+            (100, format!("{mode:07o}")),
+            (108, format!("{uid:07o}")),
+            (116, format!("{gid:07o}")),
+            (124, format!("{size:011o}")),
         ] {
-            assert!(UL_BUILD_SH.contains(marker), "{marker}");
+            h[at..at + text.len()].copy_from_slice(text.as_bytes());
         }
-        assert!(UL_BUILD_SH.lines().all(|l| l.len() < 128));
+        h[156] = if name.ends_with('/') { b'5' } else { b'0' };
+        h[257..263].copy_from_slice(b"ustar\0");
+        h[345..345 + prefix.len()].copy_from_slice(prefix.as_bytes());
+        h
     }
 
     #[test]
-    fn mk_conf_keeps_the_compilers_own_triple() {
-        // No --target anywhere: the native clang's default triple is EmiBSD's.
-        assert!(!MK_CONF.contains("--target") && !MK_CONF.contains("openbsd"));
-        for var in ["CC=", "CXX=", "CPP="] {
-            let line = MK_CONF
-                .lines()
-                .find(|l| l.starts_with(var))
-                .unwrap_or_else(|| panic!("{var}"));
-            assert!(line.contains("${EMIBSD_CFG}"), "{line}");
-        }
-        assert!(MK_CONF.contains("--config=/etc/clang-defaults.cfg"));
-        assert!(MK_CONF.lines().any(|l| l == "HOSTCC=\t\t${CC}"));
-        assert!(MK_CONF.lines().any(|l| l == "STACK_PROTECTOR="));
-        assert!(USR_SRC.contains(&"share/mk") && USR_SRC.contains(&"lib"));
-        let opts: Vec<&str> = CLANG_CFG.lines().filter(|l| !l.starts_with('#')).collect();
+    fn the_sets_owners_come_from_their_tar_headers() {
+        let mut tar = header("", "./", 0o755, 0, 0, 0);
+        tar.extend(header("", "./usr/bin/", 0o755, 0, 7, 0));
+        tar.extend(header("", "./usr/bin/passwd", 0o4555, 0, 7, 600));
+        tar.extend(vec![b'x'; 1024]); // 600 bytes of data, padded to two blocks
+        tar.extend(header("./usr/share", "misc/termcap", 0o444, 0, 7, 0));
+        tar.extend(vec![0u8; 1024]);
+        tar.extend(header("", "./ignored-after-the-end", 0o644, 9, 9, 0));
         assert_eq!(
-            opts,
-            ["-Wno-pointer-sign", "-Wno-error=unused-but-set-global"]
+            set_owners(&tar).unwrap(),
+            "755 0 7 /usr/bin\n4555 0 7 /usr/bin/passwd\n444 0 7 /usr/share/misc/termcap\n"
         );
     }
 
     #[test]
-    fn the_macro_is_renamed_everywhere_and_only_it() {
-        assert_eq!(renamed_macro(b"#ifdef __linux__\n"), None);
-        assert_eq!(
-            renamed_macro(b"#if defined(__OpenBSD__) || __OpenBSD__+0\n").as_deref(),
-            Some(&b"#if defined(__EmiBSD__) || __EmiBSD__+0\n"[..])
-        );
-        assert_eq!(
-            renamed_macro(b"__OpenBSD____OpenBSD__").as_deref(),
-            Some(&b"__EmiBSD____EmiBSD__"[..])
-        );
-        // A near miss stays: OpenBSD's name in text is not the macro.
-        assert_eq!(renamed_macro(b"__OpenBSD_ OpenBSD __OPENBSD__"), None);
-        assert_eq!(renamed_macro(b""), None);
-    }
-
-    #[test]
-    fn the_rename_walks_files_and_leaves_links() {
-        let dir = std::env::temp_dir().join(format!("xtask-rename-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(dir.join("a/b")).unwrap();
-        fs::write(dir.join("a/b/x.h"), "#ifdef __OpenBSD__\n").unwrap();
-        fs::write(dir.join("y.c"), "int y;\n").unwrap();
-        let outside = dir.with_extension("outside");
-        fs::write(&outside, "__OpenBSD__").unwrap();
-        std::os::unix::fs::symlink(&outside, dir.join("link")).unwrap();
-        fs::create_dir_all(dir.join("c++/v1")).unwrap();
-        fs::write(dir.join("c++/v1/__config"), "defined(__OpenBSD__)").unwrap();
-        assert_eq!(rename_openbsd_macro(&dir, &["c++"]).unwrap(), 1);
-        assert_eq!(
-            fs::read_to_string(dir.join("a/b/x.h")).unwrap(),
-            "#ifdef __EmiBSD__\n"
-        );
-        assert_eq!(fs::read_to_string(&outside).unwrap(), "__OpenBSD__");
-        // A skipped directory is skipped only at the top.
-        assert_eq!(
-            fs::read_to_string(dir.join("c++/v1/__config")).unwrap(),
-            "defined(__OpenBSD__)"
-        );
-        assert_eq!(rename_openbsd_macro(&dir.join("c++"), &["c++"]).unwrap(), 1);
-        assert_eq!(rename_openbsd_macro(&outside, &[]).unwrap(), 1);
-        assert_eq!(fs::read_to_string(&outside).unwrap(), "__EmiBSD__");
-        fs::remove_dir_all(&dir).unwrap();
-        fs::remove_file(&outside).unwrap();
+    fn a_bad_header_number_is_an_error() {
+        let mut h = header("", "./x", 0o644, 0, 0, 0);
+        h[124..136].copy_from_slice(b"99999999999\0");
+        assert!(set_owners(&h).is_err());
     }
 }
 /* </TESTS> */
