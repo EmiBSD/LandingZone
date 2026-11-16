@@ -2,8 +2,8 @@
 
 Milestone: **TDk met** (TD1a until 2026-11-15: this kernel built inside an arm64 EmiBSD VM
 by DevTools' native cargo, and since 2026-11-16 `ci` run inside it, its second criterion);
-**TD0's criteria seen** on 2026-11-16 (the kernel's debt: TD0..TD6; `ci-full` not run,
-below); then TD1 and on, then M17.
+**TD0 met** on 2026-11-16 (the kernel's debt: TD0..TD6; a sub-milestone, closed with
+`just ci`); **TD1 next**, then TD2..TD6, then M17.
 Updated: 2026-11-16.
 
 Toolchain: DevTools' Rust 1.99.1+emibsd.6 and LLVM 23.1.4+emibsd.7 (D-0008), run straight
@@ -18,8 +18,9 @@ Done:
   `.c` files that had none, and `ports check` refuses such a file with no row (238 `todo`,
   138 `wip`, 109 `skipped`, 1174 `ported`). The version-control id lines (`$OpenBSD$`, ...)
   are out of every file and `ports check` refuses one (the user's decision of 2026-11-15).
-  `just ci` green on that tree: rc 0 in 1090 s, 85 of 85 smokes in 13m14s, after the one
-  `xtask userland --arch arm64` the user allowed for the smokes' ramdisk (it had no `thrtest`).
+  `just ci` green at the close: rc 0 in 1055 s, 85 of 85 smokes in 13m10s, after one
+  `xtask userland` run per arch, each allowed by the user, for the smokes' ramdisks (arm64's
+  had no `thrtest`; amd64's still held the old TD1b tools and was rebuilt from a clean root).
 - `ci` inside EmiBSD (2026-11-16, `just smoke-selfhost-ci`; TDk's criterion too, the user's
   decision of that day): fmt, the arm64 and host clippy
   lines, the tests (the kernel's 2461 host tests on the kernel under test) and the kernel
@@ -32,8 +33,6 @@ Done:
 - 2026-11-02: DevTools' per-arch pairs and the renamed kernel targets; amd64 back in `ci`.
 
 Next:
-- The user's word on `ci-full` for TD0 (its three criteria are seen; the series is committed
-  on `td0`, not pushed).
 - TD1 the `wip` rows; TD2 the `unported!` stubs; TD3 swapctl, SysV IPC, ptrace, ktrace;
   TD4 the other MI files; TD5 networking; TD6 the arch files. Drivers are not in TD.
 - M17 (the user's decisions below first).
@@ -41,11 +40,9 @@ Next:
 Unsafe (`cargo xtask unsafe-report`): kernel 8992 blocks, 1143 fn, 822 impl, 31 trait, 340 other; tests 826 more.
 
 Blockers:
-- `just ci-full` cannot run in this checkout: its installer smokes need `just comp`, and
-  building a userland or a comp set here is forbidden since 2026-11-15 (the smokes' ramdisk
-  is the exception the user allowed once for arm64, on 2026-11-16). amd64's ramdisk is the
-  build of 2026-11-15, with the 61 build tools of the old TD1b still in it: harmless to the
-  smokes, but not what this tree's `userland` makes.
+- `just ci-full` was not run for TD0 (a sub-milestone); it is owed at TD's whole close. Its
+  installer smokes pack this repository's own `target/userland` and `target/comp` (comp is
+  the build of 2026-10-09), which nobody may rebuild here without the user's OK.
 - amd64 kernel stacks are tight: about 4.9 KB stay free under softraid I/O (M10f measure).
 - A `diagnostic` MP kernel panics at boot (`uvm_page_physload: page size not set!`).
 - Statistics counters the C bumps unlocked stay `Cell`s (docs/ARCHITECTURE.md, M11e).
