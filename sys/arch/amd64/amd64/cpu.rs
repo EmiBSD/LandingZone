@@ -951,6 +951,32 @@ pub(crate) extern "C" fn cpu_hatch(v: *const CpuInfo) -> ! {
     sched_toidle()
 }
 
+/// `cpu_debug_dump` (`DDB`): dump cpu information from ddb. `<machine/db_machdep.h>`
+/// declares it; nothing in the tree calls it, here as in the C.
+#[cfg(feature = "multiprocessor")]
+pub fn cpu_debug_dump() {
+    use crate::kern::subr_prf::db_printf;
+
+    db_printf(format_args!("addr\t\tdev\tid\tflags\tipis\tcurproc\n"));
+    // CPU_INFO_FOREACH(cii, ci)
+    let mut next: *const CpuInfo = cpu_info_list();
+    // SAFETY: the list links cpu_info structures that are never freed.
+    while let Some(ci) = unsafe { next.as_ref() } {
+        // SAFETY: `ci_dev` is null or the CPU's attached device, which is never freed.
+        let dev = unsafe { ci.ci_dev.get().as_ref() };
+        db_printf(format_args!(
+            "{:p}\t{}\t{}\t{:x}\t{:x}\t{:10p}\n",
+            ci,
+            dev.map_or("BOOT", |d| d.xname()),
+            ci.ci_cpuid.get(),
+            ci.ci_flags.load(Ordering::Relaxed),
+            ci.ci_ipis.load(Ordering::Relaxed),
+            ci.ci_curproc.get(),
+        ));
+        next = ci.ci_next.get();
+    }
+}
+
 /// `mp_cpu_start` (`CPU_STARTUP`): releases the processor whose hardware ID is `ci_apicid`
 /// from the bootloader's wait into `cpu_hatch_entry` (see the module's deviations); 0 when
 /// it was released.

@@ -47,13 +47,20 @@
 //!
 //! Upstream: sys/arch/amd64/include/db_machdep.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M4 ports `db_regs_t`, `PC_REGS`/`SET_PC_REGS`, the breakpoint
-//! instruction, `FIXUP_PC_AFTER_BREAK`, the single-step bit helpers and the
-//! `IS_BREAKPOINT_TRAP`/`IS_WATCHPOINT_TRAP` tests; M11c `db_expr_t` and the `inst_*`
-//! classifiers (`db_run.c`). `DB_MACHINE_COMMANDS` is defined: the table is
-//! `amd64/db_interface.rs`'s. The `DDB_STATE_*` values are here.
-//! The entry points this header declares (`db_ktrap`, `db_machine_init`, ...) live in
-//! `amd64/db_interface.rs`; what `ddb/` itself needs is the `machine::DbMachdep` contract.
+//! Status: `ported`. `db_expr_t`, `db_regs_t`, `PC_REGS`/`SET_PC_REGS`, the breakpoint and
+//! single-step-frame instructions, `FIXUP_PC_AFTER_BREAK`, the single-step bit helpers, the
+//! `IS_BREAKPOINT_TRAP`/`IS_WATCHPOINT_TRAP` tests, the `I_*` opcodes with the `inst_*`
+//! classifiers (`db_run.c`) and the `DDB_STATE_*` values. What the header declares is defined
+//! where the C defines it: `ddb_regs` (`DDB_REGS`), `db_ktrap`, `db_machine_init`,
+//! `db_enter_ddb`, `db_startcpu`, `db_stopcpu`, `x86_ipi_db` and the table
+//! `DB_MACHINE_COMMANDS` announces in `amd64/db_interface.rs`, `cpu_debug_dump` in
+//! `amd64/cpu.rs`. What `ddb/` itself needs of a machine is the `machine::DbMachdep`
+//! contract.
+//!
+//! ## Deviations
+//! - The function-like macros are `fn`s with lower-case names.
+//! - `DbAddr` (`vaddr_t`) is kept for ddb's signatures; the header has had no `db_addr_t`
+//!   since ddb took `vaddr_t`.
 
 use crate::arch::amd64::include::frame::Trapframe;
 use crate::arch::amd64::include::psl::PSL_T;
