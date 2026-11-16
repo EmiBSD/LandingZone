@@ -618,11 +618,11 @@ notes = "format engine is core::fmt (fmt::Arguments replaces fmt+va_list, so pri
 [[file]]
 c = "sys/kern/kern_xxx.c"
 rust = "sys/kern/kern_xxx.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "fa388b8de04b184a5425316e46fe8ed612e012a8"
 deps = ["sys/sys/reboot.h"]
-notes = "M2: reboot() and rebooting; the curproc KASSERT returns with M5, stop_periodic_resettodr reported unported; sys_reboot, __stack_smash_handler, scdebug_*, sys_sysctl come with their subsystems; M8: sys_reboot (suser, then reboot); M8: reboot calls stop_periodic_resettodr; M8: scdebug_call/scdebug_ret and scdebug (option SYSCALL_DEBUG, feature syscall_debug), called from mi_syscall/mi_syscall_return; M11a: sys_reboot calls sched_stop_secondary_cpus with MULTIPROCESSOR; M13: do_powerdown, powerdown_task and powerbutton_event (acpi(4)'s power button; SUSPEND's resuming() is false while subr_suspend.c is not ported)"
+notes = "rebooting, sys_reboot (stops the secondary CPUs under MULTIPROCESSOR), reboot (TD1: its KASSERT on curproc), do_powerdown/powerdown_task/powerbutton_event, scdebug_call/scdebug_ret (feature syscall_debug); __stack_smash_handler is compiled only without RETGUARD, which OpenBSD's compiler turns on by default for amd64 and arm64 (_RET_PROTECTOR), so it is not ported; resuming() (SUSPEND) is false"
 
 [[file]]
 c = "sys/kern/init_main.c"

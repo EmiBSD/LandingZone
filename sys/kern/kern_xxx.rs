@@ -52,18 +52,20 @@
 //!
 //! Upstream: sys/kern/kern_xxx.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M2 ports `reboot()` and `rebooting`, the tail of `panic(9)`;
-//! M8 `sys_reboot` (root only, then `reboot`) and `scdebug_call`/`scdebug_ret` (option
-//! `SYSCALL_DEBUG`, feature `syscall_debug`). `__stack_smash_handler` arrives with its
-//! subsystem. M11a: `sys_reboot` stops the secondary CPUs (`MULTIPROCESSOR`). M13:
-//! `do_powerdown`, `powerdown_task` and `powerbutton_event`, the power button's path from
-//! acpi(4) to init.
+//! Status: `ported`. `rebooting`, `sys_reboot` (root only; it stops the secondary CPUs under
+//! `MULTIPROCESSOR`), `reboot`, the power button's path from acpi(4) to init (`do_powerdown`,
+//! `powerdown_task`, `powerbutton_event`) and, under option `SYSCALL_DEBUG` (the feature
+//! `syscall_debug`), `scdebug` with `scdebug_call` and `scdebug_ret`.
 //!
 //! ## Deviations
-//! - `KASSERT((howto & RB_NOSYNC) || curproc != NULL)`: `curproc` arrives with M5; the
-//!   assertion returns with it.
+//! - `__stack_smash_handler` is not here. The C compiles it only without RETGUARD
+//!   (`!defined(_RET_PROTECTOR)`), and OpenBSD's compiler defines `_RET_PROTECTOR` by default
+//!   for amd64 and arm64, so neither kernel has it; Rust code has no stack protector that
+//!   would call it.
 //! - `powerbutton_event`'s `SUSPEND` check, `resuming()` (`subr_suspend.c`, not ported), is
 //!   false: the machine never suspends, so it never resumes.
+//! - `do_powerdown` signals init only if `initprocess` is set; the C does not check, and the
+//!   power button cannot be pressed before init exists.
 
 #[cfg(feature = "syscall_debug")]
 use core::sync::atomic::AtomicI32;
@@ -77,7 +79,7 @@ use crate::kern::kern_task::{SYSTQ, task_add};
 use crate::kern::kern_time::stop_periodic_resettodr;
 #[cfg(feature = "syscall_debug")]
 use crate::kern::subr_prf::printf;
-use crate::machine::cpu::boot;
+use crate::machine::cpu::{boot, curproc};
 use crate::sys::errno::Errno;
 use crate::sys::proc::Proc;
 use crate::sys::signal::SIGUSR2;
@@ -111,6 +113,8 @@ pub fn sys_reboot(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Result<
 
 /// `reboot`: stops the clock bookkeeping and hands over to the machine's `boot(9)`.
 pub fn reboot(howto: i32) -> ! {
+    crate::kassert!((howto & crate::sys::reboot::RB_NOSYNC) != 0 || curproc().is_some());
+
     stop_periodic_resettodr();
 
     REBOOTING.store(true, Ordering::Relaxed);
