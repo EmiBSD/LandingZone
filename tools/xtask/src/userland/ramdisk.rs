@@ -1048,35 +1048,22 @@ pub(super) fn build_ramdisk(ctx: &Ctx<'_>) -> Result<()> {
     let owners = ctx.out.join("host/owners.txt");
     write_if_changed(&owners, &owners_table(&attrs))?;
 
-    // TD1b: the whole tree, the build tools with it, as a disk (`base.ffs`, which
-    // `smoke-buildtools` mounts), then the ramdisk without them (`RAMDISK_EXCLUDE`).
-    let base = ctx.out.join("base.ffs");
-    make_ffs(
-        &makefs,
-        &staging,
-        &owners,
-        &ctx.out.join("host/disktab-base"),
-        &base,
-    )?;
-    let excluded = ctx
-        .ramdisk_exclude
-        .lock()
-        .map_err(|_| "lock poisoned")?
-        .clone();
-    let left_out = exclude_from(&staging, &excluded)?;
-    println!(
-        "  base: {} ({} bytes): the ramdisk's tree and the {left_out} TD1b paths {RAMDISK_EXCLUDE}",
-        base.display(),
-        fs::metadata(&base).map(|m| m.len()).unwrap_or(0),
-    );
+    // The size (partition `a` of the disktab entry): twice the contents, in whole MiB, at
+    // least 2 MiB (inodes, directories and indirect blocks fit with room to spare).
+    const MIB: u64 = 1 << 20;
+    let size = (tree_bytes(&staging)? * 2).div_ceil(MIB).max(2) * MIB;
+    let disktab = ctx.out.join("host/disktab");
+    write_if_changed(&disktab, &disktab_entry(size / 512))?;
     let image = ctx.out.join("ramdisk.ffs");
-    make_ffs(
-        &makefs,
-        &staging,
-        &owners,
-        &ctx.out.join("host/disktab"),
-        &image,
-    )?;
+    let _ = fs::remove_file(&image);
+    run(Command::new(&makefs)
+        .args(["-t", "ffs", "-T", &TIMESTAMP.to_string()])
+        .env("EMIBSD_DISKTAB", &disktab)
+        .env("EMIBSD_OWNERS", &owners)
+        .env("EMIBSD_STAGING", &staging)
+        .args(["-o", FS_OPTIONS])
+        .arg(&image)
+        .arg(&staging))?;
     let size = fs::metadata(&image).map(|m| m.len()).unwrap_or(0);
     println!(
         "  ramdisk: {} ({size} bytes; makefs -t ffs -o {FS_OPTIONS}; /etc: {} pwd.db spwd.db passwd; \
@@ -1096,59 +1083,6 @@ pub(super) fn build_ramdisk(ctx: &Ctx<'_>) -> Result<()> {
         passwd::ROOT_PASSWORD,
     );
     Ok(())
-}
-
-/// Why the `TD1B` programs, scripts and share/mk stay out of the ramdisk (printed by the
-/// build; docs/ARCHITECTURE.md, "The ramdisk image"). The ramdisk is twice its tree, and the
-/// boot image (`boot::IMAGE_SECTORS`, 256 MiB since 192 MiB filled up without them) holds a
-/// ~100 MB debug kernel and a ~95 MB ramdisk: the tools' megabytes, doubled, would eat its
-/// room. They stay in `root/`, so in the base set, `base.ffs` and the self-hosting disk.
-pub(super) const RAMDISK_EXCLUDE: &str = "it leaves out (in root/, the base set and \
-    base.ffs): the boot image keeps its room for the ~100 MB debug kernel and the ramdisk";
-
-/// Removes every path of `excluded` (absolute paths of the installed system: a file, a link
-/// or a directory) from the tree at `staging`; returns how many were there.
-pub(super) fn exclude_from(staging: &Path, excluded: &BTreeSet<String>) -> Result<usize> {
-    let mut n = 0;
-    for path in excluded {
-        let p = staging.join(path.trim_start_matches('/'));
-        let Ok(meta) = fs::symlink_metadata(&p) else {
-            continue;
-        };
-        if meta.is_dir() {
-            fs::remove_dir_all(&p)
-        } else {
-            fs::remove_file(&p)
-        }
-        .map_err(|e| format!("{}: {e}", p.display()))?;
-        n += 1;
-    }
-    Ok(n)
-}
-
-/// An ffs image of the tree at `staging` into `image`, by makefs as OpenBSD's `distrib/`
-/// runs it (`FS_OPTIONS`), with the owners of the table at `owners`. Its size (partition
-/// `a` of the disktab entry written at `disktab`): twice the contents, in whole MiB, at
-/// least 2 MiB (inodes, directories and indirect blocks fit with room to spare).
-fn make_ffs(
-    makefs: &Path,
-    staging: &Path,
-    owners: &Path,
-    disktab: &Path,
-    image: &Path,
-) -> Result<()> {
-    const MIB: u64 = 1 << 20;
-    let size = (tree_bytes(staging)? * 2).div_ceil(MIB).max(2) * MIB;
-    write_if_changed(disktab, &disktab_entry(size / 512))?;
-    let _ = fs::remove_file(image);
-    run(Command::new(makefs)
-        .args(["-t", "ffs", "-T", &TIMESTAMP.to_string()])
-        .env("EMIBSD_DISKTAB", disktab)
-        .env("EMIBSD_OWNERS", owners)
-        .env("EMIBSD_STAGING", staging)
-        .args(["-o", FS_OPTIONS])
-        .arg(image)
-        .arg(staging))
 }
 
 /// `/root/tone.wav` (M12): one second of a 440 Hz sine at half scale, 48 kHz, 16-bit
@@ -1380,36 +1314,6 @@ mod tests {
             .map(|c| i16::from_le_bytes([c[0], c[1]]).unsigned_abs())
             .max();
         assert_eq!(peak, Some(16_383));
-    }
-
-    /// TD1b: the excluded files, links and directories leave the staging tree; the rest
-    /// stays, and a path that is not there is not counted.
-    #[test]
-    fn exclude_from_removes_files_links_and_directories() {
-        let dir = std::env::temp_dir().join(format!("emibsd-exclude-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(dir.join("usr/bin")).unwrap();
-        fs::create_dir_all(dir.join("usr/share/mk")).unwrap();
-        fs::write(dir.join("usr/bin/make"), "x").unwrap();
-        fs::write(dir.join("usr/bin/sed"), "x").unwrap();
-        fs::write(dir.join("usr/share/mk/sys.mk"), "x").unwrap();
-        std::os::unix::fs::symlink("make", dir.join("usr/bin/bmake")).unwrap();
-        let excluded: BTreeSet<String> = [
-            "/usr/bin/make",
-            "/usr/bin/bmake",
-            "/usr/share/mk",
-            "/usr/bin/absent",
-        ]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-        assert_eq!(exclude_from(&dir, &excluded).unwrap(), 3);
-        assert!(!dir.join("usr/bin/make").exists());
-        assert!(fs::symlink_metadata(dir.join("usr/bin/bmake")).is_err());
-        assert!(!dir.join("usr/share/mk").exists());
-        assert!(dir.join("usr/bin/sed").is_file());
-        assert!(dir.join("usr/share").is_dir());
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

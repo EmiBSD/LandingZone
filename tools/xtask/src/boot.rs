@@ -181,8 +181,8 @@ fn timeout_scale(value: Option<&str>) -> u32 {
 const SECTOR: u64 = 512;
 /// 256 MiB: room for FAT32 if the formatter picks it, and for the modules: the debug kernel
 /// and the ramdisk (23 MiB since M9+ added LibreSSL, ftp and nc) outgrew 64 MiB, the
-/// 65 MiB debug kernel with the 63 MiB ramdisk of M11e (tcpbench) outgrew 128 MiB, and in
-/// TD1b the ~98 MiB debug kernel, the 92 MiB ramdisk, `init` and Limine outgrew 192 MiB
+/// 65 MiB debug kernel with the 63 MiB ramdisk of M11e (tcpbench) outgrew 128 MiB, and on
+/// 2026-11-15 the ~98 MiB debug kernel, the 92 MiB ramdisk, `init` and Limine outgrew 192 MiB
 /// (amd64, from a worktree whose longer path the kernel's debug info carries).
 const IMAGE_SECTORS: u64 = 256 * 1024 * 1024 / SECTOR;
 /// First partition sector: 1 MiB, the conventional alignment.

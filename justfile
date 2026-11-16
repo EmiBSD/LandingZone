@@ -63,7 +63,6 @@ xtask := env("EMIBSD_XTASK", "cargo xtask")
 ramdisks := if amd64_frozen == "true" { "test -f target/userland/arm64/ramdisk.ffs" } else { "test -f target/userland/amd64/ramdisk.ffs -a -f target/userland/arm64/ramdisk.ffs" }
 ramdisk_amd64 := if amd64_frozen == "true" { "true" } else { "test -f target/userland/amd64/ramdisk.ffs" }
 comps := if amd64_frozen == "true" { "test -f target/comp/arm64/comp.ffs" } else { "test -f target/comp/amd64/comp.ffs -a -f target/comp/arm64/comp.ffs" }
-bases := if amd64_frozen == "true" { "test -f target/userland/arm64/base.ffs" } else { "test -f target/userland/amd64/base.ffs -a -f target/userland/arm64/base.ffs" }
 comp_amd64 := if amd64_frozen == "true" { "true" } else { "test -f target/comp/amd64/comp.ffs" }
 
 # Every smoke and smoke2 run fails if a VM prints this (kern_clockintr's check under feature
@@ -184,7 +183,7 @@ smokes := "smoke-boot smoke-shell smoke-login smoke-net smoke-route smoke-diag s
     "smoke-wg smoke-pf smoke-ipsec smoke-esp smoke-pfsync smoke-ipcomp smoke-https smoke-tcp " + \
     "smoke-divert smoke-tcpdump smoke-inet6 smoke-disk smoke-ufsopts smoke-fs smoke-cd smoke-softraid " + \
     "smoke-nvme smoke-ahci smoke-smmu smoke-power smoke-siop smoke-wd smoke-fd smoke-mpi smoke-sdmmc smoke-em smoke-igb smoke-re smoke-vmx smoke-pcn smoke-ne smoke-fxp smoke-dc smoke-vmwpvs smoke-efiboot smoke-acpi smoke-gicv3 smoke-clock smoke-rtc " + \
-    "smoke-nfs smoke-ext2fs smoke-fuse smoke-thrsleep smoke-buildtools smoke-ntfs smoke-tcpbench smoke-mp smoke-ddbmp " + \
+    "smoke-nfs smoke-ext2fs smoke-fuse smoke-thrsleep smoke-ntfs smoke-tcpbench smoke-mp smoke-ddbmp " + \
     "smoke-net-mp smoke-up smoke-audio smoke-usb smoke-puc smoke-fb smoke-wscons smoke-vga smoke-kbd " + \
     "smoke-powerbtn smoke-ukc smoke-ppb smoke-dmar smoke-iic smoke-ipmi smoke-tpm smoke-virtio smoke-viogpu " + \
     "smoke-mouse smoke-ugen smoke-ehci smoke-uaudio smoke-uhci smoke-ohci smoke-cdce smoke-ucom " + \
@@ -2295,48 +2294,6 @@ thrsleep_steps := disk_login + " " + \
     "--expect 'thrtest: thrwakeup n=1 each ok' --expect 'thrtest: thrwakeup -1 broadcast ok' " + \
     "--expect 'thrtest: 300 rounds' --expect 'thrtest: stress 300 rounds ok' --expect 'thrtest: all ok' " + \
     "--expect 'thrtest-done-42' --reject 'Bad system call' --reject ' FAILED: '"
-
-# TD1b: the tools OpenBSD's `make build` runs. They stay out of the ramdisk (the boot image is
-# full; docs/ARCHITECTURE.md, "The ramdisk image"), so this boots the ramdisk kernel with
-# `base.ffs` (`target/userland/<arch>/base.ffs`, the ramdisk's tree with the tools, copied to
-# the run directory as the persistent disk set `base`, so sd0), mounts it on /mnt and chroots
-# into it, where make(1) reads /usr/share/mk/sys.mk and prints MACHINE_ARCH, awk computes,
-# tr, sort and head make a pipeline, find finds sys.mk, install(1) makes a directory and
-# mtree(8) writes its spec and checks it; m4, expr, test and diff answer too. Every mark is
-# printed by the guest (`$((40+2))`, a command's output), never typed; every line stays under
-# arm64's 128-byte console limit. Both archs. Part of `smoke`.
-smoke-buildtools: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
-    @{{ramdisks}} || \
-        { echo "smoke-buildtools: no ramdisk image; run just userland first"; exit 1; }
-    @{{bases}} || \
-        { echo "smoke-buildtools: no base.ffs; run just userland first"; exit 1; }
-    mkdir -p "${EMIBSD_RUN_DIR:-target}" && rm -f "${EMIBSD_RUN_DIR:-target}/disk-amd64-base.img" && \
-        { ! test -f target/userland/amd64/base.ffs || \
-        cp -c target/userland/amd64/base.ffs "${EMIBSD_RUN_DIR:-target}/disk-amd64-base.img"; }
-    {{xtask}} smoke {{reject}} {{smp}} --arch amd64 --kernel target/{{amd64}}/debug/bsd --expect-ramdisk --until-seen \
-        --disk-set base {{buildtools_steps}} --expect 'bt-make-amd64-42'
-    mkdir -p "${EMIBSD_RUN_DIR:-target}" && rm -f "${EMIBSD_RUN_DIR:-target}/disk-arm64-base.img" && \
-        cp -c target/userland/arm64/base.ffs "${EMIBSD_RUN_DIR:-target}/disk-arm64-base.img"
-    {{xtask}} smoke {{reject}} {{smp}} --arch arm64 --kernel target/{{arm64}}/debug/bsd --expect-ramdisk --until-seen \
-        --disk-set base {{buildtools_steps}} --expect 'bt-make-aarch64-42'
-
-# `smoke-buildtools`'s session (the arch's MACHINE_ARCH mark is the recipe's).
-buildtools_steps := disk_login + " --reject 'panic:' --reject 'Bad system call' " + \
-    "--send-after '# ' --send 'mount /dev/sd0a /mnt && echo bt-mnt-$((40+2))\\n' " + \
-    "--send-after 'bt-mnt-42' --send '/usr/sbin/chroot /mnt /bin/ksh\\n' " + \
-    "--send-after '# ' --send 'echo bt-make-$(make -V MACHINE_ARCH -f /usr/share/mk/sys.mk)-$((40+2))\\n' " + \
-    "--send-after '# ' --send 'echo bt-awk-$(awk \"BEGIN{print 6*7}\")\\n' " + \
-    "--send-after '# ' --send 'echo bt-sort-$(echo b a | tr \" \" \"\\012\" | sort | head -1)\\n' " + \
-    "--send-after '# ' --send 'echo bt-find-$(find /usr/share/mk -name sys.mk)\\n' " + \
-    "--send-after '# ' --send 'install -d -m 755 /tmp/x && echo bt-install-$((40+2))\\n' " + \
-    "--send-after '# ' --send 'mtree -c -p /tmp/x >/tmp/x.spec && echo bt-mtree-c-$((40+2))\\n' " + \
-    "--send-after '# ' --send 'mtree -f /tmp/x.spec -p /tmp/x && echo bt-mtree-$((40+2))\\n' " + \
-    "--send-after '# ' --send 'echo bt-m4-$(echo \"define(N,42)N\" | m4)-$(expr 40 + 2)\\n' " + \
-    "--send-after '# ' --send 'cd /tmp; echo a >a; cp a b; diff a b && echo bt-diff-$((40+2))\\n' " + \
-    "--send-after '# ' --send '[ -x /usr/bin/lex ] && test -x /usr/bin/yacc && echo bt-test-$((40+2))\\n' " + \
-    "--expect 'bt-mnt-42' --expect 'bt-awk-42' --expect 'bt-sort-a' " + \
-    "--expect 'bt-find-/usr/share/mk/sys.mk' --expect 'bt-install-42' --expect 'bt-mtree-c-42' " + \
-    "--expect 'bt-mtree-42' --expect 'bt-m4-42-42' --expect 'bt-diff-42' --expect 'bt-test-42'"
 
 # M10d: NTFS, read-only, amd64 only (OpenBSD builds ntfs and mount_ntfs(8) for alpha, amd64 and
 # i386). The ramdisk's /root/images/ntfs.img (an NTFS volume made on this machine by

@@ -47,8 +47,4 @@ in full in each file.
 The ramdisk's userland is compiled unmodified from the OpenBSD sources and
 keeps their licenses. Its tcpdump and libpcap include headers (bootp.h,
 ppp.h) under a Carnegie Mellon notice: copying and distribution is by
-permission of Carnegie Mellon and Stanford University. Its awk, like libc's
-gdtoa, carries Lucent Technologies' permission notice (the name Lucent
-Technologies not to be used in advertising without permission), and its
-diff's xmalloc.c Tatu Ylonen's notice (free use; derived versions clearly
-marked as such).
+permission of Carnegie Mellon and Stanford University.

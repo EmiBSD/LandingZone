@@ -355,7 +355,6 @@ impl<'a> Comp<'a> {
                 owners: Mutex::new(Vec::new()),
                 yacc: Mutex::new(None),
                 lex: Mutex::new(None),
-                ramdisk_exclude: Mutex::new(BTreeSet::new()),
                 out: out.to_path_buf(),
             },
             vars,

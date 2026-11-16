@@ -386,26 +386,6 @@ and `lib/libedit` (`LIBRARIES` in `userland.rs`, the code in `userland/libraries
 - `share/mk`'s `bsd.subdir.mk` (recursion into `SUBDIR`, the `man` directories) is stood in
   for by nothing.
 
-TD1b (2026-11-15) adds what OpenBSD's `make build` runs, so that a later step builds the
-userland inside an EmiBSD VM with the base's own make(1) and Makefiles: `usr.bin/make`,
-`awk`, `xinstall` (installed as `install`, as its `realinstall` rule names it), `yacc`
-(with its `yyfix` script), `m4`, `lex` (with its `flex` and `flex++` links), `xargs`,
-`sort`, `find`, `tail`, `head`, `cut`, `tr`, `uniq`, `basename`, `dirname`, `env`,
-`printf`, `join`, `paste`, `diff`, `nm` (the base's own `usr.bin/nm`, with its `size`
-link; LLVM's is the comp set's `llvm-nm`), `tsort`, `bin/expr`, `bin/test` (and `[`) and
-`usr.sbin/mtree` (`TD1B` in `userland.rs`), the scripts `lorder` and `mkdep`, bin/chmod's
-`afterinstall` links (`/usr/sbin/chown`, `/usr/sbin/chgrp`, `/usr/bin/chflags`), and
-`share/mk`'s `FILES` in `/usr/share/mk` (its `install` rule). All build unmodified, static
-like the rest (`VARIANTS`). OpenBSD 8.0 has no `sum(1)`: there is nothing to build for it.
-What their Makefiles do beyond objects is done as make would: `BUILDFIRST` and the sources a
-rule makes (awk's `awkgram.tab.h` by OpenBSD's yacc, `proctab.c` by its host-built
-`maketab`; nm's `elf32.c`/`elf64.c`) before the objects, with what their rules need first.
-One host shim: make's `generate`, which prints the hash constants of `varhashconsts.h` and
-its siblings, links `-lutil` for ohash(3), which macOS's libutil lacks, so it is built for
-the Mac from its sources and `lib/libutil/ohash.c`, `LDSTATIC` empty (a Mach-O program is
-never static) and the yacc shim force-included (`HOST_RULE_TOOLS`); the constants it prints
-do not depend on the machine.
-
 The self-hosting disk (TDk, `cargo xtask selfhost`, `userland/selfhost.rs`) is not made
 from this userland: since TD0 (the user's decision of 2026-11-15: this repository is the
 kernel, the userland is the Userland repository's) it unpacks Userland's released `base`
@@ -415,7 +395,8 @@ case-sensitive APFS volume (a sparse image that `hdiutil` makes and attaches und
 `target/selfhost/<arch>/` and xtask detaches and removes when it is done): the sets hold
 names that differ only in case (`/usr/bin/Mail` and `mail`, `/usr/sbin/ZZZ` and `zzz`,
 terminfo's entries), which the Mac's file system cannot hold. A build of the userland inside
-EmiBSD (the old TD1b's `selfhost-userland`, added and removed the same day) is Userland's.
+EmiBSD (the old TD1b: `selfhost-userland`, the build tools in the base, `base.ffs` and
+`smoke-buildtools`, added and removed on the same day) is Userland's.
 
 Every OpenBSD file compiled or included is classified by licence into `licences.txt`;
 LibreSSL's two licences are named `OpenSSL` and `SSLeay` there (accepted by the user on
@@ -434,17 +415,10 @@ clone): one track of one cylinder spanning the image, partition `a` FFS at offse
 4096/512 blocks/fragments. makefs's own `rdroot=1` label is not used: it leaves `d_nsectors`
 0, which `checkdisklabel` rejects. The result is FFS1 in `a` and the label in sector 1; the
 size is twice the contents in whole MiB (at least 2 MiB), the timestamps fixed (`-T`).
-Its tree is `root/` plus `/etc`, `/dev` and the directories below, less TD1b's build tools.
-Those (the `TD1B` programs and their links, the scripts and `/usr/share/mk`, recorded as
-they are installed) stay out of the ramdisk, and only of it (TD1b's brief of 2026-11-15
-prefers that to a larger boot image): the image is twice its tree, and the
-boot image (`IMAGE_SECTORS`) holds a ~100 MB debug kernel and a ~95 MB ramdisk. At
+Its tree is `root/` plus `/etc`, `/dev` and the directories below.
+The boot image (`IMAGE_SECTORS`) holds a ~100 MB debug kernel and a ~95 MB ramdisk. At
 192 MiB that left about 2.5 MB, and an amd64 kernel built in a worktree with a longer path
-(its debug info carries the paths) filled it even without the tools, so it is 256 MiB
-since TD1b step 2; the tools add 6.0 MB (amd64) and 6.4 MB
-(arm64) to `root/`, 12 MB or more to the ramdisk. They are in `root/`, so in the base set
-and the self-hosting disk, and in `base.ffs`, made beside the ramdisk by the same makefs
-from the whole tree (ramdisk and tools), which `smoke-buildtools` mounts and chroots into.
+(its debug info carries the paths) filled it, so it is 256 MiB since 2026-11-15.
 M10c adds `/root/images` (`images.rs`): a FAT12 and an ISO 9660 image made by the same makefs
 (`-t msdos`, `-t cd9660 -o rockridge`) and a UDF image made by macOS's own `hdiutil makehybrid
 -udf` (OpenBSD has no UDF writer; nothing is installed), for vnd(4) to attach in `smoke-fs`.
