@@ -64,8 +64,7 @@
 //!   `pic_dev`), but `sc_pic` follows it: amd64's `struct pic` here holds a name instead of
 //!   the device (`pic.rs`), and a `&str` is not valid as zeroes, so the softc
 //!   `config_make_softc` zeroes holds it as `MaybeUninit`, written by `ioapic_attach`;
-//!   `ioapic.rs` gets from a `&Pic` back to its softc by the field's offset. The C's
-//!   `sc_pic.pic_mutex` (`MULTIPROCESSOR`) is `sc_mutex` (the ported `struct pic` has none).
+//!   `ioapic.rs` gets from a `&Pic` back to its softc by the field's offset.
 //! - `sc_pins` points at the `sc_apic_sz` pins `ioapic_attach` allocates (the C's
 //!   `mallocarray`); [`IoapicSoftc::pins`] returns them as a slice.
 
@@ -77,7 +76,6 @@ use crate::arch::amd64::include::cpu::CpuInfo;
 use crate::arch::amd64::include::pic::Pic;
 use crate::machine::mpconfig::MpIntrMap;
 use crate::sys::device::{Device, Softc};
-use crate::sys::mutex::Mutex;
 
 /// `struct ioapic_pin`.
 pub struct IoapicPin {
@@ -113,15 +111,14 @@ impl Default for IoapicPin {
 }
 
 /// `struct ioapic_softc`. The cells are written by `ioapic_attach` and, for the pins, by
-/// `intr_establish` (under the kernel lock); the registers are reached under `sc_mutex`.
+/// `intr_establish` (under the kernel lock); the registers are reached under
+/// `sc_pic.pic_mutex` (`MULTIPROCESSOR`).
 #[repr(C)]
 pub struct IoapicSoftc {
     /// `sc_pic.pic_dev`: the device.
     pub sc_dev: Device,
     /// `sc_pic`: written once by `ioapic_attach`, before the pic is handed out.
     pub sc_pic: UnsafeCell<MaybeUninit<Pic>>,
-    /// `sc_pic.pic_mutex`.
-    pub sc_mutex: Mutex,
     /// `sc_next`.
     pub sc_next: Cell<*const IoapicSoftc>,
     /// `sc_apicid`.
@@ -166,7 +163,7 @@ impl IoapicSoftc {
 }
 
 // SAFETY: `#[repr(C)]` with the device first; every field is valid as zeroes (the pic is
-// `MaybeUninit`, the mutex at `IPL_NONE`, `X86BusSpace::Io`, a null handle and pointers).
+// `MaybeUninit`, `X86BusSpace::Io`, a null handle and pointers).
 unsafe impl Softc for IoapicSoftc {}
 
 /// `APIC_INT_VIA_APIC`: the handle is routed through an I/O APIC (MP: `intr_handle_t` is

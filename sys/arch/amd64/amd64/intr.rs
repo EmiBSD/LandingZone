@@ -120,6 +120,8 @@ use crate::sys::syslog::LOG_CRIT;
 pub static SOFTINTR_PIC: Pic = Pic {
     pic_name: "softintr_pic0",
     pic_type: PIC_SOFT,
+    #[cfg(feature = "multiprocessor")]
+    pic_mutex: crate::sys::mutex::Mutex::new(crate::arch::amd64::include::intrdefs::IPL_NONE),
     pic_hwmask: None,
     pic_hwunmask: None,
     pic_addroute: None,

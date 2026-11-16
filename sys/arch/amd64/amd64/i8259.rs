@@ -134,6 +134,8 @@ pub fn i8259_stubs_table() -> &'static [Intrstub] {
 pub static I8259_PIC: Pic = Pic {
     pic_name: "pic0",
     pic_type: PIC_I8259,
+    #[cfg(feature = "multiprocessor")]
+    pic_mutex: crate::sys::mutex::Mutex::new(crate::arch::amd64::include::intrdefs::IPL_NONE),
     pic_hwmask: Some(i8259_hwmask),
     pic_hwunmask: Some(i8259_hwunmask),
     pic_addroute: Some(i8259_addroute),

@@ -168,6 +168,8 @@ static IPI_IRQ: AtomicU64 = AtomicU64::new(0);
 pub static LOCAL_PIC: Pic = Pic {
     pic_name: "lapic",
     pic_type: PIC_LAPIC,
+    #[cfg(feature = "multiprocessor")]
+    pic_mutex: crate::sys::mutex::Mutex::new(crate::arch::amd64::include::intrdefs::IPL_NONE),
     pic_hwmask: Some(lapic_hwmask),
     pic_hwunmask: Some(lapic_hwunmask),
     pic_addroute: Some(lapic_setup),

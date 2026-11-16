@@ -115,8 +115,6 @@
 //! - `bios_memmap` is boot(8)'s; under Limine there is none, so `acpidmar_rmrr` finds no
 //!   reserved E820 region and `iommu_showfault` prints no `mem in e820.reserved` line.
 //! - `acpidmar_ddb` (`#ifdef DDB`, 0) is an `AtomicI32`; DDB is always configured here.
-//! - The `pic_mutex` of `dmarpic` (`MULTIPROCESSOR`) does not exist: amd64's `struct pic`
-//!   has none (`include/pic.rs`).
 //! - `_iommu_map` and `_iommu_domain` (for vmm(4), not ported) are ported but have no
 //!   caller.
 
@@ -1398,6 +1396,8 @@ impl IommuSoftc {
                 pic: x86::Pic {
                     pic_name: "dmarpic",
                     pic_type: x86::PIC_MSI,
+                    #[cfg(feature = "multiprocessor")]
+                    pic_mutex: Mutex::new(IPL_NONE),
                     pic_hwmask: Some(acpidmar_msi_hwmask),
                     pic_hwunmask: Some(acpidmar_msi_hwunmask),
                     pic_addroute: Some(acpidmar_msi_addroute),
@@ -5686,6 +5686,8 @@ pub fn acpidmar_intr_establish(
     what: &'static str,
 ) -> *mut c_void {
     iommu.pic.iommu.set(ptr::from_ref(iommu));
+    #[cfg(feature = "multiprocessor")]
+    mtx_init(&iommu.pic.pic.pic_mutex, level);
 
     x86::intr_establish(
         -1,

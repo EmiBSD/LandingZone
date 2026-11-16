@@ -1779,10 +1779,10 @@ notes = "M4: struct intrstub/intrsource/intrhand (repr(C) with Cells: the stubs 
 c = "sys/arch/amd64/include/pic.h"
 rust = "sys/arch/amd64/include/pic.rs"
 license = "none"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "c5b29937decb9af070cbfab408c95774f8893d76"
-notes = "M4: struct pic (pic_dev reduced to pic_name, no pic_mutex without MULTIPROCESSOR, the stub tables reached through a function since they live in assembly), PIC_*; the header has no copyright block; msi_pic is M5"
+notes = "struct pic (pic_dev reduced to pic_name; pic_mutex under MULTIPROCESSOR, TD1: ioapic_lock and acpidmar's dmarpic use it as the C does; the stub tables reached through a function since they live in assembly), PIC_*; the four pics it declares are in i8259.rs, lapic.rs, pci_machdep.rs and intr.rs; the header has no copyright block"
 
 [[file]]
 c = "sys/arch/amd64/include/i8259.h"

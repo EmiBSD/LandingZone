@@ -21,18 +21,23 @@
 //!
 //! Upstream: sys/arch/amd64/include/pic.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M4 ports `struct pic` and the `PIC_*` types; `i8259_pic` lives in
-//! `amd64/i8259.rs` and `softintr_pic` in `amd64/intr.rs`; `local_pic` (the LAPIC) and
-//! `msi_pic` come with their drivers.
+//! Status: `ported`. `struct pic` and the `PIC_*` types. The four pics the header declares
+//! are defined where the C defines them: `i8259_pic` in `amd64/i8259.rs` (`I8259_PIC`),
+//! `local_pic` in `amd64/lapic.rs` (`LOCAL_PIC`), `msi_pic` in `pci/pci_machdep.rs`
+//! (`MSI_PIC`) and `softintr_pic` in `amd64/intr.rs` (`SOFTINTR_PIC`).
 //!
 //! ## Deviations
-//! - `pic_dev` (`struct device`, autoconfiguration) is reduced to its name, `pic_name`.
-//! - `pic_mutex` is `MULTIPROCESSOR` only.
+//! - `pic_dev` (`struct device`, autoconfiguration) is reduced to its name, `pic_name`, which
+//!   is all the C's static pics set of it and all anybody reads through the `pic_name` macro.
+//!   The one pic that is a device, an I/O APIC's, keeps its `struct device` beside the pic in
+//!   its softc (`i82093var.rs`).
 //! - The stub tables live in assembly (`vector.S`), so they are reached through a function
 //!   returning the slice instead of a pointer in the struct.
 
 use crate::arch::amd64::include::cpu::CpuInfo;
 use crate::arch::amd64::include::intr::Intrstub;
+#[cfg(feature = "multiprocessor")]
+use crate::sys::mutex::Mutex;
 
 /// `pic_addroute`/`pic_delroute`: `(pic, ci, pin, idtvec, type)`.
 pub type PicRouteFn = fn(&Pic, &CpuInfo, i32, i32, i32);
@@ -45,6 +50,11 @@ pub struct Pic {
     pub pic_name: &'static str,
     /// `pic_type`: `PIC_*`.
     pub pic_type: i32,
+    /// `pic_mutex` (`MULTIPROCESSOR`): `ioapic_lock` takes it around an I/O APIC's registers,
+    /// and acpidmar(4) initialises its own pic's. A pic that never locks keeps the free
+    /// `IPL_NONE` mutex its initialiser gives it, the C's zeroes.
+    #[cfg(feature = "multiprocessor")]
+    pub pic_mutex: Mutex,
     /// `pic_hwmask(pic, pin)`.
     pub pic_hwmask: Option<fn(&Pic, i32)>,
     /// `pic_hwunmask(pic, pin)`.

@@ -175,8 +175,10 @@ fn ioapics() -> impl Iterator<Item = &'static IoapicSoftc> {
 /// `ioapic_lock`: interrupts off and, with `MULTIPROCESSOR`, the pic's mutex.
 fn ioapic_lock(sc: &IoapicSoftc) -> u64 {
     let flags = intr_disable();
+    // SAFETY: `ioapic_attach` writes the pic before it reads or writes a register, and no
+    // softc is reachable (`ioapics`, a pin's pic) before that.
     #[cfg(feature = "multiprocessor")]
-    mtx_enter(&sc.sc_mutex);
+    mtx_enter(&unsafe { sc.pic() }.pic_mutex);
     #[cfg(not(feature = "multiprocessor"))]
     let _ = sc;
     flags
@@ -184,8 +186,9 @@ fn ioapic_lock(sc: &IoapicSoftc) -> u64 {
 
 /// `ioapic_unlock`.
 fn ioapic_unlock(sc: &IoapicSoftc, flags: u64) {
+    // SAFETY: as in `ioapic_lock`.
     #[cfg(feature = "multiprocessor")]
-    mtx_leave(&sc.sc_mutex);
+    mtx_leave(&unsafe { sc.pic() }.pic_mutex);
     #[cfg(not(feature = "multiprocessor"))]
     let _ = sc;
     // SAFETY: `flags` came from the matching `ioapic_lock`.
@@ -337,6 +340,11 @@ pub fn ioapic_attach(_parent: Option<&Device>, self_: &Device, aux: *mut c_void)
         (*sc.sc_pic.get()) = MaybeUninit::new(Pic {
             pic_name: name,
             pic_type: PIC_IOAPIC,
+            // mtx_init(&sc->sc_pic.pic_mutex, IPL_NONE).
+            #[cfg(feature = "multiprocessor")]
+            pic_mutex: crate::sys::mutex::Mutex::new(
+                crate::arch::amd64::include::intrdefs::IPL_NONE,
+            ),
             pic_hwmask: Some(ioapic_pic_hwmask),
             pic_hwunmask: Some(ioapic_pic_hwunmask),
             pic_addroute: Some(ioapic_addroute),
@@ -346,9 +354,6 @@ pub fn ioapic_attach(_parent: Option<&Device>, self_: &Device, aux: *mut c_void)
             pic_level_stubs: Some(ioapic_level_stubs_table),
         });
     }
-    // MULTIPROCESSOR: mtx_init(&sc->sc_pic.pic_mutex, IPL_NONE): the zeroed sc_mutex is a
-    // free IPL_NONE mutex.
-
     // The C adds the softc to `ioapics` before mapping; it is added here once its registers
     // and pic are set up, which nothing between the two reads.
     ioapic_add(sc);

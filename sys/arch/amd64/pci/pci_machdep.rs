@@ -228,6 +228,8 @@ pub static PCI_BUS_DMA_TAG: BusDmaTag = BusDmaTag {
 pub static MSI_PIC: Pic = Pic {
     pic_name: "msi",
     pic_type: PIC_MSI,
+    #[cfg(feature = "multiprocessor")]
+    pic_mutex: crate::sys::mutex::Mutex::new(crate::arch::amd64::include::intrdefs::IPL_NONE),
     pic_hwmask: Some(msi_hwmask),
     pic_hwunmask: Some(msi_hwunmask),
     pic_addroute: Some(msi_addroute),
@@ -241,6 +243,8 @@ pub static MSI_PIC: Pic = Pic {
 pub static MSIX_PIC: Pic = Pic {
     pic_name: "msix",
     pic_type: PIC_MSI,
+    #[cfg(feature = "multiprocessor")]
+    pic_mutex: crate::sys::mutex::Mutex::new(crate::arch::amd64::include::intrdefs::IPL_NONE),
     pic_hwmask: Some(msix_hwmask),
     pic_hwunmask: Some(msix_hwunmask),
     pic_addroute: Some(msix_addroute),
