@@ -266,6 +266,7 @@ means EmiBSD's code has it too ("Bugs the port reproduces").
 | EXT-79 | `sys/dev/softraid_raid6.c:632` | RAID 6 leaks blocks and ccbs on error | alloc-failure | leak | read | fixed | open |
 | EXT-215 | `sys/dev/pci/pcscp.c:304` | attach's error path unmaps the DMA map pointer, not the MDL mapping | alloc-failure | wrong result | read | not ported (M17) | open |
 | EXT-226 | `sys/dev/rnd.c:659` | `random_start` reads kernel text through a misaligned `u_int32_t *` (amd64) | — (the kernel's own link) | cosmetic | reproduced | read unaligned | open |
+| EXT-229 | `sys/arch/arm64/include/armreg.h:813` | `MAIR_ATTR_MASK(idx)` expands to `(0xff << ((n)* 8))`: `n` is not its parameter | — (the macro has no user) | cosmetic | read | `mair_attr_mask(idx)` shifts by `idx` | open |
 
 ## Entries (EXT-1 to EXT-8, EXT-192 to EXT-197)
 
@@ -775,6 +776,20 @@ Every C line in this and the following sections is at the pin 3ce1f3f79392, unde
   `read_unaligned`.
 - Severity: cosmetic (undefined behaviour that the hardware tolerates).
 - Fix: read the words with `memcpy`, or round the pointer down to 4 bytes.
+
+### EXT-229: `MAIR_ATTR_MASK(idx)` names a variable that is not its parameter
+
+- Where: `sys/arch/arm64/include/armreg.h:813` at 3ce1f3f79392.
+- What: `#define MAIR_ATTR_MASK(idx) (0xff << ((n)* 8))`. The parameter is `idx`; the body
+  uses `n`. The line below it, `MAIR_ATTR(attr, idx)`, uses `idx`, which is what is meant: the
+  mask of attribute `idx` in `MAIR_EL1`.
+- Reach: none. Nothing in `sys/` uses the macro, so it is never expanded; a first user would
+  get a compile error, or the value of whatever `n` is in scope.
+- Verified: read; `grep -rn MAIR_ATTR_MASK sys` finds only the definition.
+- Port's handling: `sys/arch/arm64/include/armreg.rs`, `mair_attr_mask(idx)`, shifts by
+  `idx` (a deviation listed in the file).
+- Severity: cosmetic.
+- Fix: `(0xff << ((idx) * 8))`.
 
 ### EXT-227: an address lifetime past INT_MAX seconds rearms the expiry timer every tick
 

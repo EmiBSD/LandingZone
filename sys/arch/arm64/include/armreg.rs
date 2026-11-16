@@ -53,14 +53,20 @@
 //!
 //! Upstream: sys/arch/arm64/include/armreg.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M4 ports `INSN_SIZE`, `READ_SPECIALREG`/`WRITE_SPECIALREG`, the
-//! `ESR_ELx` exception classes and syndrome bits the kernel trap handler reads, the `PSR`
-//! bits and the `MDSCR_EL1` debug bits. M11a (`cpu.c`) adds the cache registers (`CCSIDR`,
-//! `CLIDR`, `CSSELR`, `CTR_IL1P`), every `ID_AA64*` field, `SCTLR_EL1`, `TCR_A1` and
-//! `DBG_MDSCR_TDCC`. The GIC system registers come with the drivers that use them: M16f
-//! (`agintc.c`) adds the GICv3 CPU interface's `ICC_*_EL1` fields.
+//! Status: `ported`. The whole header: every system register the kernel names, with its
+//! fields, their values and the macros that pick a field out of a register's value. A check
+//! outside the tree evaluated the header's 712 defines that have a value against the
+//! constants here (TD1): all equal.
 //!
 //! ## Deviations
+//! - A function-like macro is a `const fn` with the lower-case name (`ID_AA64ISAR0_AES(x)` is
+//!   [`id_aa64isar0_aes`]). The six `ISS_MSR_*(x)` field macros are one function,
+//!   [`iss_msr_field`], given the field's mask and shift.
+//! - `MAIR_ATTR_MASK(idx)` shifts by `idx`; the header's body names `n`, which is not the
+//!   macro's parameter (docs/EXTERNAL_BUGS.md, EXT-229; nothing uses the macro).
+//! - A name the header writes in mixed case keeps it in what TD1 added (`ESR_ELx_IL`,
+//!   `MAIR_DEVICE_nGnRnE`, `I_bit`); the earlier ports upper-cased theirs (`ESR_ELX_EC_MASK`,
+//!   `ISS_DATA_WNR`), and their users name them so.
 //! - `READ_SPECIALREG`/`WRITE_SPECIALREG` are `macro_rules!` taking the register name as a
 //!   string literal: `asm!` needs the name at compile time, as the C's `__STRING(reg)` does.
 //! - `CNTKCTL_EVNTEN`, `CNTKCTL_EVNTDIR`, `CNTKCTL_EVNTI_SHIFT` and `CNTKCTL_EVNTI_MASK` are
@@ -174,6 +180,12 @@ pub const CLIDR_CTYPE_INSN: u64 = 0x1;
 pub const CLIDR_CTYPE_DATA: u64 = 0x2;
 /// `CLIDR_CTYPE_UNIFIED`.
 pub const CLIDR_CTYPE_UNIFIED: u64 = 0x4;
+/// `CNTHCTL_EVNTI_MASK`: Bit to trigger event stream.
+pub const CNTHCTL_EVNTI_MASK: u64 = 0xf << 4;
+/// `CNTHCTL_EVNTDIR`: Control transition trigger bit.
+pub const CNTHCTL_EVNTDIR: u64 = 1 << 3;
+/// `CNTHCTL_EVNTEN`: Enable event stream.
+pub const CNTHCTL_EVNTEN: u64 = 1 << 2;
 
 /* CSSELR_EL1 - Cache Size Selection Register */
 
@@ -181,6 +193,15 @@ pub const CLIDR_CTYPE_UNIFIED: u64 = 0x4;
 pub const CSSELR_IND: u64 = 1 << 0;
 /// `CSSELR_LEVEL_SHIFT`.
 pub const CSSELR_LEVEL_SHIFT: u32 = 1;
+/// `CTR_DLINE_SHIFT`.
+pub const CTR_DLINE_SHIFT: u32 = 16;
+/// `CTR_DLINE_MASK`.
+pub const CTR_DLINE_MASK: u64 = 0xf << CTR_DLINE_SHIFT;
+
+/// `CTR_DLINE_SIZE(reg)`.
+pub const fn ctr_dline_size(reg: u64) -> u64 {
+    (reg & CTR_DLINE_MASK) >> CTR_DLINE_SHIFT
+}
 
 /* CTR_EL0 - Cache Type Register */
 
@@ -194,11 +215,22 @@ pub const CTR_IL1P_AIVIVT: u64 = 0x1 << CTR_IL1P_SHIFT;
 pub const CTR_IL1P_VIPT: u64 = 0x2 << CTR_IL1P_SHIFT;
 /// `CTR_IL1P_PIPT`.
 pub const CTR_IL1P_PIPT: u64 = 0x3 << CTR_IL1P_SHIFT;
+/// `CTR_ILINE_SHIFT`.
+pub const CTR_ILINE_SHIFT: u32 = 0;
+/// `CTR_ILINE_MASK`.
+pub const CTR_ILINE_MASK: u64 = 0xf << CTR_ILINE_SHIFT;
+
+/// `CTR_ILINE_SIZE(reg)`.
+pub const fn ctr_iline_size(reg: u64) -> u64 {
+    (reg & CTR_ILINE_MASK) >> CTR_ILINE_SHIFT
+}
 
 /* TCR_EL1 */
 
 /// `TCR_A1`: the ASID comes from `TTBR1_EL1`.
 pub const TCR_A1: u64 = 1 << 22;
+/// `TCR_TG0_SHIFT`.
+pub const TCR_TG0_SHIFT: u32 = 14;
 
 /// `TCR_T0SZ_SHIFT`.
 pub const TCR_T0SZ_SHIFT: u32 = 0;
@@ -208,31 +240,72 @@ pub const fn tcr_t0sz(x: u64) -> u64 {
     x << TCR_T0SZ_SHIFT
 }
 
+/// `TCR_TxSZ(x)`.
+pub const fn tcr_txsz(x: u64) -> u64 {
+    tcr_t1sz(x) | tcr_t0sz(x)
+}
+
 /// `TCR_AS`: 16-bit ASIDs.
 pub const TCR_AS: u64 = 1 << 36;
 /// `TCR_IPS_SHIFT`: the intermediate physical address size (`start_mmu` copies
 /// `ID_AA64MMFR0_EL1.PARange` there).
 pub const TCR_IPS_SHIFT: u32 = 32;
+/// `TCR_IPS_32BIT`.
+pub const TCR_IPS_32BIT: u64 = 0 << TCR_IPS_SHIFT;
+/// `TCR_IPS_36BIT`.
+pub const TCR_IPS_36BIT: u64 = 1 << TCR_IPS_SHIFT;
+/// `TCR_IPS_40BIT`.
+pub const TCR_IPS_40BIT: u64 = 2 << TCR_IPS_SHIFT;
+/// `TCR_IPS_42BIT`.
+pub const TCR_IPS_42BIT: u64 = 3 << TCR_IPS_SHIFT;
+/// `TCR_IPS_44BIT`.
+pub const TCR_IPS_44BIT: u64 = 4 << TCR_IPS_SHIFT;
+/// `TCR_IPS_48BIT`.
+pub const TCR_IPS_48BIT: u64 = 5 << TCR_IPS_SHIFT;
+/// `TCR_TG1_SHIFT`.
+pub const TCR_TG1_SHIFT: u32 = 30;
+/// `TCR_TG1_16K`.
+pub const TCR_TG1_16K: u64 = 1 << TCR_TG1_SHIFT;
 /// `TCR_TG1_4K`: 4 KiB granule for `TTBR1_EL1`.
 pub const TCR_TG1_4K: u64 = 2 << 30;
+/// `TCR_TG1_64K`.
+pub const TCR_TG1_64K: u64 = 3 << TCR_TG1_SHIFT;
+/// `TCR_SH1_SHIFT`.
+pub const TCR_SH1_SHIFT: u32 = 28;
 /// `TCR_SH1_IS`: inner shareable `TTBR1_EL1` walks.
 pub const TCR_SH1_IS: u64 = 0x3 << 28;
+/// `TCR_ORGN1_SHIFT`.
+pub const TCR_ORGN1_SHIFT: u32 = 26;
 /// `TCR_ORGN1_WBWA`: outer write-back write-allocate `TTBR1_EL1` walks.
 pub const TCR_ORGN1_WBWA: u64 = 0x1 << 26;
+/// `TCR_IRGN1_SHIFT`.
+pub const TCR_IRGN1_SHIFT: u32 = 24;
 /// `TCR_IRGN1_WBWA`: inner write-back write-allocate `TTBR1_EL1` walks.
 pub const TCR_IRGN1_WBWA: u64 = 0x1 << 24;
 /// `TCR_TG0_4K`: 4 KiB granule for `TTBR0_EL1`.
 pub const TCR_TG0_4K: u64 = 0 << 14;
+/// `TCR_TG0_64K`.
+pub const TCR_TG0_64K: u64 = 1 << TCR_TG0_SHIFT;
+/// `TCR_TG0_16K`.
+pub const TCR_TG0_16K: u64 = 2 << TCR_TG0_SHIFT;
+/// `TCR_SH0_SHIFT`.
+pub const TCR_SH0_SHIFT: u32 = 12;
 /// `TCR_SH0_IS`: inner shareable `TTBR0_EL1` walks.
 pub const TCR_SH0_IS: u64 = 0x3 << 12;
+/// `TCR_ORGN0_SHIFT`.
+pub const TCR_ORGN0_SHIFT: u32 = 10;
 /// `TCR_ORGN0_WBWA`: outer write-back write-allocate `TTBR0_EL1` walks.
 pub const TCR_ORGN0_WBWA: u64 = 0x1 << 10;
+/// `TCR_IRGN0_SHIFT`.
+pub const TCR_IRGN0_SHIFT: u32 = 8;
 /// `TCR_IRGN0_WBWA`: inner write-back write-allocate `TTBR0_EL1` walks.
 pub const TCR_IRGN0_WBWA: u64 = 0x1 << 8;
 /// `TCR_CACHE_ATTRS`: cacheable walks for both halves.
 pub const TCR_CACHE_ATTRS: u64 = TCR_IRGN0_WBWA | TCR_IRGN1_WBWA | TCR_ORGN0_WBWA | TCR_ORGN1_WBWA;
 /// `TCR_SMP_ATTRS`: inner shareable walks for both halves.
 pub const TCR_SMP_ATTRS: u64 = TCR_SH0_IS | TCR_SH1_IS;
+/// `TCR_T1SZ_SHIFT`.
+pub const TCR_T1SZ_SHIFT: u32 = 16;
 /// `TCR_T1SZ(x)`: the size offset of the `TTBR1_EL1` region (64 minus its address bits).
 pub const fn tcr_t1sz(x: u64) -> u64 {
     x << 16
@@ -375,6 +448,17 @@ pub const MPIDR_AFF1: u64 = 0xFF << 8;
 pub const MPIDR_AFF0: u64 = 0xFF;
 /// `MPIDR_AFF`: the four affinity levels, a CPU's address in the device tree.
 pub const MPIDR_AFF: u64 = MPIDR_AFF3 | MPIDR_AFF2 | MPIDR_AFF1 | MPIDR_AFF0;
+/// `DCZID_DZP`: DC ZVA prohibited if non-0.
+pub const DCZID_DZP: u64 = 1 << 4;
+/// `DCZID_BS_SHIFT`.
+pub const DCZID_BS_SHIFT: u32 = 0;
+/// `DCZID_BS_MASK`.
+pub const DCZID_BS_MASK: u64 = 0xf << DCZID_BS_SHIFT;
+
+/// `DCZID_BS_SIZE(reg)`.
+pub const fn dczid_bs_size(reg: u64) -> u64 {
+    (reg & DCZID_BS_MASK) >> DCZID_BS_SHIFT
+}
 
 /// `ESR_ELx_ISS_MASK`: the instruction specific syndrome.
 pub const ESR_ELX_ISS_MASK: u64 = 0x00ff_ffff;
@@ -410,21 +494,66 @@ pub const ISS_DATA_S1PTW: u64 = 0x01 << 7;
 pub const ISS_DATA_WNR: u64 = 0x01 << 6;
 /// `ISS_DATA_DFSC_MASK`: the data fault status code.
 pub const ISS_DATA_DFSC_MASK: u64 = 0x3f;
+/// `ISS_DATA_DFSC_ASF_L0`.
+pub const ISS_DATA_DFSC_ASF_L0: u64 = 0x00;
+/// `ISS_DATA_DFSC_ASF_L1`.
+pub const ISS_DATA_DFSC_ASF_L1: u64 = 0x01;
+/// `ISS_DATA_DFSC_ASF_L2`.
+pub const ISS_DATA_DFSC_ASF_L2: u64 = 0x02;
+/// `ISS_DATA_DFSC_ASF_L3`.
+pub const ISS_DATA_DFSC_ASF_L3: u64 = 0x03;
 /// `ISS_DATA_DFSC_TF_L0`: translation fault, level 0 (`_L1` to `_L3` follow).
 pub const ISS_DATA_DFSC_TF_L0: u64 = 0x04;
+/// `ISS_DATA_DFSC_TF_L1`.
+pub const ISS_DATA_DFSC_TF_L1: u64 = 0x05;
+/// `ISS_DATA_DFSC_TF_L2`.
+pub const ISS_DATA_DFSC_TF_L2: u64 = 0x06;
 /// `ISS_DATA_DFSC_TF_L3`.
 pub const ISS_DATA_DFSC_TF_L3: u64 = 0x07;
 /// `ISS_DATA_DFSC_AFF_L1`: access flag fault, level 1.
 pub const ISS_DATA_DFSC_AFF_L1: u64 = 0x09;
+/// `ISS_DATA_DFSC_AFF_L2`.
+pub const ISS_DATA_DFSC_AFF_L2: u64 = 0x0a;
+/// `ISS_DATA_DFSC_AFF_L3`.
+pub const ISS_DATA_DFSC_AFF_L3: u64 = 0x0b;
 /// `ISS_DATA_DFSC_PF_L1`: permission fault, level 1.
 pub const ISS_DATA_DFSC_PF_L1: u64 = 0x0d;
+/// `ISS_DATA_DFSC_PF_L2`.
+pub const ISS_DATA_DFSC_PF_L2: u64 = 0x0e;
 /// `ISS_DATA_DFSC_PF_L3`.
 pub const ISS_DATA_DFSC_PF_L3: u64 = 0x0f;
+/// `ISS_DATA_DFSC_EXT`.
+pub const ISS_DATA_DFSC_EXT: u64 = 0x10;
+/// `ISS_DATA_DFSC_EXT_L0`.
+pub const ISS_DATA_DFSC_EXT_L0: u64 = 0x14;
+/// `ISS_DATA_DFSC_EXT_L1`.
+pub const ISS_DATA_DFSC_EXT_L1: u64 = 0x15;
+/// `ISS_DATA_DFSC_EXT_L2`.
+pub const ISS_DATA_DFSC_EXT_L2: u64 = 0x16;
+/// `ISS_DATA_DFSC_EXT_L3`.
+pub const ISS_DATA_DFSC_EXT_L3: u64 = 0x17;
+/// `ISS_DATA_DFSC_ECC`.
+pub const ISS_DATA_DFSC_ECC: u64 = 0x18;
+/// `ISS_DATA_DFSC_ECC_L0`.
+pub const ISS_DATA_DFSC_ECC_L0: u64 = 0x1c;
+/// `ISS_DATA_DFSC_ECC_L1`.
+pub const ISS_DATA_DFSC_ECC_L1: u64 = 0x1d;
+/// `ISS_DATA_DFSC_ECC_L2`.
+pub const ISS_DATA_DFSC_ECC_L2: u64 = 0x1e;
+/// `ISS_DATA_DFSC_ECC_L3`.
+pub const ISS_DATA_DFSC_ECC_L3: u64 = 0x1f;
 /// `ISS_DATA_DFSC_ALIGN`: alignment fault.
 pub const ISS_DATA_DFSC_ALIGN: u64 = 0x21;
+/// `ISS_DATA_DFSC_TLB_CONFLICT`.
+pub const ISS_DATA_DFSC_TLB_CONFLICT: u64 = 0x30;
+/// `ISS_MSR_DIR_SHIFT`.
+pub const ISS_MSR_DIR_SHIFT: u32 = 0;
 
 /// `ISS_BRK_COMMENT_MASK`: the immediate of a `brk` instruction.
 pub const ISS_BRK_COMMENT_MASK: u64 = 0xffff;
+/// `ESR_ELx_IL`.
+#[allow(non_upper_case_globals)] // the C name
+pub const ESR_ELx_IL: u64 = 0x01 << 25;
 /// `ISS_MSR_DIR`: a read (`mrs`).
 pub const ISS_MSR_DIR: u64 = 0x01;
 /// `ISS_MSR_Rt_SHIFT`.
@@ -517,6 +646,44 @@ pub const DBG_MDSCR_TDCC: u64 = 0x1 << 12;
 pub const DBG_MDSCR_KDE: u64 = 0x1 << 13;
 /// `DBG_MDSCR_MDE`: monitor debug events enable.
 pub const DBG_MDSCR_MDE: u64 = 0x1 << 15;
+/// `PMCR_E`: Enable all counters.
+pub const PMCR_E: u64 = 1;
+/// `PMCR_P`: Reset all counters.
+pub const PMCR_P: u64 = 1 << 1;
+/// `PMCR_C`: Clock counter reset.
+pub const PMCR_C: u64 = 1 << 2;
+/// `PMCR_D`: CNTR counts every 64 clk cycles.
+pub const PMCR_D: u64 = 1 << 3;
+/// `PMCR_X`: Export to ext. monitoring (ETM).
+pub const PMCR_X: u64 = 1 << 4;
+/// `PMCR_DP`: Disable CCNT if non-invasive debug.
+pub const PMCR_DP: u64 = 1 << 5;
+/// `PMCR_LC`: Long cycle count enable.
+pub const PMCR_LC: u64 = 1 << 6;
+/// `PMCR_IMP_SHIFT`: Implementer code.
+pub const PMCR_IMP_SHIFT: u32 = 24;
+/// `PMCR_IMP_MASK`.
+pub const PMCR_IMP_MASK: u64 = 0xff << PMCR_IMP_SHIFT;
+/// `PMCR_IDCODE_SHIFT`: Identification code.
+pub const PMCR_IDCODE_SHIFT: u32 = 16;
+/// `PMCR_IDCODE_MASK`.
+pub const PMCR_IDCODE_MASK: u64 = 0xff << PMCR_IDCODE_SHIFT;
+/// `PMCR_IDCODE_CORTEX_A57`.
+pub const PMCR_IDCODE_CORTEX_A57: u64 = 0x01;
+/// `PMCR_IDCODE_CORTEX_A72`.
+pub const PMCR_IDCODE_CORTEX_A72: u64 = 0x02;
+/// `PMCR_IDCODE_CORTEX_A53`.
+pub const PMCR_IDCODE_CORTEX_A53: u64 = 0x03;
+/// `PMCR_N_SHIFT`: Number of counters implemented.
+pub const PMCR_N_SHIFT: u32 = 11;
+/// `PMCR_N_MASK`.
+pub const PMCR_N_MASK: u64 = 0x1f << PMCR_N_SHIFT;
+/// `I_bit`: IRQ disable.
+#[allow(non_upper_case_globals)] // the C name
+pub const I_bit: u64 = 1 << 7;
+/// `F_bit`: FIQ disable - not actually used.
+#[allow(non_upper_case_globals)] // the C name
+pub const F_bit: u64 = 0;
 
 /// `PSR_M_EL0t`.
 pub const PSR_M_EL0T: u64 = 0x0000_0000;
@@ -536,17 +703,27 @@ pub const PSR_F: u64 = 0x0000_0040;
 pub const PSR_I: u64 = 0x0000_0080;
 /// `PSR_BTYPE`: the branch type of the last indirect branch (BTI).
 pub const PSR_BTYPE: u64 = 0x0000_0c00;
+/// `PSR_SSBS`.
+pub const PSR_SSBS: u64 = 0x0000_1000;
+/// `PSR_IL`.
+pub const PSR_IL: u64 = 0x0010_0000;
 /// `PSR_M_EL0t`: the EL0 mode (`SPSR_EL1.M`).
 #[allow(non_upper_case_globals)]
 pub const PSR_M_EL0t: u64 = 0x0000_0000;
 /// `PSR_DIT`: data independent timing.
 pub const PSR_DIT: u64 = 0x0100_0000;
+/// `PSR_TCO`.
+pub const PSR_TCO: u64 = 0x0200_0000;
 /// `PSR_A`: SError masked.
 pub const PSR_A: u64 = 0x0000_0100;
 /// `PSR_D`: debug exceptions masked.
 pub const PSR_D: u64 = 0x0000_0200;
 /// `PSR_SS`: software step.
 pub const PSR_SS: u64 = 0x0020_0000;
+/// `PSR_PAN`.
+pub const PSR_PAN: u64 = 0x0040_0000;
+/// `PSR_UAO`.
+pub const PSR_UAO: u64 = 0x0080_0000;
 /// `PSR_V`.
 pub const PSR_V: u64 = 0x1000_0000;
 /// `PSR_C`.
@@ -564,6 +741,12 @@ pub const ID_AA64DFR0_MASK: u64 = 0x00000000f0f0ffff;
 pub const ID_AA64DFR0_DEBUG_VER_SHIFT: u32 = 0;
 /// `ID_AA64DFR0_DEBUG_VER_MASK`.
 pub const ID_AA64DFR0_DEBUG_VER_MASK: u64 = 0xf << ID_AA64DFR0_DEBUG_VER_SHIFT;
+
+/// `ID_AA64DFR0_DEBUG_VER(x)`.
+pub const fn id_aa64dfr0_debug_ver(x: u64) -> u64 {
+    x & ID_AA64DFR0_DEBUG_VER_MASK
+}
+
 /// `ID_AA64DFR0_DEBUG_VER_8`.
 pub const ID_AA64DFR0_DEBUG_VER_8: u64 = 0x6 << ID_AA64DFR0_DEBUG_VER_SHIFT;
 /// `ID_AA64DFR0_DEBUG_VER_8_VHE`.
@@ -572,6 +755,12 @@ pub const ID_AA64DFR0_DEBUG_VER_8_VHE: u64 = 0x7 << ID_AA64DFR0_DEBUG_VER_SHIFT;
 pub const ID_AA64DFR0_TRACE_VER_SHIFT: u32 = 4;
 /// `ID_AA64DFR0_TRACE_VER_MASK`.
 pub const ID_AA64DFR0_TRACE_VER_MASK: u64 = 0xf << ID_AA64DFR0_TRACE_VER_SHIFT;
+
+/// `ID_AA64DFR0_TRACE_VER(x)`.
+pub const fn id_aa64dfr0_trace_ver(x: u64) -> u64 {
+    x & ID_AA64DFR0_TRACE_VER_MASK
+}
+
 /// `ID_AA64DFR0_TRACE_VER_NONE`.
 pub const ID_AA64DFR0_TRACE_VER_NONE: u64 = 0x0 << ID_AA64DFR0_TRACE_VER_SHIFT;
 /// `ID_AA64DFR0_TRACE_VER_IMPL`.
@@ -580,6 +769,12 @@ pub const ID_AA64DFR0_TRACE_VER_IMPL: u64 = 0x1 << ID_AA64DFR0_TRACE_VER_SHIFT;
 pub const ID_AA64DFR0_PMU_VER_SHIFT: u32 = 8;
 /// `ID_AA64DFR0_PMU_VER_MASK`.
 pub const ID_AA64DFR0_PMU_VER_MASK: u64 = 0xf << ID_AA64DFR0_PMU_VER_SHIFT;
+
+/// `ID_AA64DFR0_PMU_VER(x)`.
+pub const fn id_aa64dfr0_pmu_ver(x: u64) -> u64 {
+    x & ID_AA64DFR0_PMU_VER_MASK
+}
+
 /// `ID_AA64DFR0_PMU_VER_NONE`.
 pub const ID_AA64DFR0_PMU_VER_NONE: u64 = 0x0 << ID_AA64DFR0_PMU_VER_SHIFT;
 /// `ID_AA64DFR0_PMU_VER_3`.
@@ -592,14 +787,31 @@ pub const ID_AA64DFR0_PMU_VER_IMPL: u64 = 0xf << ID_AA64DFR0_PMU_VER_SHIFT;
 pub const ID_AA64DFR0_BRPS_SHIFT: u32 = 12;
 /// `ID_AA64DFR0_BRPS_MASK`.
 pub const ID_AA64DFR0_BRPS_MASK: u64 = 0xf << ID_AA64DFR0_BRPS_SHIFT;
+
+/// `ID_AA64DFR0_BRPS(x)`.
+pub const fn id_aa64dfr0_brps(x: u64) -> u64 {
+    ((x >> ID_AA64DFR0_BRPS_SHIFT) & 0xf) + 1
+}
+
 /// `ID_AA64DFR0_WRPS_SHIFT`.
 pub const ID_AA64DFR0_WRPS_SHIFT: u32 = 20;
 /// `ID_AA64DFR0_WRPS_MASK`.
 pub const ID_AA64DFR0_WRPS_MASK: u64 = 0xf << ID_AA64DFR0_WRPS_SHIFT;
+
+/// `ID_AA64DFR0_WRPS(x)`.
+pub const fn id_aa64dfr0_wrps(x: u64) -> u64 {
+    ((x >> ID_AA64DFR0_WRPS_SHIFT) & 0xf) + 1
+}
+
 /// `ID_AA64DFR0_CTX_CMPS_SHIFT`.
 pub const ID_AA64DFR0_CTX_CMPS_SHIFT: u32 = 28;
 /// `ID_AA64DFR0_CTX_CMPS_MASK`.
 pub const ID_AA64DFR0_CTX_CMPS_MASK: u64 = 0xf << ID_AA64DFR0_CTX_CMPS_SHIFT;
+
+/// `ID_AA64DFR0_CTX_CMPS(x)`.
+pub const fn id_aa64dfr0_ctx_cmps(x: u64) -> u64 {
+    ((x >> ID_AA64DFR0_CTX_CMPS_SHIFT) & 0xf) + 1
+}
 
 // ID_AA64ISAR0_EL1
 
@@ -609,6 +821,12 @@ pub const ID_AA64ISAR0_MASK: u64 = 0xfffffffff0fffff0;
 pub const ID_AA64ISAR0_AES_SHIFT: u32 = 4;
 /// `ID_AA64ISAR0_AES_MASK`.
 pub const ID_AA64ISAR0_AES_MASK: u64 = 0xf << ID_AA64ISAR0_AES_SHIFT;
+
+/// `ID_AA64ISAR0_AES(x)`.
+pub const fn id_aa64isar0_aes(x: u64) -> u64 {
+    x & ID_AA64ISAR0_AES_MASK
+}
+
 /// `ID_AA64ISAR0_AES_NONE`.
 pub const ID_AA64ISAR0_AES_NONE: u64 = 0x0 << ID_AA64ISAR0_AES_SHIFT;
 /// `ID_AA64ISAR0_AES_BASE`.
@@ -619,6 +837,12 @@ pub const ID_AA64ISAR0_AES_PMULL: u64 = 0x2 << ID_AA64ISAR0_AES_SHIFT;
 pub const ID_AA64ISAR0_SHA1_SHIFT: u32 = 8;
 /// `ID_AA64ISAR0_SHA1_MASK`.
 pub const ID_AA64ISAR0_SHA1_MASK: u64 = 0xf << ID_AA64ISAR0_SHA1_SHIFT;
+
+/// `ID_AA64ISAR0_SHA1(x)`.
+pub const fn id_aa64isar0_sha1(x: u64) -> u64 {
+    x & ID_AA64ISAR0_SHA1_MASK
+}
+
 /// `ID_AA64ISAR0_SHA1_NONE`.
 pub const ID_AA64ISAR0_SHA1_NONE: u64 = 0x0 << ID_AA64ISAR0_SHA1_SHIFT;
 /// `ID_AA64ISAR0_SHA1_BASE`.
@@ -627,6 +851,12 @@ pub const ID_AA64ISAR0_SHA1_BASE: u64 = 0x1 << ID_AA64ISAR0_SHA1_SHIFT;
 pub const ID_AA64ISAR0_SHA2_SHIFT: u32 = 12;
 /// `ID_AA64ISAR0_SHA2_MASK`.
 pub const ID_AA64ISAR0_SHA2_MASK: u64 = 0xf << ID_AA64ISAR0_SHA2_SHIFT;
+
+/// `ID_AA64ISAR0_SHA2(x)`.
+pub const fn id_aa64isar0_sha2(x: u64) -> u64 {
+    x & ID_AA64ISAR0_SHA2_MASK
+}
+
 /// `ID_AA64ISAR0_SHA2_NONE`.
 pub const ID_AA64ISAR0_SHA2_NONE: u64 = 0x0 << ID_AA64ISAR0_SHA2_SHIFT;
 /// `ID_AA64ISAR0_SHA2_BASE`.
@@ -637,6 +867,12 @@ pub const ID_AA64ISAR0_SHA2_512: u64 = 0x2 << ID_AA64ISAR0_SHA2_SHIFT;
 pub const ID_AA64ISAR0_CRC32_SHIFT: u32 = 16;
 /// `ID_AA64ISAR0_CRC32_MASK`.
 pub const ID_AA64ISAR0_CRC32_MASK: u64 = 0xf << ID_AA64ISAR0_CRC32_SHIFT;
+
+/// `ID_AA64ISAR0_CRC32(x)`.
+pub const fn id_aa64isar0_crc32(x: u64) -> u64 {
+    x & ID_AA64ISAR0_CRC32_MASK
+}
+
 /// `ID_AA64ISAR0_CRC32_NONE`.
 pub const ID_AA64ISAR0_CRC32_NONE: u64 = 0x0 << ID_AA64ISAR0_CRC32_SHIFT;
 /// `ID_AA64ISAR0_CRC32_BASE`.
@@ -645,6 +881,12 @@ pub const ID_AA64ISAR0_CRC32_BASE: u64 = 0x1 << ID_AA64ISAR0_CRC32_SHIFT;
 pub const ID_AA64ISAR0_ATOMIC_SHIFT: u32 = 20;
 /// `ID_AA64ISAR0_ATOMIC_MASK`.
 pub const ID_AA64ISAR0_ATOMIC_MASK: u64 = 0xf << ID_AA64ISAR0_ATOMIC_SHIFT;
+
+/// `ID_AA64ISAR0_ATOMIC(x)`.
+pub const fn id_aa64isar0_atomic(x: u64) -> u64 {
+    x & ID_AA64ISAR0_ATOMIC_MASK
+}
+
 /// `ID_AA64ISAR0_ATOMIC_NONE`.
 pub const ID_AA64ISAR0_ATOMIC_NONE: u64 = 0x0 << ID_AA64ISAR0_ATOMIC_SHIFT;
 /// `ID_AA64ISAR0_ATOMIC_IMPL`.
@@ -653,6 +895,12 @@ pub const ID_AA64ISAR0_ATOMIC_IMPL: u64 = 0x2 << ID_AA64ISAR0_ATOMIC_SHIFT;
 pub const ID_AA64ISAR0_RDM_SHIFT: u32 = 28;
 /// `ID_AA64ISAR0_RDM_MASK`.
 pub const ID_AA64ISAR0_RDM_MASK: u64 = 0xf << ID_AA64ISAR0_RDM_SHIFT;
+
+/// `ID_AA64ISAR0_RDM(x)`.
+pub const fn id_aa64isar0_rdm(x: u64) -> u64 {
+    x & ID_AA64ISAR0_RDM_MASK
+}
+
 /// `ID_AA64ISAR0_RDM_NONE`.
 pub const ID_AA64ISAR0_RDM_NONE: u64 = 0x0 << ID_AA64ISAR0_RDM_SHIFT;
 /// `ID_AA64ISAR0_RDM_IMPL`.
@@ -661,6 +909,12 @@ pub const ID_AA64ISAR0_RDM_IMPL: u64 = 0x1 << ID_AA64ISAR0_RDM_SHIFT;
 pub const ID_AA64ISAR0_SHA3_SHIFT: u32 = 32;
 /// `ID_AA64ISAR0_SHA3_MASK`.
 pub const ID_AA64ISAR0_SHA3_MASK: u64 = 0xf << ID_AA64ISAR0_SHA3_SHIFT;
+
+/// `ID_AA64ISAR0_SHA3(x)`.
+pub const fn id_aa64isar0_sha3(x: u64) -> u64 {
+    x & ID_AA64ISAR0_SHA3_MASK
+}
+
 /// `ID_AA64ISAR0_SHA3_NONE`.
 pub const ID_AA64ISAR0_SHA3_NONE: u64 = 0x0 << ID_AA64ISAR0_SHA3_SHIFT;
 /// `ID_AA64ISAR0_SHA3_IMPL`.
@@ -669,6 +923,12 @@ pub const ID_AA64ISAR0_SHA3_IMPL: u64 = 0x1 << ID_AA64ISAR0_SHA3_SHIFT;
 pub const ID_AA64ISAR0_SM3_SHIFT: u32 = 36;
 /// `ID_AA64ISAR0_SM3_MASK`.
 pub const ID_AA64ISAR0_SM3_MASK: u64 = 0xf << ID_AA64ISAR0_SM3_SHIFT;
+
+/// `ID_AA64ISAR0_SM3(x)`.
+pub const fn id_aa64isar0_sm3(x: u64) -> u64 {
+    x & ID_AA64ISAR0_SM3_MASK
+}
+
 /// `ID_AA64ISAR0_SM3_NONE`.
 pub const ID_AA64ISAR0_SM3_NONE: u64 = 0x0 << ID_AA64ISAR0_SM3_SHIFT;
 /// `ID_AA64ISAR0_SM3_IMPL`.
@@ -677,6 +937,12 @@ pub const ID_AA64ISAR0_SM3_IMPL: u64 = 0x1 << ID_AA64ISAR0_SM3_SHIFT;
 pub const ID_AA64ISAR0_SM4_SHIFT: u32 = 40;
 /// `ID_AA64ISAR0_SM4_MASK`.
 pub const ID_AA64ISAR0_SM4_MASK: u64 = 0xf << ID_AA64ISAR0_SM4_SHIFT;
+
+/// `ID_AA64ISAR0_SM4(x)`.
+pub const fn id_aa64isar0_sm4(x: u64) -> u64 {
+    x & ID_AA64ISAR0_SM4_MASK
+}
+
 /// `ID_AA64ISAR0_SM4_NONE`.
 pub const ID_AA64ISAR0_SM4_NONE: u64 = 0x0 << ID_AA64ISAR0_SM4_SHIFT;
 /// `ID_AA64ISAR0_SM4_IMPL`.
@@ -685,6 +951,12 @@ pub const ID_AA64ISAR0_SM4_IMPL: u64 = 0x1 << ID_AA64ISAR0_SM4_SHIFT;
 pub const ID_AA64ISAR0_DP_SHIFT: u32 = 44;
 /// `ID_AA64ISAR0_DP_MASK`.
 pub const ID_AA64ISAR0_DP_MASK: u64 = 0xf << ID_AA64ISAR0_DP_SHIFT;
+
+/// `ID_AA64ISAR0_DP(x)`.
+pub const fn id_aa64isar0_dp(x: u64) -> u64 {
+    x & ID_AA64ISAR0_DP_MASK
+}
+
 /// `ID_AA64ISAR0_DP_NONE`.
 pub const ID_AA64ISAR0_DP_NONE: u64 = 0x0 << ID_AA64ISAR0_DP_SHIFT;
 /// `ID_AA64ISAR0_DP_IMPL`.
@@ -693,6 +965,12 @@ pub const ID_AA64ISAR0_DP_IMPL: u64 = 0x1 << ID_AA64ISAR0_DP_SHIFT;
 pub const ID_AA64ISAR0_FHM_SHIFT: u32 = 48;
 /// `ID_AA64ISAR0_FHM_MASK`.
 pub const ID_AA64ISAR0_FHM_MASK: u64 = 0xf << ID_AA64ISAR0_FHM_SHIFT;
+
+/// `ID_AA64ISAR0_FHM(x)`.
+pub const fn id_aa64isar0_fhm(x: u64) -> u64 {
+    x & ID_AA64ISAR0_FHM_MASK
+}
+
 /// `ID_AA64ISAR0_FHM_NONE`.
 pub const ID_AA64ISAR0_FHM_NONE: u64 = 0x0 << ID_AA64ISAR0_FHM_SHIFT;
 /// `ID_AA64ISAR0_FHM_IMPL`.
@@ -701,6 +979,12 @@ pub const ID_AA64ISAR0_FHM_IMPL: u64 = 0x1 << ID_AA64ISAR0_FHM_SHIFT;
 pub const ID_AA64ISAR0_TS_SHIFT: u32 = 52;
 /// `ID_AA64ISAR0_TS_MASK`.
 pub const ID_AA64ISAR0_TS_MASK: u64 = 0xf << ID_AA64ISAR0_TS_SHIFT;
+
+/// `ID_AA64ISAR0_TS(x)`.
+pub const fn id_aa64isar0_ts(x: u64) -> u64 {
+    x & ID_AA64ISAR0_TS_MASK
+}
+
 /// `ID_AA64ISAR0_TS_NONE`.
 pub const ID_AA64ISAR0_TS_NONE: u64 = 0x0 << ID_AA64ISAR0_TS_SHIFT;
 /// `ID_AA64ISAR0_TS_BASE`.
@@ -711,6 +995,12 @@ pub const ID_AA64ISAR0_TS_AXFLAG: u64 = 0x2 << ID_AA64ISAR0_TS_SHIFT;
 pub const ID_AA64ISAR0_TLB_SHIFT: u32 = 56;
 /// `ID_AA64ISAR0_TLB_MASK`.
 pub const ID_AA64ISAR0_TLB_MASK: u64 = 0xf << ID_AA64ISAR0_TLB_SHIFT;
+
+/// `ID_AA64ISAR0_TLB(x)`.
+pub const fn id_aa64isar0_tlb(x: u64) -> u64 {
+    x & ID_AA64ISAR0_TLB_MASK
+}
+
 /// `ID_AA64ISAR0_TLB_NONE`.
 pub const ID_AA64ISAR0_TLB_NONE: u64 = 0x0 << ID_AA64ISAR0_TLB_SHIFT;
 /// `ID_AA64ISAR0_TLB_IOS`.
@@ -721,6 +1011,12 @@ pub const ID_AA64ISAR0_TLB_IRANGE: u64 = 0x2 << ID_AA64ISAR0_TLB_SHIFT;
 pub const ID_AA64ISAR0_RNDR_SHIFT: u32 = 60;
 /// `ID_AA64ISAR0_RNDR_MASK`.
 pub const ID_AA64ISAR0_RNDR_MASK: u64 = 0xf << ID_AA64ISAR0_RNDR_SHIFT;
+
+/// `ID_AA64ISAR0_RNDR(x)`.
+pub const fn id_aa64isar0_rndr(x: u64) -> u64 {
+    x & ID_AA64ISAR0_RNDR_MASK
+}
+
 /// `ID_AA64ISAR0_RNDR_NONE`.
 pub const ID_AA64ISAR0_RNDR_NONE: u64 = 0x0 << ID_AA64ISAR0_RNDR_SHIFT;
 /// `ID_AA64ISAR0_RNDR_IMPL`.
@@ -734,6 +1030,12 @@ pub const ID_AA64ISAR1_MASK: u64 = 0xffffffffffffffff;
 pub const ID_AA64ISAR1_DPB_SHIFT: u32 = 0;
 /// `ID_AA64ISAR1_DPB_MASK`.
 pub const ID_AA64ISAR1_DPB_MASK: u64 = 0xf << ID_AA64ISAR1_DPB_SHIFT;
+
+/// `ID_AA64ISAR1_DPB(x)`.
+pub const fn id_aa64isar1_dpb(x: u64) -> u64 {
+    x & ID_AA64ISAR1_DPB_MASK
+}
+
 /// `ID_AA64ISAR1_DPB_NONE`.
 pub const ID_AA64ISAR1_DPB_NONE: u64 = 0x0 << ID_AA64ISAR1_DPB_SHIFT;
 /// `ID_AA64ISAR1_DPB_IMPL`.
@@ -744,6 +1046,12 @@ pub const ID_AA64ISAR1_DPB_DCCVADP: u64 = 0x2 << ID_AA64ISAR1_DPB_SHIFT;
 pub const ID_AA64ISAR1_APA_SHIFT: u32 = 4;
 /// `ID_AA64ISAR1_APA_MASK`.
 pub const ID_AA64ISAR1_APA_MASK: u64 = 0xf << ID_AA64ISAR1_APA_SHIFT;
+
+/// `ID_AA64ISAR1_APA(x)`.
+pub const fn id_aa64isar1_apa(x: u64) -> u64 {
+    x & ID_AA64ISAR1_APA_MASK
+}
+
 /// `ID_AA64ISAR1_APA_NONE`.
 pub const ID_AA64ISAR1_APA_NONE: u64 = 0x0 << ID_AA64ISAR1_APA_SHIFT;
 /// `ID_AA64ISAR1_APA_PAC`.
@@ -760,6 +1068,12 @@ pub const ID_AA64ISAR1_APA_FPAC_COMBINED: u64 = 0x5 << ID_AA64ISAR1_APA_SHIFT;
 pub const ID_AA64ISAR1_API_SHIFT: u32 = 8;
 /// `ID_AA64ISAR1_API_MASK`.
 pub const ID_AA64ISAR1_API_MASK: u64 = 0xf << ID_AA64ISAR1_API_SHIFT;
+
+/// `ID_AA64ISAR1_API(x)`.
+pub const fn id_aa64isar1_api(x: u64) -> u64 {
+    x & ID_AA64ISAR1_API_MASK
+}
+
 /// `ID_AA64ISAR1_API_NONE`.
 pub const ID_AA64ISAR1_API_NONE: u64 = 0x0 << ID_AA64ISAR1_API_SHIFT;
 /// `ID_AA64ISAR1_API_PAC`.
@@ -776,6 +1090,12 @@ pub const ID_AA64ISAR1_API_FPAC_COMBINED: u64 = 0x5 << ID_AA64ISAR1_API_SHIFT;
 pub const ID_AA64ISAR1_JSCVT_SHIFT: u32 = 12;
 /// `ID_AA64ISAR1_JSCVT_MASK`.
 pub const ID_AA64ISAR1_JSCVT_MASK: u64 = 0xf << ID_AA64ISAR1_JSCVT_SHIFT;
+
+/// `ID_AA64ISAR1_JSCVT(x)`.
+pub const fn id_aa64isar1_jscvt(x: u64) -> u64 {
+    x & ID_AA64ISAR1_JSCVT_MASK
+}
+
 /// `ID_AA64ISAR1_JSCVT_NONE`.
 pub const ID_AA64ISAR1_JSCVT_NONE: u64 = 0x0 << ID_AA64ISAR1_JSCVT_SHIFT;
 /// `ID_AA64ISAR1_JSCVT_IMPL`.
@@ -784,6 +1104,12 @@ pub const ID_AA64ISAR1_JSCVT_IMPL: u64 = 0x1 << ID_AA64ISAR1_JSCVT_SHIFT;
 pub const ID_AA64ISAR1_FCMA_SHIFT: u32 = 16;
 /// `ID_AA64ISAR1_FCMA_MASK`.
 pub const ID_AA64ISAR1_FCMA_MASK: u64 = 0xf << ID_AA64ISAR1_FCMA_SHIFT;
+
+/// `ID_AA64ISAR1_FCMA(x)`.
+pub const fn id_aa64isar1_fcma(x: u64) -> u64 {
+    x & ID_AA64ISAR1_FCMA_MASK
+}
+
 /// `ID_AA64ISAR1_FCMA_NONE`.
 pub const ID_AA64ISAR1_FCMA_NONE: u64 = 0x0 << ID_AA64ISAR1_FCMA_SHIFT;
 /// `ID_AA64ISAR1_FCMA_IMPL`.
@@ -792,6 +1118,12 @@ pub const ID_AA64ISAR1_FCMA_IMPL: u64 = 0x1 << ID_AA64ISAR1_FCMA_SHIFT;
 pub const ID_AA64ISAR1_LRCPC_SHIFT: u32 = 20;
 /// `ID_AA64ISAR1_LRCPC_MASK`.
 pub const ID_AA64ISAR1_LRCPC_MASK: u64 = 0xf << ID_AA64ISAR1_LRCPC_SHIFT;
+
+/// `ID_AA64ISAR1_LRCPC(x)`.
+pub const fn id_aa64isar1_lrcpc(x: u64) -> u64 {
+    x & ID_AA64ISAR1_LRCPC_MASK
+}
+
 /// `ID_AA64ISAR1_LRCPC_NONE`.
 pub const ID_AA64ISAR1_LRCPC_NONE: u64 = 0x0 << ID_AA64ISAR1_LRCPC_SHIFT;
 /// `ID_AA64ISAR1_LRCPC_BASE`.
@@ -802,6 +1134,12 @@ pub const ID_AA64ISAR1_LRCPC_LDAPUR: u64 = 0x2 << ID_AA64ISAR1_LRCPC_SHIFT;
 pub const ID_AA64ISAR1_GPA_SHIFT: u32 = 24;
 /// `ID_AA64ISAR1_GPA_MASK`.
 pub const ID_AA64ISAR1_GPA_MASK: u64 = 0xf << ID_AA64ISAR1_GPA_SHIFT;
+
+/// `ID_AA64ISAR1_GPA(x)`.
+pub const fn id_aa64isar1_gpa(x: u64) -> u64 {
+    x & ID_AA64ISAR1_GPA_MASK
+}
+
 /// `ID_AA64ISAR1_GPA_NONE`.
 pub const ID_AA64ISAR1_GPA_NONE: u64 = 0x0 << ID_AA64ISAR1_GPA_SHIFT;
 /// `ID_AA64ISAR1_GPA_IMPL`.
@@ -810,6 +1148,12 @@ pub const ID_AA64ISAR1_GPA_IMPL: u64 = 0x1 << ID_AA64ISAR1_GPA_SHIFT;
 pub const ID_AA64ISAR1_GPI_SHIFT: u32 = 28;
 /// `ID_AA64ISAR1_GPI_MASK`.
 pub const ID_AA64ISAR1_GPI_MASK: u64 = 0xf << ID_AA64ISAR1_GPI_SHIFT;
+
+/// `ID_AA64ISAR1_GPI(x)`.
+pub const fn id_aa64isar1_gpi(x: u64) -> u64 {
+    x & ID_AA64ISAR1_GPI_MASK
+}
+
 /// `ID_AA64ISAR1_GPI_NONE`.
 pub const ID_AA64ISAR1_GPI_NONE: u64 = 0x0 << ID_AA64ISAR1_GPI_SHIFT;
 /// `ID_AA64ISAR1_GPI_IMPL`.
@@ -818,6 +1162,12 @@ pub const ID_AA64ISAR1_GPI_IMPL: u64 = 0x1 << ID_AA64ISAR1_GPI_SHIFT;
 pub const ID_AA64ISAR1_FRINTTS_SHIFT: u32 = 32;
 /// `ID_AA64ISAR1_FRINTTS_MASK`.
 pub const ID_AA64ISAR1_FRINTTS_MASK: u64 = 0xf << ID_AA64ISAR1_FRINTTS_SHIFT;
+
+/// `ID_AA64ISAR1_FRINTTS(x)`.
+pub const fn id_aa64isar1_frintts(x: u64) -> u64 {
+    x & ID_AA64ISAR1_FRINTTS_MASK
+}
+
 /// `ID_AA64ISAR1_FRINTTS_NONE`.
 pub const ID_AA64ISAR1_FRINTTS_NONE: u64 = 0x0 << ID_AA64ISAR1_FRINTTS_SHIFT;
 /// `ID_AA64ISAR1_FRINTTS_IMPL`.
@@ -826,6 +1176,12 @@ pub const ID_AA64ISAR1_FRINTTS_IMPL: u64 = 0x1 << ID_AA64ISAR1_FRINTTS_SHIFT;
 pub const ID_AA64ISAR1_SB_SHIFT: u32 = 36;
 /// `ID_AA64ISAR1_SB_MASK`.
 pub const ID_AA64ISAR1_SB_MASK: u64 = 0xf << ID_AA64ISAR1_SB_SHIFT;
+
+/// `ID_AA64ISAR1_SB(x)`.
+pub const fn id_aa64isar1_sb(x: u64) -> u64 {
+    x & ID_AA64ISAR1_SB_MASK
+}
+
 /// `ID_AA64ISAR1_SB_NONE`.
 pub const ID_AA64ISAR1_SB_NONE: u64 = 0x0 << ID_AA64ISAR1_SB_SHIFT;
 /// `ID_AA64ISAR1_SB_IMPL`.
@@ -834,6 +1190,12 @@ pub const ID_AA64ISAR1_SB_IMPL: u64 = 0x1 << ID_AA64ISAR1_SB_SHIFT;
 pub const ID_AA64ISAR1_SPECRES_SHIFT: u32 = 40;
 /// `ID_AA64ISAR1_SPECRES_MASK`.
 pub const ID_AA64ISAR1_SPECRES_MASK: u64 = 0xf << ID_AA64ISAR1_SPECRES_SHIFT;
+
+/// `ID_AA64ISAR1_SPECRES(x)`.
+pub const fn id_aa64isar1_specres(x: u64) -> u64 {
+    x & ID_AA64ISAR1_SPECRES_MASK
+}
+
 /// `ID_AA64ISAR1_SPECRES_NONE`.
 pub const ID_AA64ISAR1_SPECRES_NONE: u64 = 0x0 << ID_AA64ISAR1_SPECRES_SHIFT;
 /// `ID_AA64ISAR1_SPECRES_IMPL`.
@@ -842,6 +1204,12 @@ pub const ID_AA64ISAR1_SPECRES_IMPL: u64 = 0x1 << ID_AA64ISAR1_SPECRES_SHIFT;
 pub const ID_AA64ISAR1_BF16_SHIFT: u32 = 44;
 /// `ID_AA64ISAR1_BF16_MASK`.
 pub const ID_AA64ISAR1_BF16_MASK: u64 = 0xf << ID_AA64ISAR1_BF16_SHIFT;
+
+/// `ID_AA64ISAR1_BF16(x)`.
+pub const fn id_aa64isar1_bf16(x: u64) -> u64 {
+    x & ID_AA64ISAR1_BF16_MASK
+}
+
 /// `ID_AA64ISAR1_BF16_NONE`.
 pub const ID_AA64ISAR1_BF16_NONE: u64 = 0x0 << ID_AA64ISAR1_BF16_SHIFT;
 /// `ID_AA64ISAR1_BF16_BASE`.
@@ -852,6 +1220,12 @@ pub const ID_AA64ISAR1_BF16_EBF: u64 = 0x2 << ID_AA64ISAR1_BF16_SHIFT;
 pub const ID_AA64ISAR1_DGH_SHIFT: u32 = 48;
 /// `ID_AA64ISAR1_DGH_MASK`.
 pub const ID_AA64ISAR1_DGH_MASK: u64 = 0xf << ID_AA64ISAR1_DGH_SHIFT;
+
+/// `ID_AA64ISAR1_DGH(x)`.
+pub const fn id_aa64isar1_dgh(x: u64) -> u64 {
+    x & ID_AA64ISAR1_DGH_MASK
+}
+
 /// `ID_AA64ISAR1_DGH_NONE`.
 pub const ID_AA64ISAR1_DGH_NONE: u64 = 0x0 << ID_AA64ISAR1_DGH_SHIFT;
 /// `ID_AA64ISAR1_DGH_IMPL`.
@@ -860,6 +1234,12 @@ pub const ID_AA64ISAR1_DGH_IMPL: u64 = 0x1 << ID_AA64ISAR1_DGH_SHIFT;
 pub const ID_AA64ISAR1_I8MM_SHIFT: u32 = 52;
 /// `ID_AA64ISAR1_I8MM_MASK`.
 pub const ID_AA64ISAR1_I8MM_MASK: u64 = 0xf << ID_AA64ISAR1_I8MM_SHIFT;
+
+/// `ID_AA64ISAR1_I8MM(x)`.
+pub const fn id_aa64isar1_i8mm(x: u64) -> u64 {
+    x & ID_AA64ISAR1_I8MM_MASK
+}
+
 /// `ID_AA64ISAR1_I8MM_NONE`.
 pub const ID_AA64ISAR1_I8MM_NONE: u64 = 0x0 << ID_AA64ISAR1_I8MM_SHIFT;
 /// `ID_AA64ISAR1_I8MM_IMPL`.
@@ -868,6 +1248,12 @@ pub const ID_AA64ISAR1_I8MM_IMPL: u64 = 0x1 << ID_AA64ISAR1_I8MM_SHIFT;
 pub const ID_AA64ISAR1_XS_SHIFT: u32 = 56;
 /// `ID_AA64ISAR1_XS_MASK`.
 pub const ID_AA64ISAR1_XS_MASK: u64 = 0xf << ID_AA64ISAR1_XS_SHIFT;
+
+/// `ID_AA64ISAR1_XS(x)`.
+pub const fn id_aa64isar1_xs(x: u64) -> u64 {
+    x & ID_AA64ISAR1_XS_MASK
+}
+
 /// `ID_AA64ISAR1_XS_NONE`.
 pub const ID_AA64ISAR1_XS_NONE: u64 = 0x0 << ID_AA64ISAR1_XS_SHIFT;
 /// `ID_AA64ISAR1_XS_IMPL`.
@@ -876,6 +1262,12 @@ pub const ID_AA64ISAR1_XS_IMPL: u64 = 0x1 << ID_AA64ISAR1_XS_SHIFT;
 pub const ID_AA64ISAR1_LS64_SHIFT: u32 = 60;
 /// `ID_AA64ISAR1_LS64_MASK`.
 pub const ID_AA64ISAR1_LS64_MASK: u64 = 0xf << ID_AA64ISAR1_LS64_SHIFT;
+
+/// `ID_AA64ISAR1_LS64(x)`.
+pub const fn id_aa64isar1_ls64(x: u64) -> u64 {
+    x & ID_AA64ISAR1_LS64_MASK
+}
+
 /// `ID_AA64ISAR1_LS64_NONE`.
 pub const ID_AA64ISAR1_LS64_NONE: u64 = 0x0 << ID_AA64ISAR1_LS64_SHIFT;
 /// `ID_AA64ISAR1_LS64_BASE`.
@@ -893,6 +1285,12 @@ pub const ID_AA64ISAR2_MASK: u64 = 0x00ff0000f0ffffff;
 pub const ID_AA64ISAR2_WFXT_SHIFT: u32 = 0;
 /// `ID_AA64ISAR2_WFXT_MASK`.
 pub const ID_AA64ISAR2_WFXT_MASK: u64 = 0xf << ID_AA64ISAR2_WFXT_SHIFT;
+
+/// `ID_AA64ISAR2_WFXT(x)`.
+pub const fn id_aa64isar2_wfxt(x: u64) -> u64 {
+    x & ID_AA64ISAR2_WFXT_MASK
+}
+
 /// `ID_AA64ISAR2_WFXT_NONE`.
 pub const ID_AA64ISAR2_WFXT_NONE: u64 = 0x0 << ID_AA64ISAR2_WFXT_SHIFT;
 /// `ID_AA64ISAR2_WFXT_IMPL`.
@@ -901,6 +1299,12 @@ pub const ID_AA64ISAR2_WFXT_IMPL: u64 = 0x2 << ID_AA64ISAR2_WFXT_SHIFT;
 pub const ID_AA64ISAR2_RPRES_SHIFT: u32 = 4;
 /// `ID_AA64ISAR2_RPRES_MASK`.
 pub const ID_AA64ISAR2_RPRES_MASK: u64 = 0xf << ID_AA64ISAR2_RPRES_SHIFT;
+
+/// `ID_AA64ISAR2_RPRES(x)`.
+pub const fn id_aa64isar2_rpres(x: u64) -> u64 {
+    x & ID_AA64ISAR2_RPRES_MASK
+}
+
 /// `ID_AA64ISAR2_RPRES_NONE`.
 pub const ID_AA64ISAR2_RPRES_NONE: u64 = 0x0 << ID_AA64ISAR2_RPRES_SHIFT;
 /// `ID_AA64ISAR2_RPRES_IMPL`.
@@ -911,6 +1315,12 @@ pub const ID_AA64ISAR2_GPA3_SHIFT: u32 = 8;
 pub const ID_AA64ISAR2_GPA3_WIDTH: u64 = 4;
 /// `ID_AA64ISAR2_GPA3_MASK`.
 pub const ID_AA64ISAR2_GPA3_MASK: u64 = 0xf << ID_AA64ISAR2_GPA3_SHIFT;
+
+/// `ID_AA64ISAR2_GPA3(x)`.
+pub const fn id_aa64isar2_gpa3(x: u64) -> u64 {
+    x & ID_AA64ISAR2_GPA3_MASK
+}
+
 /// `ID_AA64ISAR2_GPA3_NONE`.
 pub const ID_AA64ISAR2_GPA3_NONE: u64 = 0x0 << ID_AA64ISAR2_GPA3_SHIFT;
 /// `ID_AA64ISAR2_GPA3_IMPL`.
@@ -921,6 +1331,12 @@ pub const ID_AA64ISAR2_APA3_SHIFT: u32 = 12;
 pub const ID_AA64ISAR2_APA3_WIDTH: u64 = 4;
 /// `ID_AA64ISAR2_APA3_MASK`.
 pub const ID_AA64ISAR2_APA3_MASK: u64 = 0xf << ID_AA64ISAR2_APA3_SHIFT;
+
+/// `ID_AA64ISAR2_APA3(x)`.
+pub const fn id_aa64isar2_apa3(x: u64) -> u64 {
+    x & ID_AA64ISAR2_APA3_MASK
+}
+
 /// `ID_AA64ISAR2_APA3_NONE`.
 pub const ID_AA64ISAR2_APA3_NONE: u64 = 0x0 << ID_AA64ISAR2_APA3_SHIFT;
 /// `ID_AA64ISAR2_APA3_PAC`.
@@ -937,6 +1353,12 @@ pub const ID_AA64ISAR2_APA3_FPAC_COMBINED: u64 = 0x5 << ID_AA64ISAR2_APA3_SHIFT;
 pub const ID_AA64ISAR2_MOPS_SHIFT: u32 = 16;
 /// `ID_AA64ISAR2_MOPS_MASK`.
 pub const ID_AA64ISAR2_MOPS_MASK: u64 = 0xf << ID_AA64ISAR2_MOPS_SHIFT;
+
+/// `ID_AA64ISAR2_MOPS(x)`.
+pub const fn id_aa64isar2_mops(x: u64) -> u64 {
+    x & ID_AA64ISAR2_MOPS_MASK
+}
+
 /// `ID_AA64ISAR2_MOPS_NONE`.
 pub const ID_AA64ISAR2_MOPS_NONE: u64 = 0x0 << ID_AA64ISAR2_MOPS_SHIFT;
 /// `ID_AA64ISAR2_MOPS_IMPL`.
@@ -945,6 +1367,12 @@ pub const ID_AA64ISAR2_MOPS_IMPL: u64 = 0x1 << ID_AA64ISAR2_MOPS_SHIFT;
 pub const ID_AA64ISAR2_BC_SHIFT: u32 = 20;
 /// `ID_AA64ISAR2_BC_MASK`.
 pub const ID_AA64ISAR2_BC_MASK: u64 = 0xf << ID_AA64ISAR2_BC_SHIFT;
+
+/// `ID_AA64ISAR2_BC(x)`.
+pub const fn id_aa64isar2_bc(x: u64) -> u64 {
+    x & ID_AA64ISAR2_BC_MASK
+}
+
 /// `ID_AA64ISAR2_BC_NONE`.
 pub const ID_AA64ISAR2_BC_NONE: u64 = 0x0 << ID_AA64ISAR2_BC_SHIFT;
 /// `ID_AA64ISAR2_BC_IMPL`.
@@ -953,6 +1381,12 @@ pub const ID_AA64ISAR2_BC_IMPL: u64 = 0x1 << ID_AA64ISAR2_BC_SHIFT;
 pub const ID_AA64ISAR2_CLRBHB_SHIFT: u32 = 28;
 /// `ID_AA64ISAR2_CLRBHB_MASK`.
 pub const ID_AA64ISAR2_CLRBHB_MASK: u64 = 0xf << ID_AA64ISAR2_CLRBHB_SHIFT;
+
+/// `ID_AA64ISAR2_CLRBHB(x)`.
+pub const fn id_aa64isar2_clrbhb(x: u64) -> u64 {
+    x & ID_AA64ISAR2_CLRBHB_MASK
+}
+
 /// `ID_AA64ISAR2_CLRBHB_NONE`.
 pub const ID_AA64ISAR2_CLRBHB_NONE: u64 = 0x0 << ID_AA64ISAR2_CLRBHB_SHIFT;
 /// `ID_AA64ISAR2_CLRBHB_IMPL`.
@@ -961,6 +1395,12 @@ pub const ID_AA64ISAR2_CLRBHB_IMPL: u64 = 0x1 << ID_AA64ISAR2_CLRBHB_SHIFT;
 pub const ID_AA64ISAR2_RPRFM_SHIFT: u32 = 48;
 /// `ID_AA64ISAR2_RPRFM_MASK`.
 pub const ID_AA64ISAR2_RPRFM_MASK: u64 = 0xf << ID_AA64ISAR2_RPRFM_SHIFT;
+
+/// `ID_AA64ISAR2_RPRFM(x)`.
+pub const fn id_aa64isar2_rprfm(x: u64) -> u64 {
+    x & ID_AA64ISAR2_RPRFM_MASK
+}
+
 /// `ID_AA64ISAR2_RPRFM_NONE`.
 pub const ID_AA64ISAR2_RPRFM_NONE: u64 = 0x0 << ID_AA64ISAR2_RPRFM_SHIFT;
 /// `ID_AA64ISAR2_RPRFM_IMPL`.
@@ -969,6 +1409,12 @@ pub const ID_AA64ISAR2_RPRFM_IMPL: u64 = 0x1 << ID_AA64ISAR2_RPRFM_SHIFT;
 pub const ID_AA64ISAR2_CSSC_SHIFT: u32 = 52;
 /// `ID_AA64ISAR2_CSSC_MASK`.
 pub const ID_AA64ISAR2_CSSC_MASK: u64 = 0xf << ID_AA64ISAR2_CSSC_SHIFT;
+
+/// `ID_AA64ISAR2_CSSC(x)`.
+pub const fn id_aa64isar2_cssc(x: u64) -> u64 {
+    x & ID_AA64ISAR2_CSSC_MASK
+}
+
 /// `ID_AA64ISAR2_CSSC_NONE`.
 pub const ID_AA64ISAR2_CSSC_NONE: u64 = 0x0 << ID_AA64ISAR2_CSSC_SHIFT;
 /// `ID_AA64ISAR2_CSSC_IMPL`.
@@ -982,6 +1428,12 @@ pub const ID_AA64MMFR0_MASK: u64 = 0xf0000000ffffffff;
 pub const ID_AA64MMFR0_PA_RANGE_SHIFT: u32 = 0;
 /// `ID_AA64MMFR0_PA_RANGE_MASK`.
 pub const ID_AA64MMFR0_PA_RANGE_MASK: u64 = 0xf << ID_AA64MMFR0_PA_RANGE_SHIFT;
+
+/// `ID_AA64MMFR0_PA_RANGE(x)`.
+pub const fn id_aa64mmfr0_pa_range(x: u64) -> u64 {
+    x & ID_AA64MMFR0_PA_RANGE_MASK
+}
+
 /// `ID_AA64MMFR0_PA_RANGE_4G`.
 pub const ID_AA64MMFR0_PA_RANGE_4G: u64 = 0x0 << ID_AA64MMFR0_PA_RANGE_SHIFT;
 /// `ID_AA64MMFR0_PA_RANGE_64G`.
@@ -998,6 +1450,12 @@ pub const ID_AA64MMFR0_PA_RANGE_256T: u64 = 0x5 << ID_AA64MMFR0_PA_RANGE_SHIFT;
 pub const ID_AA64MMFR0_ASID_BITS_SHIFT: u32 = 4;
 /// `ID_AA64MMFR0_ASID_BITS_MASK`.
 pub const ID_AA64MMFR0_ASID_BITS_MASK: u64 = 0xf << ID_AA64MMFR0_ASID_BITS_SHIFT;
+
+/// `ID_AA64MMFR0_ASID_BITS(x)`.
+pub const fn id_aa64mmfr0_asid_bits(x: u64) -> u64 {
+    x & ID_AA64MMFR0_ASID_BITS_MASK
+}
+
 /// `ID_AA64MMFR0_ASID_BITS_8`.
 pub const ID_AA64MMFR0_ASID_BITS_8: u64 = 0x0 << ID_AA64MMFR0_ASID_BITS_SHIFT;
 /// `ID_AA64MMFR0_ASID_BITS_16`.
@@ -1006,6 +1464,12 @@ pub const ID_AA64MMFR0_ASID_BITS_16: u64 = 0x2 << ID_AA64MMFR0_ASID_BITS_SHIFT;
 pub const ID_AA64MMFR0_BIGEND_SHIFT: u32 = 8;
 /// `ID_AA64MMFR0_BIGEND_MASK`.
 pub const ID_AA64MMFR0_BIGEND_MASK: u64 = 0xf << ID_AA64MMFR0_BIGEND_SHIFT;
+
+/// `ID_AA64MMFR0_BIGEND(x)`.
+pub const fn id_aa64mmfr0_bigend(x: u64) -> u64 {
+    x & ID_AA64MMFR0_BIGEND_MASK
+}
+
 /// `ID_AA64MMFR0_BIGEND_FIXED`.
 pub const ID_AA64MMFR0_BIGEND_FIXED: u64 = 0x0 << ID_AA64MMFR0_BIGEND_SHIFT;
 /// `ID_AA64MMFR0_BIGEND_MIXED`.
@@ -1014,6 +1478,12 @@ pub const ID_AA64MMFR0_BIGEND_MIXED: u64 = 0x1 << ID_AA64MMFR0_BIGEND_SHIFT;
 pub const ID_AA64MMFR0_S_NS_MEM_SHIFT: u32 = 12;
 /// `ID_AA64MMFR0_S_NS_MEM_MASK`.
 pub const ID_AA64MMFR0_S_NS_MEM_MASK: u64 = 0xf << ID_AA64MMFR0_S_NS_MEM_SHIFT;
+
+/// `ID_AA64MMFR0_S_NS_MEM(x)`.
+pub const fn id_aa64mmfr0_s_ns_mem(x: u64) -> u64 {
+    x & ID_AA64MMFR0_S_NS_MEM_MASK
+}
+
 /// `ID_AA64MMFR0_S_NS_MEM_NONE`.
 pub const ID_AA64MMFR0_S_NS_MEM_NONE: u64 = 0x0 << ID_AA64MMFR0_S_NS_MEM_SHIFT;
 /// `ID_AA64MMFR0_S_NS_MEM_DISTINCT`.
@@ -1022,6 +1492,12 @@ pub const ID_AA64MMFR0_S_NS_MEM_DISTINCT: u64 = 0x1 << ID_AA64MMFR0_S_NS_MEM_SHI
 pub const ID_AA64MMFR0_BIGEND_EL0_SHIFT: u32 = 16;
 /// `ID_AA64MMFR0_BIGEND_EL0_MASK`.
 pub const ID_AA64MMFR0_BIGEND_EL0_MASK: u64 = 0xf << ID_AA64MMFR0_BIGEND_EL0_SHIFT;
+
+/// `ID_AA64MMFR0_BIGEND_EL0(x)`.
+pub const fn id_aa64mmfr0_bigend_el0(x: u64) -> u64 {
+    x & ID_AA64MMFR0_BIGEND_EL0_MASK
+}
+
 /// `ID_AA64MMFR0_BIGEND_EL0_FIXED`.
 pub const ID_AA64MMFR0_BIGEND_EL0_FIXED: u64 = 0x0 << ID_AA64MMFR0_BIGEND_EL0_SHIFT;
 /// `ID_AA64MMFR0_BIGEND_EL0_MIXED`.
@@ -1030,6 +1506,12 @@ pub const ID_AA64MMFR0_BIGEND_EL0_MIXED: u64 = 0x1 << ID_AA64MMFR0_BIGEND_EL0_SH
 pub const ID_AA64MMFR0_TGRAN16_SHIFT: u32 = 20;
 /// `ID_AA64MMFR0_TGRAN16_MASK`.
 pub const ID_AA64MMFR0_TGRAN16_MASK: u64 = 0xf << ID_AA64MMFR0_TGRAN16_SHIFT;
+
+/// `ID_AA64MMFR0_TGRAN16(x)`.
+pub const fn id_aa64mmfr0_tgran16(x: u64) -> u64 {
+    x & ID_AA64MMFR0_TGRAN16_MASK
+}
+
 /// `ID_AA64MMFR0_TGRAN16_NONE`.
 pub const ID_AA64MMFR0_TGRAN16_NONE: u64 = 0x0 << ID_AA64MMFR0_TGRAN16_SHIFT;
 /// `ID_AA64MMFR0_TGRAN16_IMPL`.
@@ -1038,6 +1520,12 @@ pub const ID_AA64MMFR0_TGRAN16_IMPL: u64 = 0x1 << ID_AA64MMFR0_TGRAN16_SHIFT;
 pub const ID_AA64MMFR0_TGRAN64_SHIFT: u32 = 24;
 /// `ID_AA64MMFR0_TGRAN64_MASK`.
 pub const ID_AA64MMFR0_TGRAN64_MASK: u64 = 0xf << ID_AA64MMFR0_TGRAN64_SHIFT;
+
+/// `ID_AA64MMFR0_TGRAN64(x)`.
+pub const fn id_aa64mmfr0_tgran64(x: u64) -> u64 {
+    x & ID_AA64MMFR0_TGRAN64_MASK
+}
+
 /// `ID_AA64MMFR0_TGRAN64_IMPL`.
 pub const ID_AA64MMFR0_TGRAN64_IMPL: u64 = 0x0 << ID_AA64MMFR0_TGRAN64_SHIFT;
 /// `ID_AA64MMFR0_TGRAN64_NONE`.
@@ -1046,6 +1534,12 @@ pub const ID_AA64MMFR0_TGRAN64_NONE: u64 = 0xf << ID_AA64MMFR0_TGRAN64_SHIFT;
 pub const ID_AA64MMFR0_TGRAN4_SHIFT: u32 = 28;
 /// `ID_AA64MMFR0_TGRAN4_MASK`.
 pub const ID_AA64MMFR0_TGRAN4_MASK: u64 = 0xf << ID_AA64MMFR0_TGRAN4_SHIFT;
+
+/// `ID_AA64MMFR0_TGRAN4(x)`.
+pub const fn id_aa64mmfr0_tgran4(x: u64) -> u64 {
+    x & ID_AA64MMFR0_TGRAN4_MASK
+}
+
 /// `ID_AA64MMFR0_TGRAN4_IMPL`.
 pub const ID_AA64MMFR0_TGRAN4_IMPL: u64 = 0x0 << ID_AA64MMFR0_TGRAN4_SHIFT;
 /// `ID_AA64MMFR0_TGRAN4_NONE`.
@@ -1054,6 +1548,12 @@ pub const ID_AA64MMFR0_TGRAN4_NONE: u64 = 0xf << ID_AA64MMFR0_TGRAN4_SHIFT;
 pub const ID_AA64MMFR0_ECV_SHIFT: u32 = 60;
 /// `ID_AA64MMFR0_ECV_MASK`.
 pub const ID_AA64MMFR0_ECV_MASK: u64 = 0xf << ID_AA64MMFR0_ECV_SHIFT;
+
+/// `ID_AA64MMFR0_ECV(x)`.
+pub const fn id_aa64mmfr0_ecv(x: u64) -> u64 {
+    x & ID_AA64MMFR0_ECV_MASK
+}
+
 /// `ID_AA64MMFR0_ECV_NONE`.
 pub const ID_AA64MMFR0_ECV_NONE: u64 = 0x0 << ID_AA64MMFR0_ECV_SHIFT;
 /// `ID_AA64MMFR0_ECV_IMPL`.
@@ -1069,6 +1569,12 @@ pub const ID_AA64MMFR1_MASK: u64 = 0xf000f000ffffffff;
 pub const ID_AA64MMFR1_HAFDBS_SHIFT: u32 = 0;
 /// `ID_AA64MMFR1_HAFDBS_MASK`.
 pub const ID_AA64MMFR1_HAFDBS_MASK: u64 = 0xf << ID_AA64MMFR1_HAFDBS_SHIFT;
+
+/// `ID_AA64MMFR1_HAFDBS(x)`.
+pub const fn id_aa64mmfr1_hafdbs(x: u64) -> u64 {
+    x & ID_AA64MMFR1_HAFDBS_MASK
+}
+
 /// `ID_AA64MMFR1_HAFDBS_NONE`.
 pub const ID_AA64MMFR1_HAFDBS_NONE: u64 = 0x0 << ID_AA64MMFR1_HAFDBS_SHIFT;
 /// `ID_AA64MMFR1_HAFDBS_AF`.
@@ -1079,6 +1585,12 @@ pub const ID_AA64MMFR1_HAFDBS_AF_DBS: u64 = 0x2 << ID_AA64MMFR1_HAFDBS_SHIFT;
 pub const ID_AA64MMFR1_VMIDBITS_SHIFT: u32 = 4;
 /// `ID_AA64MMFR1_VMIDBITS_MASK`.
 pub const ID_AA64MMFR1_VMIDBITS_MASK: u64 = 0xf << ID_AA64MMFR1_VMIDBITS_SHIFT;
+
+/// `ID_AA64MMFR1_VMIDBITS(x)`.
+pub const fn id_aa64mmfr1_vmidbits(x: u64) -> u64 {
+    x & ID_AA64MMFR1_VMIDBITS_MASK
+}
+
 /// `ID_AA64MMFR1_VMIDBITS_8`.
 pub const ID_AA64MMFR1_VMIDBITS_8: u64 = 0x0 << ID_AA64MMFR1_VMIDBITS_SHIFT;
 /// `ID_AA64MMFR1_VMIDBITS_16`.
@@ -1087,6 +1599,12 @@ pub const ID_AA64MMFR1_VMIDBITS_16: u64 = 0x2 << ID_AA64MMFR1_VMIDBITS_SHIFT;
 pub const ID_AA64MMFR1_VH_SHIFT: u32 = 8;
 /// `ID_AA64MMFR1_VH_MASK`.
 pub const ID_AA64MMFR1_VH_MASK: u64 = 0xf << ID_AA64MMFR1_VH_SHIFT;
+
+/// `ID_AA64MMFR1_VH(x)`.
+pub const fn id_aa64mmfr1_vh(x: u64) -> u64 {
+    x & ID_AA64MMFR1_VH_MASK
+}
+
 /// `ID_AA64MMFR1_VH_NONE`.
 pub const ID_AA64MMFR1_VH_NONE: u64 = 0x0 << ID_AA64MMFR1_VH_SHIFT;
 /// `ID_AA64MMFR1_VH_IMPL`.
@@ -1095,6 +1613,12 @@ pub const ID_AA64MMFR1_VH_IMPL: u64 = 0x1 << ID_AA64MMFR1_VH_SHIFT;
 pub const ID_AA64MMFR1_HPDS_SHIFT: u32 = 12;
 /// `ID_AA64MMFR1_HPDS_MASK`.
 pub const ID_AA64MMFR1_HPDS_MASK: u64 = 0xf << ID_AA64MMFR1_HPDS_SHIFT;
+
+/// `ID_AA64MMFR1_HPDS(x)`.
+pub const fn id_aa64mmfr1_hpds(x: u64) -> u64 {
+    x & ID_AA64MMFR1_HPDS_MASK
+}
+
 /// `ID_AA64MMFR1_HPDS_NONE`.
 pub const ID_AA64MMFR1_HPDS_NONE: u64 = 0x0 << ID_AA64MMFR1_HPDS_SHIFT;
 /// `ID_AA64MMFR1_HPDS_IMPL`.
@@ -1103,6 +1627,12 @@ pub const ID_AA64MMFR1_HPDS_IMPL: u64 = 0x1 << ID_AA64MMFR1_HPDS_SHIFT;
 pub const ID_AA64MMFR1_LO_SHIFT: u32 = 16;
 /// `ID_AA64MMFR1_LO_MASK`.
 pub const ID_AA64MMFR1_LO_MASK: u64 = 0xf << ID_AA64MMFR1_LO_SHIFT;
+
+/// `ID_AA64MMFR1_LO(x)`.
+pub const fn id_aa64mmfr1_lo(x: u64) -> u64 {
+    x & ID_AA64MMFR1_LO_MASK
+}
+
 /// `ID_AA64MMFR1_LO_NONE`.
 pub const ID_AA64MMFR1_LO_NONE: u64 = 0x0 << ID_AA64MMFR1_LO_SHIFT;
 /// `ID_AA64MMFR1_LO_IMPL`.
@@ -1111,6 +1641,12 @@ pub const ID_AA64MMFR1_LO_IMPL: u64 = 0x1 << ID_AA64MMFR1_LO_SHIFT;
 pub const ID_AA64MMFR1_PAN_SHIFT: u32 = 20;
 /// `ID_AA64MMFR1_PAN_MASK`.
 pub const ID_AA64MMFR1_PAN_MASK: u64 = 0xf << ID_AA64MMFR1_PAN_SHIFT;
+
+/// `ID_AA64MMFR1_PAN(x)`.
+pub const fn id_aa64mmfr1_pan(x: u64) -> u64 {
+    x & ID_AA64MMFR1_PAN_MASK
+}
+
 /// `ID_AA64MMFR1_PAN_NONE`.
 pub const ID_AA64MMFR1_PAN_NONE: u64 = 0x0 << ID_AA64MMFR1_PAN_SHIFT;
 /// `ID_AA64MMFR1_PAN_IMPL`.
@@ -1123,6 +1659,12 @@ pub const ID_AA64MMFR1_PAN_EPAN: u64 = 0x3 << ID_AA64MMFR1_PAN_SHIFT;
 pub const ID_AA64MMFR1_SPECSEI_SHIFT: u32 = 24;
 /// `ID_AA64MMFR1_SPECSEI_MASK`.
 pub const ID_AA64MMFR1_SPECSEI_MASK: u64 = 0xf << ID_AA64MMFR1_SPECSEI_SHIFT;
+
+/// `ID_AA64MMFR1_SPECSEI(x)`.
+pub const fn id_aa64mmfr1_specsei(x: u64) -> u64 {
+    x & ID_AA64MMFR1_SPECSEI_MASK
+}
+
 /// `ID_AA64MMFR1_SPECSEI_NONE`.
 pub const ID_AA64MMFR1_SPECSEI_NONE: u64 = 0x0 << ID_AA64MMFR1_SPECSEI_SHIFT;
 /// `ID_AA64MMFR1_SPECSEI_IMPL`.
@@ -1131,6 +1673,12 @@ pub const ID_AA64MMFR1_SPECSEI_IMPL: u64 = 0x1 << ID_AA64MMFR1_SPECSEI_SHIFT;
 pub const ID_AA64MMFR1_XNX_SHIFT: u32 = 28;
 /// `ID_AA64MMFR1_XNX_MASK`.
 pub const ID_AA64MMFR1_XNX_MASK: u64 = 0xf << ID_AA64MMFR1_XNX_SHIFT;
+
+/// `ID_AA64MMFR1_XNX(x)`.
+pub const fn id_aa64mmfr1_xnx(x: u64) -> u64 {
+    x & ID_AA64MMFR1_XNX_MASK
+}
+
 /// `ID_AA64MMFR1_XNX_NONE`.
 pub const ID_AA64MMFR1_XNX_NONE: u64 = 0x0 << ID_AA64MMFR1_XNX_SHIFT;
 /// `ID_AA64MMFR1_XNX_IMPL`.
@@ -1139,6 +1687,12 @@ pub const ID_AA64MMFR1_XNX_IMPL: u64 = 0x1 << ID_AA64MMFR1_XNX_SHIFT;
 pub const ID_AA64MMFR1_AFP_SHIFT: u32 = 44;
 /// `ID_AA64MMFR1_AFP_MASK`.
 pub const ID_AA64MMFR1_AFP_MASK: u64 = 0xf << ID_AA64MMFR1_AFP_SHIFT;
+
+/// `ID_AA64MMFR1_AFP(x)`.
+pub const fn id_aa64mmfr1_afp(x: u64) -> u64 {
+    x & ID_AA64MMFR1_AFP_MASK
+}
+
 /// `ID_AA64MMFR1_AFP_NONE`.
 pub const ID_AA64MMFR1_AFP_NONE: u64 = 0x0 << ID_AA64MMFR1_AFP_SHIFT;
 /// `ID_AA64MMFR1_AFP_IMPL`.
@@ -1147,6 +1701,12 @@ pub const ID_AA64MMFR1_AFP_IMPL: u64 = 0x1 << ID_AA64MMFR1_AFP_SHIFT;
 pub const ID_AA64MMFR1_ECBHB_SHIFT: u32 = 60;
 /// `ID_AA64MMFR1_ECBHB_MASK`.
 pub const ID_AA64MMFR1_ECBHB_MASK: u64 = 0xf << ID_AA64MMFR1_ECBHB_SHIFT;
+
+/// `ID_AA64MMFR1_ECBHB(x)`.
+pub const fn id_aa64mmfr1_ecbhb(x: u64) -> u64 {
+    x & ID_AA64MMFR1_ECBHB_MASK
+}
+
 /// `ID_AA64MMFR1_ECBHB_NONE`.
 pub const ID_AA64MMFR1_ECBHB_NONE: u64 = 0x0 << ID_AA64MMFR1_ECBHB_SHIFT;
 /// `ID_AA64MMFR1_ECBHB_IMPL`.
@@ -1160,12 +1720,24 @@ pub const ID_AA64MMFR2_MASK: u64 = 0xffff0fffffffffff;
 pub const ID_AA64MMFR2_CCIDX_SHIFT: u32 = 20;
 /// `ID_AA64MMFR2_CCIDX_MASK`.
 pub const ID_AA64MMFR2_CCIDX_MASK: u64 = 0xf << ID_AA64MMFR2_CCIDX_SHIFT;
+
+/// `ID_AA64MMFR2_CCIDX(x)`.
+pub const fn id_aa64mmfr2_ccidx(x: u64) -> u64 {
+    x & ID_AA64MMFR2_CCIDX_MASK
+}
+
 /// `ID_AA64MMFR2_CCIDX_IMPL`.
 pub const ID_AA64MMFR2_CCIDX_IMPL: u64 = 0x1 << ID_AA64MMFR2_CCIDX_SHIFT;
 /// `ID_AA64MMFR2_AT_SHIFT`.
 pub const ID_AA64MMFR2_AT_SHIFT: u32 = 32;
 /// `ID_AA64MMFR2_AT_MASK`.
 pub const ID_AA64MMFR2_AT_MASK: u64 = 0xf << ID_AA64MMFR2_AT_SHIFT;
+
+/// `ID_AA64MMFR2_AT(x)`.
+pub const fn id_aa64mmfr2_at(x: u64) -> u64 {
+    x & ID_AA64MMFR2_AT_MASK
+}
+
 /// `ID_AA64MMFR2_AT_NONE`.
 pub const ID_AA64MMFR2_AT_NONE: u64 = 0x0 << ID_AA64MMFR2_AT_SHIFT;
 /// `ID_AA64MMFR2_AT_IMPL`.
@@ -1174,6 +1746,12 @@ pub const ID_AA64MMFR2_AT_IMPL: u64 = 0x1 << ID_AA64MMFR2_AT_SHIFT;
 pub const ID_AA64MMFR2_IDS_SHIFT: u32 = 36;
 /// `ID_AA64MMFR2_IDS_MASK`.
 pub const ID_AA64MMFR2_IDS_MASK: u64 = 0xf << ID_AA64MMFR2_IDS_SHIFT;
+
+/// `ID_AA64MMFR2_IDS(x)`.
+pub const fn id_aa64mmfr2_ids(x: u64) -> u64 {
+    x & ID_AA64MMFR2_IDS_MASK
+}
+
 /// `ID_AA64MMFR2_IDS_NONE`.
 pub const ID_AA64MMFR2_IDS_NONE: u64 = 0x0 << ID_AA64MMFR2_IDS_SHIFT;
 /// `ID_AA64MMFR2_IDS_IMPL`.
@@ -1187,6 +1765,12 @@ pub const ID_AA64PFR0_MASK: u64 = 0xff0fffffffffffff;
 pub const ID_AA64PFR0_EL0_SHIFT: u32 = 0;
 /// `ID_AA64PFR0_EL0_MASK`.
 pub const ID_AA64PFR0_EL0_MASK: u64 = 0xf << ID_AA64PFR0_EL0_SHIFT;
+
+/// `ID_AA64PFR0_EL0(x)`.
+pub const fn id_aa64pfr0_el0(x: u64) -> u64 {
+    x & ID_AA64PFR0_EL0_MASK
+}
+
 /// `ID_AA64PFR0_EL0_64`.
 pub const ID_AA64PFR0_EL0_64: u64 = 0x1 << ID_AA64PFR0_EL0_SHIFT;
 /// `ID_AA64PFR0_EL0_64_32`.
@@ -1195,6 +1779,12 @@ pub const ID_AA64PFR0_EL0_64_32: u64 = 0x2 << ID_AA64PFR0_EL0_SHIFT;
 pub const ID_AA64PFR0_EL1_SHIFT: u32 = 4;
 /// `ID_AA64PFR0_EL1_MASK`.
 pub const ID_AA64PFR0_EL1_MASK: u64 = 0xf << ID_AA64PFR0_EL1_SHIFT;
+
+/// `ID_AA64PFR0_EL1(x)`.
+pub const fn id_aa64pfr0_el1(x: u64) -> u64 {
+    x & ID_AA64PFR0_EL1_MASK
+}
+
 /// `ID_AA64PFR0_EL1_64`.
 pub const ID_AA64PFR0_EL1_64: u64 = 0x1 << ID_AA64PFR0_EL1_SHIFT;
 /// `ID_AA64PFR0_EL1_64_32`.
@@ -1203,6 +1793,12 @@ pub const ID_AA64PFR0_EL1_64_32: u64 = 0x2 << ID_AA64PFR0_EL1_SHIFT;
 pub const ID_AA64PFR0_EL2_SHIFT: u32 = 8;
 /// `ID_AA64PFR0_EL2_MASK`.
 pub const ID_AA64PFR0_EL2_MASK: u64 = 0xf << ID_AA64PFR0_EL2_SHIFT;
+
+/// `ID_AA64PFR0_EL2(x)`.
+pub const fn id_aa64pfr0_el2(x: u64) -> u64 {
+    x & ID_AA64PFR0_EL2_MASK
+}
+
 /// `ID_AA64PFR0_EL2_NONE`.
 pub const ID_AA64PFR0_EL2_NONE: u64 = 0x0 << ID_AA64PFR0_EL2_SHIFT;
 /// `ID_AA64PFR0_EL2_64`.
@@ -1213,6 +1809,12 @@ pub const ID_AA64PFR0_EL2_64_32: u64 = 0x2 << ID_AA64PFR0_EL2_SHIFT;
 pub const ID_AA64PFR0_EL3_SHIFT: u32 = 12;
 /// `ID_AA64PFR0_EL3_MASK`.
 pub const ID_AA64PFR0_EL3_MASK: u64 = 0xf << ID_AA64PFR0_EL3_SHIFT;
+
+/// `ID_AA64PFR0_EL3(x)`.
+pub const fn id_aa64pfr0_el3(x: u64) -> u64 {
+    x & ID_AA64PFR0_EL3_MASK
+}
+
 /// `ID_AA64PFR0_EL3_NONE`.
 pub const ID_AA64PFR0_EL3_NONE: u64 = 0x0 << ID_AA64PFR0_EL3_SHIFT;
 /// `ID_AA64PFR0_EL3_64`.
@@ -1223,6 +1825,12 @@ pub const ID_AA64PFR0_EL3_64_32: u64 = 0x2 << ID_AA64PFR0_EL3_SHIFT;
 pub const ID_AA64PFR0_FP_SHIFT: u32 = 16;
 /// `ID_AA64PFR0_FP_MASK`.
 pub const ID_AA64PFR0_FP_MASK: u64 = 0xf << ID_AA64PFR0_FP_SHIFT;
+
+/// `ID_AA64PFR0_FP(x)`.
+pub const fn id_aa64pfr0_fp(x: u64) -> u64 {
+    x & ID_AA64PFR0_FP_MASK
+}
+
 /// `ID_AA64PFR0_FP_IMPL`.
 pub const ID_AA64PFR0_FP_IMPL: u64 = 0x0 << ID_AA64PFR0_FP_SHIFT;
 /// `ID_AA64PFR0_FP_HP`.
@@ -1233,6 +1841,12 @@ pub const ID_AA64PFR0_FP_NONE: u64 = 0xf << ID_AA64PFR0_FP_SHIFT;
 pub const ID_AA64PFR0_ADV_SIMD_SHIFT: u32 = 20;
 /// `ID_AA64PFR0_ADV_SIMD_MASK`.
 pub const ID_AA64PFR0_ADV_SIMD_MASK: u64 = 0xf << ID_AA64PFR0_ADV_SIMD_SHIFT;
+
+/// `ID_AA64PFR0_ADV_SIMD(x)`.
+pub const fn id_aa64pfr0_adv_simd(x: u64) -> u64 {
+    x & ID_AA64PFR0_ADV_SIMD_MASK
+}
+
 /// `ID_AA64PFR0_ADV_SIMD_IMPL`.
 pub const ID_AA64PFR0_ADV_SIMD_IMPL: u64 = 0x0 << ID_AA64PFR0_ADV_SIMD_SHIFT;
 /// `ID_AA64PFR0_ADV_SIMD_HP`.
@@ -1245,6 +1859,12 @@ pub const ID_AA64PFR0_GIC_BITS: u64 = 0x4;
 pub const ID_AA64PFR0_GIC_SHIFT: u32 = 24;
 /// `ID_AA64PFR0_GIC_MASK`.
 pub const ID_AA64PFR0_GIC_MASK: u64 = 0xf << ID_AA64PFR0_GIC_SHIFT;
+
+/// `ID_AA64PFR0_GIC(x)`.
+pub const fn id_aa64pfr0_gic(x: u64) -> u64 {
+    x & ID_AA64PFR0_GIC_MASK
+}
+
 /// `ID_AA64PFR0_GIC_CPUIF_NONE`.
 pub const ID_AA64PFR0_GIC_CPUIF_NONE: u64 = 0x0 << ID_AA64PFR0_GIC_SHIFT;
 /// `ID_AA64PFR0_GIC_CPUIF_EN`.
@@ -1253,6 +1873,12 @@ pub const ID_AA64PFR0_GIC_CPUIF_EN: u64 = 0x1 << ID_AA64PFR0_GIC_SHIFT;
 pub const ID_AA64PFR0_RAS_SHIFT: u32 = 28;
 /// `ID_AA64PFR0_RAS_MASK`.
 pub const ID_AA64PFR0_RAS_MASK: u64 = 0xf << ID_AA64PFR0_RAS_SHIFT;
+
+/// `ID_AA64PFR0_RAS(x)`.
+pub const fn id_aa64pfr0_ras(x: u64) -> u64 {
+    x & ID_AA64PFR0_RAS_MASK
+}
+
 /// `ID_AA64PFR0_RAS_NONE`.
 pub const ID_AA64PFR0_RAS_NONE: u64 = 0x0 << ID_AA64PFR0_RAS_SHIFT;
 /// `ID_AA64PFR0_RAS_IMPL`.
@@ -1263,6 +1889,12 @@ pub const ID_AA64PFR0_RAS_IMPL_V1P1: u64 = 0x2 << ID_AA64PFR0_RAS_SHIFT;
 pub const ID_AA64PFR0_SVE_SHIFT: u32 = 32;
 /// `ID_AA64PFR0_SVE_MASK`.
 pub const ID_AA64PFR0_SVE_MASK: u64 = 0xf << ID_AA64PFR0_SVE_SHIFT;
+
+/// `ID_AA64PFR0_SVE(x)`.
+pub const fn id_aa64pfr0_sve(x: u64) -> u64 {
+    x & ID_AA64PFR0_SVE_MASK
+}
+
 /// `ID_AA64PFR0_SVE_NONE`.
 pub const ID_AA64PFR0_SVE_NONE: u64 = 0x0 << ID_AA64PFR0_SVE_SHIFT;
 /// `ID_AA64PFR0_SVE_IMPL`.
@@ -1271,6 +1903,12 @@ pub const ID_AA64PFR0_SVE_IMPL: u64 = 0x1 << ID_AA64PFR0_SVE_SHIFT;
 pub const ID_AA64PFR0_SEL2_SHIFT: u32 = 36;
 /// `ID_AA64PFR0_SEL2_MASK`.
 pub const ID_AA64PFR0_SEL2_MASK: u64 = 0xf << ID_AA64PFR0_SEL2_SHIFT;
+
+/// `ID_AA64PFR0_SEL2(x)`.
+pub const fn id_aa64pfr0_sel2(x: u64) -> u64 {
+    x & ID_AA64PFR0_SEL2_MASK
+}
+
 /// `ID_AA64PFR0_SEL2_NONE`.
 pub const ID_AA64PFR0_SEL2_NONE: u64 = 0x0 << ID_AA64PFR0_SEL2_SHIFT;
 /// `ID_AA64PFR0_SEL2_IMPL`.
@@ -1279,6 +1917,12 @@ pub const ID_AA64PFR0_SEL2_IMPL: u64 = 0x1 << ID_AA64PFR0_SEL2_SHIFT;
 pub const ID_AA64PFR0_MPAM_SHIFT: u32 = 40;
 /// `ID_AA64PFR0_MPAM_MASK`.
 pub const ID_AA64PFR0_MPAM_MASK: u64 = 0xf << ID_AA64PFR0_MPAM_SHIFT;
+
+/// `ID_AA64PFR0_MPAM(x)`.
+pub const fn id_aa64pfr0_mpam(x: u64) -> u64 {
+    x & ID_AA64PFR0_MPAM_MASK
+}
+
 /// `ID_AA64PFR0_MPAM_NONE`.
 pub const ID_AA64PFR0_MPAM_NONE: u64 = 0x0 << ID_AA64PFR0_MPAM_SHIFT;
 /// `ID_AA64PFR0_MPAM_IMPL`.
@@ -1287,6 +1931,12 @@ pub const ID_AA64PFR0_MPAM_IMPL: u64 = 0x1 << ID_AA64PFR0_MPAM_SHIFT;
 pub const ID_AA64PFR0_AMU_SHIFT: u32 = 44;
 /// `ID_AA64PFR0_AMU_MASK`.
 pub const ID_AA64PFR0_AMU_MASK: u64 = 0xf << ID_AA64PFR0_AMU_SHIFT;
+
+/// `ID_AA64PFR0_AMU(x)`.
+pub const fn id_aa64pfr0_amu(x: u64) -> u64 {
+    x & ID_AA64PFR0_AMU_MASK
+}
+
 /// `ID_AA64PFR0_AMU_NONE`.
 pub const ID_AA64PFR0_AMU_NONE: u64 = 0x0 << ID_AA64PFR0_AMU_SHIFT;
 /// `ID_AA64PFR0_AMU_IMPL`.
@@ -1297,6 +1947,12 @@ pub const ID_AA64PFR0_AMU_IMPL_V1P1: u64 = 0x2 << ID_AA64PFR0_AMU_SHIFT;
 pub const ID_AA64PFR0_DIT_SHIFT: u32 = 48;
 /// `ID_AA64PFR0_DIT_MASK`.
 pub const ID_AA64PFR0_DIT_MASK: u64 = 0xf << ID_AA64PFR0_DIT_SHIFT;
+
+/// `ID_AA64PFR0_DIT(x)`.
+pub const fn id_aa64pfr0_dit(x: u64) -> u64 {
+    x & ID_AA64PFR0_DIT_MASK
+}
+
 /// `ID_AA64PFR0_DIT_UNKNOWN`.
 pub const ID_AA64PFR0_DIT_UNKNOWN: u64 = 0x0 << ID_AA64PFR0_DIT_SHIFT;
 /// `ID_AA64PFR0_DIT_IMPL`.
@@ -1305,6 +1961,12 @@ pub const ID_AA64PFR0_DIT_IMPL: u64 = 0x1 << ID_AA64PFR0_DIT_SHIFT;
 pub const ID_AA64PFR0_CSV2_SHIFT: u32 = 56;
 /// `ID_AA64PFR0_CSV2_MASK`.
 pub const ID_AA64PFR0_CSV2_MASK: u64 = 0xf << ID_AA64PFR0_CSV2_SHIFT;
+
+/// `ID_AA64PFR0_CSV2(x)`.
+pub const fn id_aa64pfr0_csv2(x: u64) -> u64 {
+    x & ID_AA64PFR0_CSV2_MASK
+}
+
 /// `ID_AA64PFR0_CSV2_UNKNOWN`.
 pub const ID_AA64PFR0_CSV2_UNKNOWN: u64 = 0x0 << ID_AA64PFR0_CSV2_SHIFT;
 /// `ID_AA64PFR0_CSV2_IMPL`.
@@ -1317,6 +1979,12 @@ pub const ID_AA64PFR0_CSV2_HCXT: u64 = 0x3 << ID_AA64PFR0_CSV2_SHIFT;
 pub const ID_AA64PFR0_CSV3_SHIFT: u32 = 60;
 /// `ID_AA64PFR0_CSV3_MASK`.
 pub const ID_AA64PFR0_CSV3_MASK: u64 = 0xf << ID_AA64PFR0_CSV3_SHIFT;
+
+/// `ID_AA64PFR0_CSV3(x)`.
+pub const fn id_aa64pfr0_csv3(x: u64) -> u64 {
+    x & ID_AA64PFR0_CSV3_MASK
+}
+
 /// `ID_AA64PFR0_CSV3_UNKNOWN`.
 pub const ID_AA64PFR0_CSV3_UNKNOWN: u64 = 0x0 << ID_AA64PFR0_CSV3_SHIFT;
 /// `ID_AA64PFR0_CSV3_IMPL`.
@@ -1330,6 +1998,12 @@ pub const ID_AA64PFR1_MASK: u64 = 0x000000000000ffff;
 pub const ID_AA64PFR1_BT_SHIFT: u32 = 0;
 /// `ID_AA64PFR1_BT_MASK`.
 pub const ID_AA64PFR1_BT_MASK: u64 = 0xf << ID_AA64PFR1_BT_SHIFT;
+
+/// `ID_AA64PFR1_BT(x)`.
+pub const fn id_aa64pfr1_bt(x: u64) -> u64 {
+    x & ID_AA64PFR1_BT_MASK
+}
+
 /// `ID_AA64PFR1_BT_NONE`.
 pub const ID_AA64PFR1_BT_NONE: u64 = 0x0 << ID_AA64PFR1_BT_SHIFT;
 /// `ID_AA64PFR1_BT_IMPL`.
@@ -1338,6 +2012,12 @@ pub const ID_AA64PFR1_BT_IMPL: u64 = 0x1 << ID_AA64PFR1_BT_SHIFT;
 pub const ID_AA64PFR1_SSBS_SHIFT: u32 = 4;
 /// `ID_AA64PFR1_SSBS_MASK`.
 pub const ID_AA64PFR1_SSBS_MASK: u64 = 0xf << ID_AA64PFR1_SSBS_SHIFT;
+
+/// `ID_AA64PFR1_SSBS(x)`.
+pub const fn id_aa64pfr1_ssbs(x: u64) -> u64 {
+    x & ID_AA64PFR1_SSBS_MASK
+}
+
 /// `ID_AA64PFR1_SSBS_NONE`.
 pub const ID_AA64PFR1_SSBS_NONE: u64 = 0x0 << ID_AA64PFR1_SSBS_SHIFT;
 /// `ID_AA64PFR1_SSBS_PSTATE`.
@@ -1348,6 +2028,12 @@ pub const ID_AA64PFR1_SSBS_PSTATE_MSR: u64 = 0x2 << ID_AA64PFR1_SSBS_SHIFT;
 pub const ID_AA64PFR1_MTE_SHIFT: u32 = 8;
 /// `ID_AA64PFR1_MTE_MASK`.
 pub const ID_AA64PFR1_MTE_MASK: u64 = 0xf << ID_AA64PFR1_MTE_SHIFT;
+
+/// `ID_AA64PFR1_MTE(x)`.
+pub const fn id_aa64pfr1_mte(x: u64) -> u64 {
+    x & ID_AA64PFR1_MTE_MASK
+}
+
 /// `ID_AA64PFR1_MTE_NONE`.
 pub const ID_AA64PFR1_MTE_NONE: u64 = 0x0 << ID_AA64PFR1_MTE_SHIFT;
 /// `ID_AA64PFR1_MTE_IMPL`.
@@ -1356,6 +2042,12 @@ pub const ID_AA64PFR1_MTE_IMPL: u64 = 0x1 << ID_AA64PFR1_MTE_SHIFT;
 pub const ID_AA64PFR1_RAS_FRAC_SHIFT: u32 = 12;
 /// `ID_AA64PFR1_RAS_FRAC_MASK`.
 pub const ID_AA64PFR1_RAS_FRAC_MASK: u64 = 0xf << ID_AA64PFR1_RAS_FRAC_SHIFT;
+
+/// `ID_AA64PFR1_RAS_FRAC(x)`.
+pub const fn id_aa64pfr1_ras_frac(x: u64) -> u64 {
+    x & ID_AA64PFR1_RAS_FRAC_MASK
+}
+
 /// `ID_AA64PFR1_RAS_FRAC_NONE`.
 pub const ID_AA64PFR1_RAS_FRAC_NONE: u64 = 0x0 << ID_AA64PFR1_RAS_FRAC_SHIFT;
 /// `ID_AA64PFR1_RAS_FRAC_IMPL`.
@@ -1369,6 +2061,12 @@ pub const ID_AA64ZFR0_MASK: u64 = 0x0ff0ff0f00ff00ff;
 pub const ID_AA64ZFR0_SVEVER_SHIFT: u32 = 0;
 /// `ID_AA64ZFR0_SVEVER_MASK`.
 pub const ID_AA64ZFR0_SVEVER_MASK: u64 = 0xf << ID_AA64ZFR0_SVEVER_SHIFT;
+
+/// `ID_AA64ZFR0_SVEVER(x)`.
+pub const fn id_aa64zfr0_svever(x: u64) -> u64 {
+    x & ID_AA64ZFR0_SVEVER_MASK
+}
+
 /// `ID_AA64ZFR0_SVEVER_SVE1`.
 pub const ID_AA64ZFR0_SVEVER_SVE1: u64 = 0x0 << ID_AA64ZFR0_SVEVER_SHIFT;
 /// `ID_AA64ZFR0_SVEVER_SVE2`.
@@ -1379,6 +2077,12 @@ pub const ID_AA64ZFR0_SVEVER_SVE2P1: u64 = 0x2 << ID_AA64ZFR0_SVEVER_SHIFT;
 pub const ID_AA64ZFR0_AES_SHIFT: u32 = 4;
 /// `ID_AA64ZFR0_AES_MASK`.
 pub const ID_AA64ZFR0_AES_MASK: u64 = 0xf << ID_AA64ZFR0_AES_SHIFT;
+
+/// `ID_AA64ZFR0_AES(x)`.
+pub const fn id_aa64zfr0_aes(x: u64) -> u64 {
+    x & ID_AA64ZFR0_AES_MASK
+}
+
 /// `ID_AA64ZFR0_AES_NONE`.
 pub const ID_AA64ZFR0_AES_NONE: u64 = 0x0 << ID_AA64ZFR0_AES_SHIFT;
 /// `ID_AA64ZFR0_AES_BASE`.
@@ -1389,6 +2093,12 @@ pub const ID_AA64ZFR0_AES_PMULL: u64 = 0x2 << ID_AA64ZFR0_AES_SHIFT;
 pub const ID_AA64ZFR0_BITPERM_SHIFT: u32 = 16;
 /// `ID_AA64ZFR0_BITPERM_MASK`.
 pub const ID_AA64ZFR0_BITPERM_MASK: u64 = 0xf << ID_AA64ZFR0_BITPERM_SHIFT;
+
+/// `ID_AA64ZFR0_BITPERM(x)`.
+pub const fn id_aa64zfr0_bitperm(x: u64) -> u64 {
+    x & ID_AA64ZFR0_BITPERM_MASK
+}
+
 /// `ID_AA64ZFR0_BITPERM_NONE`.
 pub const ID_AA64ZFR0_BITPERM_NONE: u64 = 0x0 << ID_AA64ZFR0_BITPERM_SHIFT;
 /// `ID_AA64ZFR0_BITPERM_IMPL`.
@@ -1397,6 +2107,12 @@ pub const ID_AA64ZFR0_BITPERM_IMPL: u64 = 0x1 << ID_AA64ZFR0_BITPERM_SHIFT;
 pub const ID_AA64ZFR0_BF16_SHIFT: u32 = 20;
 /// `ID_AA64ZFR0_BF16_MASK`.
 pub const ID_AA64ZFR0_BF16_MASK: u64 = 0xf << ID_AA64ZFR0_BF16_SHIFT;
+
+/// `ID_AA64ZFR0_BF16(x)`.
+pub const fn id_aa64zfr0_bf16(x: u64) -> u64 {
+    x & ID_AA64ZFR0_BF16_MASK
+}
+
 /// `ID_AA64ZFR0_BF16_NONE`.
 pub const ID_AA64ZFR0_BF16_NONE: u64 = 0x0 << ID_AA64ZFR0_BF16_SHIFT;
 /// `ID_AA64ZFR0_BF16_BASE`.
@@ -1407,6 +2123,12 @@ pub const ID_AA64ZFR0_BF16_EBF: u64 = 0x2 << ID_AA64ZFR0_BF16_SHIFT;
 pub const ID_AA64ZFR0_SHA3_SHIFT: u32 = 32;
 /// `ID_AA64ZFR0_SHA3_MASK`.
 pub const ID_AA64ZFR0_SHA3_MASK: u64 = 0xf << ID_AA64ZFR0_SHA3_SHIFT;
+
+/// `ID_AA64ZFR0_SHA3(x)`.
+pub const fn id_aa64zfr0_sha3(x: u64) -> u64 {
+    x & ID_AA64ZFR0_SHA3_MASK
+}
+
 /// `ID_AA64ZFR0_SHA3_NONE`.
 pub const ID_AA64ZFR0_SHA3_NONE: u64 = 0x0 << ID_AA64ZFR0_SHA3_SHIFT;
 /// `ID_AA64ZFR0_SHA3_IMPL`.
@@ -1415,6 +2137,12 @@ pub const ID_AA64ZFR0_SHA3_IMPL: u64 = 0x1 << ID_AA64ZFR0_SHA3_SHIFT;
 pub const ID_AA64ZFR0_SM4_SHIFT: u32 = 40;
 /// `ID_AA64ZFR0_SM4_MASK`.
 pub const ID_AA64ZFR0_SM4_MASK: u64 = 0xf << ID_AA64ZFR0_SM4_SHIFT;
+
+/// `ID_AA64ZFR0_SM4(x)`.
+pub const fn id_aa64zfr0_sm4(x: u64) -> u64 {
+    x & ID_AA64ZFR0_SM4_MASK
+}
+
 /// `ID_AA64ZFR0_SM4_NONE`.
 pub const ID_AA64ZFR0_SM4_NONE: u64 = 0x0 << ID_AA64ZFR0_SM4_SHIFT;
 /// `ID_AA64ZFR0_SM4_IMPL`.
@@ -1423,6 +2151,12 @@ pub const ID_AA64ZFR0_SM4_IMPL: u64 = 0x1 << ID_AA64ZFR0_SM4_SHIFT;
 pub const ID_AA64ZFR0_I8MM_SHIFT: u32 = 44;
 /// `ID_AA64ZFR0_I8MM_MASK`.
 pub const ID_AA64ZFR0_I8MM_MASK: u64 = 0xf << ID_AA64ZFR0_I8MM_SHIFT;
+
+/// `ID_AA64ZFR0_I8MM(x)`.
+pub const fn id_aa64zfr0_i8mm(x: u64) -> u64 {
+    x & ID_AA64ZFR0_I8MM_MASK
+}
+
 /// `ID_AA64ZFR0_I8MM_NONE`.
 pub const ID_AA64ZFR0_I8MM_NONE: u64 = 0x0 << ID_AA64ZFR0_I8MM_SHIFT;
 /// `ID_AA64ZFR0_I8MM_IMPL`.
@@ -1431,6 +2165,12 @@ pub const ID_AA64ZFR0_I8MM_IMPL: u64 = 0x1 << ID_AA64ZFR0_I8MM_SHIFT;
 pub const ID_AA64ZFR0_F32MM_SHIFT: u32 = 52;
 /// `ID_AA64ZFR0_F32MM_MASK`.
 pub const ID_AA64ZFR0_F32MM_MASK: u64 = 0xf << ID_AA64ZFR0_F32MM_SHIFT;
+
+/// `ID_AA64ZFR0_F32MM(x)`.
+pub const fn id_aa64zfr0_f32mm(x: u64) -> u64 {
+    x & ID_AA64ZFR0_F32MM_MASK
+}
+
 /// `ID_AA64ZFR0_F32MM_NONE`.
 pub const ID_AA64ZFR0_F32MM_NONE: u64 = 0x0 << ID_AA64ZFR0_F32MM_SHIFT;
 /// `ID_AA64ZFR0_F32MM_IMPL`.
@@ -1439,10 +2179,74 @@ pub const ID_AA64ZFR0_F32MM_IMPL: u64 = 0x1 << ID_AA64ZFR0_F32MM_SHIFT;
 pub const ID_AA64ZFR0_F64MM_SHIFT: u32 = 56;
 /// `ID_AA64ZFR0_F64MM_MASK`.
 pub const ID_AA64ZFR0_F64MM_MASK: u64 = 0xf << ID_AA64ZFR0_F64MM_SHIFT;
+
+/// `ID_AA64ZFR0_F64MM(x)`.
+pub const fn id_aa64zfr0_f64mm(x: u64) -> u64 {
+    x & ID_AA64ZFR0_F64MM_MASK
+}
+
 /// `ID_AA64ZFR0_F64MM_NONE`.
 pub const ID_AA64ZFR0_F64MM_NONE: u64 = 0x0 << ID_AA64ZFR0_F64MM_SHIFT;
 /// `ID_AA64ZFR0_F64MM_IMPL`.
 pub const ID_AA64ZFR0_F64MM_IMPL: u64 = 0x1 << ID_AA64ZFR0_F64MM_SHIFT;
+
+/// `MAIR_ATTR_MASK(idx)`.
+pub const fn mair_attr_mask(idx: u64) -> u64 {
+    0xff << (idx * 8)
+}
+
+/// `MAIR_ATTR(attr, idx)`.
+pub const fn mair_attr(attr: u64, idx: u64) -> u64 {
+    attr << (idx * 8)
+}
+
+/// `MAIR_DEVICE_nGnRnE`.
+#[allow(non_upper_case_globals)] // the C name
+pub const MAIR_DEVICE_nGnRnE: u64 = 0x00;
+/// `MAIR_NORMAL_NC`.
+pub const MAIR_NORMAL_NC: u64 = 0x44;
+/// `MAIR_NORMAL_WT`.
+pub const MAIR_NORMAL_WT: u64 = 0x88;
+/// `MAIR_NORMAL_WB`.
+pub const MAIR_NORMAL_WB: u64 = 0xff;
+/// `PAR_F_SHIFT`.
+pub const PAR_F_SHIFT: u32 = 0;
+/// `PAR_F`.
+pub const PAR_F: u64 = 0x1 << PAR_F_SHIFT;
+
+/// `PAR_SUCCESS(x)`.
+pub const fn par_success(x: u64) -> bool {
+    (x & PAR_F) == 0
+}
+
+/// `PAR_SH_SHIFT`.
+pub const PAR_SH_SHIFT: u32 = 7;
+/// `PAR_SH_MASK`.
+pub const PAR_SH_MASK: u64 = 0x3 << PAR_SH_SHIFT;
+/// `PAR_NS_SHIFT`.
+pub const PAR_NS_SHIFT: u32 = 9;
+/// `PAR_NS_MASK`.
+pub const PAR_NS_MASK: u64 = 0x3 << PAR_NS_SHIFT;
+/// `PAR_PA_SHIFT`.
+pub const PAR_PA_SHIFT: u32 = 12;
+/// `PAR_PA_MASK`.
+pub const PAR_PA_MASK: u64 = 0x0000_ffff_ffff_f000;
+/// `PAR_ATTR_SHIFT`.
+pub const PAR_ATTR_SHIFT: u32 = 56;
+/// `PAR_ATTR_MASK`.
+pub const PAR_ATTR_MASK: u64 = 0xff << PAR_ATTR_SHIFT;
+/// `PAR_FST_SHIFT`.
+pub const PAR_FST_SHIFT: u32 = 1;
+/// `PAR_FST_MASK`.
+pub const PAR_FST_MASK: u64 = 0x3f << PAR_FST_SHIFT;
+/// `PAR_PTW_SHIFT`.
+pub const PAR_PTW_SHIFT: u32 = 8;
+/// `PAR_PTW_MASK`.
+pub const PAR_PTW_MASK: u64 = 0x1 << PAR_PTW_SHIFT;
+/// `PAR_S_SHIFT`.
+pub const PAR_S_SHIFT: u32 = 9;
+/// `PAR_S_MASK`.
+pub const PAR_S_MASK: u64 = 0x1 << PAR_S_SHIFT;
 
 /* SCTLR_EL1 - System Control Register */
 
