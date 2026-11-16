@@ -1837,10 +1837,10 @@ notes = "M4: the registers and bits lapic.c's boot path uses (ID, version, TPR, 
 [[file]]
 c = "sys/arch/amd64/include/i82489var.h"
 rust = "sys/arch/amd64/include/i82489var.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "b324e0ea8cfa307ba34f452ee893996d358a93d7"
-notes = "M4: the LAPIC vector numbers; local_apic, lapic_tpr, the lapic_readreg/writereg pointers and the prototypes are amd64/lapic.rs; the IPI and timer stubs are M5"
+notes = "the LAPIC vector numbers (all of the header's own values); local_apic, the lapic_readreg/writereg pointers and the lapic_* functions it declares are amd64/lapic.rs, the interrupt stubs vector.S/vector.rs; the _pcid IPI variants, Xipi_invept (NVMM) and the Xen/Hyper-V upcall stubs are vector.S's row and unported drivers (TD1: read again whole)"
 
 [[file]]
 c = "sys/arch/amd64/amd64/i8259.c"

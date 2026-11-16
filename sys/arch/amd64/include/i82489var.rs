@@ -50,9 +50,19 @@
 //!
 //! Upstream: sys/arch/amd64/include/i82489var.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M4 ports the vector numbers; `local_apic`, `lapic_tpr`, the
-//! `lapic_readreg`/`lapic_writereg` pointers and the functions it declares are
-//! `amd64/lapic.rs`. The IPI and timer stubs (`Xintr_lapic_*`, `Xipi_*`) come with M5.
+//! Status: `ported`. The header's own values are the vector numbers. The rest are
+//! declarations, defined where the C defines them: `local_apic`, the `lapic_readreg` and
+//! `lapic_writereg` pointers, `lapic_cpu_number`, `lapic_boot_init`, `lapic_set_lvt`,
+//! `lapic_enable`, `lapic_disable`, `lapic_calibrate_timer`, `lapic_startclock` and
+//! `lapic_initclocks` in `amd64/lapic.rs`; the interrupt stubs (`Xintrspurious`,
+//! `Xintr_lapic_ipi`, `Xintr_lapic_ltimer` with their `Xrecurse_`/`Xresume_` entries, the
+//! `Xipi_inv*` handlers) in `amd64/vector.S`, declared to Rust in `amd64/vector.rs`.
+//!
+//! ## Deviations
+//! - What `vector.S` does not have yet has no declaration here either, and belongs to its
+//!   row: the `_pcid` variants of `Xipi_invlpg` and `Xipi_invlrange` (PCID), `Xipi_invept`
+//!   (`NVMM > 0`), and the Xen and Hyper-V upcall stubs (`NXEN`, `NHYPERV`: drivers that are
+//!   not ported). Their vector numbers are here.
 
 /// `LAPIC_SPURIOUS_VECTOR`: "spurious interrupt vector"; vector used by interrupt which was
 /// aborted because the CPU masked it after it happened but before it was delivered.. "Oh,
