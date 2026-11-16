@@ -1,16 +1,16 @@
 # Status
 
-Milestone: **TD1a met** (2026-11-15: this kernel built inside an arm64 EmiBSD VM by DevTools'
-native cargo); **TD1b under way** (EmiBSD builds EmiBSD, no Apple tool builds it); then M17.
+Milestone: **TDk met** (TD1a until 2026-11-15: this kernel built inside an arm64 EmiBSD VM
+by DevTools' native cargo); **TD0 under way** (the kernel's debt: TD0..TD6); then M17.
 Updated: 2026-11-15.
 
 Toolchain: DevTools' Rust 1.99.1+emibsd.5 and LLVM 23.1.4+emibsd.6 (D-0008), run straight
 from `~/devel/emibsd/toolchains` (no rustup; `just cargo`); the userland by DevTools' clang.
 
 Done:
-- TD1b step 2 (2026-11-15): `smoke-selfhost-userland` builds `make build`'s lib, bin, sbin,
-  usr.bin and libexec inside the VM (hvf, 286 s) with the native `aarch64-emibsd-emibsd8.0`
-  clang and `__EmiBSD__`: 32/33, 30/30, 65/65, 208/209, 28/28; left: libcrypto, bgplg.
+- 2026-11-15: TD restated by the user: this repository is the kernel; userland
+  self-hosting is the Userland repository's (the in-VM userland build made here comes out
+  in TD0). The debt measured: 138 `wip`, 42 `todo`, 198 `unported!`, `sys_nosys` calls.
 - TD1a (2026-11-15): `smoke-selfhost-kernel` ok (32m21s in the VM). Fixed on the way: the
   "EmiBSD" ELF note (ENOEXEC), `__thrsleep`, shared libcrypto/libssl, the selfhost disk's base;
   also sysarch (TD3), the userland by DevTools' clang (TD2), the build tools in the base (TD1b),
@@ -19,10 +19,10 @@ Done:
 - M16 (2026-10-09): QEMU drivers, M16a..M16g, with the install images.
 
 Next:
-- TD1b: `ul-build-rc-0` needs perl (libcrypto's `obj_mac.h`) and readline (bgplg) in the
-  VM: the user's decision (clone). The Mac's cross build still uses `*-unknown-openbsd`.
-- TD1c..d: comp with DevTools' native toolchain; sets and images made inside.
-- TD2: the first image by DevTools' cross toolchain only; TD3..TD6 in self-hosting's order.
+- TD0: TDk's disk from Userland's base; the userland build for the VM out; a row for every
+  kernel `.c` outside the drivers, checked by `ports check`.
+- TD1 the `wip` rows; TD2 the `unported!` stubs; TD3 swapctl, SysV IPC, ptrace, ktrace;
+  TD4 the other MI files; TD5 networking; TD6 the arch files. Drivers are not in TD.
 - M17 (the user's decisions below first).
 - Left by M14: GPL parts of the sets, lldb, efi(4).
 
@@ -38,4 +38,4 @@ Blockers:
 
 Decisions pending (the user's): the scope section; vga(4)'s SeaBIOS path; Limine's retirement;
 M17's PC CPU, Pi 4 model and networking; reporting EXTERNAL_BUGS upstream; the restated M16
-criteria; TD1b's perl (libcrypto) and readline (bgplg), both outside the clone.
+criteria.

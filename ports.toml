@@ -12177,7 +12177,7 @@ deps = ["sys/dev/ofw/ofw_gpio.c", "sys/dev/ofw/ofw_pinctrl.c", "sys/kern/kern_se
 notes = "M16f: the whole file: GPIOKEYS_EV_*, GPIOKEYS_SW_LID, GPIOKEYS_KEY_POWER, struct gpiokeys_key (Box'd, gpios cells as a 'static slice), struct gpiokeys_softc, gpiokeys_ca/cd, gpiokeys_match, gpiokeys_attach (labels, the lid sensor, the power key, interrupts or the 1 s sensor task, sensordev_install), gpiokeys_update_key (lid sensor and machdep.lidaction through machine::fdt::lid_action, simplefb_burn_hook), gpiokeys_power_button (powerbutton_event on release), gpiokeys_intr; option SUSPEND waits for kern/subr_suspend.c: cpu_suspended reads 0, device_register_wakeup and request_sleep are unported! stubs; gpiokeys* at fdt? in arm64's ioconf. QEMU virt: gpiokeys0 attaches to the PL061's power key, which has no interrupt and is polled through gpiokeys_update_key, which ignores KEY_POWER: system_powerdown does nothing, exactly as on OpenBSD 8.0 (the M16f criterion, after the user's option A of 2026-10-08); host tests"
 
 # ---------------------------------------------------------------------------
-# TD: technical debt (decided by the user on 2026-11-15; docs/ROADMAP.md, TD1..TD6)
+# TD: the kernel's technical debt (decided by the user on 2026-11-15; docs/ROADMAP.md, TD0..TD6)
 # ---------------------------------------------------------------------------
 
 [[file]]
@@ -12186,7 +12186,7 @@ rust = "sys/arch/arm64/arm64/sys_machdep.rs"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "b2291b0026bcc94e5a4125cc70a5eb35a776e05d"
-notes = "TD3: the whole file: sys_sysarch (EINVAL for every op; pledge_fail under pledge), reached from init_sysent through machine::sys_sysarch (MachineSysarch); before TD3 the row answered sys_nosys (SIGSYS); host test through the host double"
+notes = "TDk: the whole file: sys_sysarch (EINVAL for every op; pledge_fail under pledge), reached from init_sysent through machine::sys_sysarch (MachineSysarch); before TD3 the row answered sys_nosys (SIGSYS); host test through the host double"
 
 [[file]]
 c = "sys/arch/amd64/amd64/sys_machdep.c"
@@ -12194,43 +12194,43 @@ rust = "sys/arch/amd64/amd64/sys_machdep.rs"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "940b417ccb2ef077a2c57a4635bcb4a8739645bd"
-notes = "TD3: the whole file: amd64_iopl (suser, EPERM above securelevel 0, copyin of struct amd64_iopl_args, PSL_IOPL in the trap frame's rflags) and sys_sysarch (AMD64_IOPL, else EINVAL; pledge_fail under pledge); option APERTURE not configured (the #else branch); reached through machine::sys_sysarch"
+notes = "TDk: the whole file: amd64_iopl (suser, EPERM above securelevel 0, copyin of struct amd64_iopl_args, PSL_IOPL in the trap frame's rflags) and sys_sysarch (AMD64_IOPL, else EINVAL; pledge_fail under pledge); option APERTURE not configured (the #else branch); reached through machine::sys_sysarch"
 
 [[file]]
 c = "sys/kern/sysv_ipc.c"
 rust = "sys/kern/sysv_ipc.rs"
 status = "todo"
-notes = "TD4: ipcperm, shared by the three System V IPC files"
+notes = "TD3: ipcperm, shared by the three System V IPC files"
 
 [[file]]
 c = "sys/kern/sysv_sem.c"
 rust = "sys/kern/sysv_sem.rs"
 status = "todo"
 deps = ["sys/kern/sysv_ipc.c"]
-notes = "TD4: option SYSVSEM (GENERIC): semget, semop, __semctl, semexit, kern.seminfo"
+notes = "TD3: option SYSVSEM (GENERIC): semget, semop, __semctl, semexit, kern.seminfo"
 
 [[file]]
 c = "sys/kern/sysv_msg.c"
 rust = "sys/kern/sysv_msg.rs"
 status = "todo"
 deps = ["sys/kern/sysv_ipc.c"]
-notes = "TD4: option SYSVMSG (GENERIC): msgget, msgsnd, msgrcv, msgctl"
+notes = "TD3: option SYSVMSG (GENERIC): msgget, msgsnd, msgrcv, msgctl"
 
 [[file]]
 c = "sys/kern/sysv_shm.c"
 rust = "sys/kern/sysv_shm.rs"
 status = "todo"
 deps = ["sys/kern/sysv_ipc.c"]
-notes = "TD4: option SYSVSHM (GENERIC): shmat, shmdt, shmget, shmctl, shmfork, shmexit, kern.shminfo"
+notes = "TD3: option SYSVSHM (GENERIC): shmat, shmdt, shmget, shmctl, shmfork, shmexit, kern.shminfo"
 
 [[file]]
 c = "sys/kern/sys_process.c"
 rust = "sys/kern/sys_process.rs"
 status = "todo"
-notes = "TD5: option PTRACE (GENERIC): sys_ptrace and process_* helpers"
+notes = "TD3: option PTRACE (GENERIC): sys_ptrace and process_* helpers"
 
 [[file]]
 c = "sys/kern/kern_ktrace.c"
 rust = "sys/kern/kern_ktrace.rs"
 status = "todo"
-notes = "TD5: option KTRACE (GENERIC): sys_ktrace, ktr* record writers, and the KTRACE blocks other ported files left out"
+notes = "TD3: option KTRACE (GENERIC): sys_ktrace, ktr* record writers, and the KTRACE blocks other ported files left out"

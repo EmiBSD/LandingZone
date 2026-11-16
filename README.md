@@ -45,10 +45,10 @@ it; nothing here adapts to them. The whole picture is in
 
 ## Status
 
-Status: TD1a met (2026-11-15): EmiBSD builds its own kernel, DevTools' native rustc and cargo
-compiling this repository's arm64 kernel inside an arm64 EmiBSD VM. TD (technical debt:
-self-hosting and no Apple tools) under way, TD1b (the userland built inside) next; M16 (QEMU
-drivers) was the last milestone met before it, M17 (real hardware) waits behind TD.
+Status: TDk met (2026-11-15; TD1a until then): EmiBSD builds its own kernel, DevTools' native
+rustc and cargo compiling this repository's arm64 kernel inside an arm64 EmiBSD VM. TD (the
+kernel's technical debt: what is not migrated yet) under way, TD0 first; M16 (QEMU drivers)
+was the last milestone met before it, M17 (real hardware) waits behind TD.
 
 | Milestone | Scope | State |
 |---|---|---|
@@ -86,8 +86,8 @@ drivers) was the last milestone met before it, M17 (real hardware) waits behind 
 | M16d | Console, virtio and legacy devices: pckbc(4), pckbd(4) and pms(4); viogpu(4), viomb(4), viornd(4) with rnd(4)'s entropy pool and /dev/random, viocon(4) (cargo feature); lpt(4); pcppi(4) and spkr(4); eap(4) with midi(4) | met |
 | M16a | Storage drivers: pciide(4) with every chip of its table, wdc and wd(4) (`wd0` on PIIX3), mpi(4) on mptsas1068, sdhc(4) with the sdmmc(4) stack on sdhci-pci, fd(4) and fdc(4) with isadma(4); vmwpvs(4) behaves as on OpenBSD 8.0. mfi, mfii, pcscp and ufshci moved to M17: OpenBSD 8.0 itself fails on QEMU's devices | met |
 | M16g | Install images: `install80.img` (both archs) and `cd80.iso` (amd64) laid out as `distrib/` makes them, the ISO 9660 image written by xtask; OpenBSD's installer, answered over the console, installs from the stick with no HTTP server; the CD boots to the installer | met |
-| TD1a | Self-hosting, the kernel: DevTools' native rustc and cargo build this kernel inside an arm64 EmiBSD VM (`just smoke-selfhost-kernel`, 32 min under TCG); with it `__thrsleep`/`__thrwakeup`, shared libcrypto/libssl, the "EmiBSD" ELF note | met |
-| TD1b..TD6 | Self-hosting of the userland, comp and sets; the bootstrap without Apple; sysarch, swapctl; SysV IPC; ptrace, ktrace; the stubs | under way |
+| TDk (TD1a) | The kernel inside EmiBSD: DevTools' native rustc and cargo build this kernel inside an arm64 EmiBSD VM (`just smoke-selfhost-kernel`, 32 min under TCG); with it `__thrsleep`/`__thrwakeup`, shared libcrypto/libssl, the "EmiBSD" ELF note | met |
+| TD0..TD6 | The kernel's debt: inventory, the `wip` rows, the `unported!` stubs, swapctl/SysV IPC/ptrace/ktrace, the other MI files, networking, the arch files | under way |
 | M17 | Real hardware and virtualisation (vmm, vmd; optional) | after TD |
 
 Stage 2 of the diagnostic tools (ps, fstat, vmstat, df) is also met. Exit criteria and dates are
