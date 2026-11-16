@@ -53,9 +53,10 @@
 //!
 //! Upstream: sys/kern/subr_xxx.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M5 (part b2) ports `enodev`, `enxio`, `eopnotsupp`, `nullop`
-//! and `assertwaitok`; the device switch (M8) brings `bdevsw_lookup`, `chrtoblk` and
-//! `blktochr`.
+//! Status: `ported`. The file's eight functions: the error stubs `enodev`, `enxio`,
+//! `eopnotsupp` and `nullop`, the device switch's `bdevsw_lookup`, `chrtoblk` and `blktochr`,
+//! and `assertwaitok` with its three checks (the spl, the SMR critical section and, under
+//! `DIAGNOSTIC`, the CPU's mutex count).
 //!
 //! ## Deviations
 //! - The error stubs return `Result<(), Errno>` like every other error path.
