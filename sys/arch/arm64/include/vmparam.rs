@@ -55,10 +55,17 @@
 //!
 //! Upstream: sys/arch/arm64/include/vmparam.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M3 needs the address-space bounds and the physical segment
-//! policy; the user limits (`MAXTSIZ`, `DFLDSIZ`, `MAXDSIZ`, `BRKSIZ`, `DFLSSIZ`, `MAXSSIZ`,
-//! `STACKGAP_RANDOM`, `USRSTACK`, `VM_MIN_STACK_ADDRESS`); M10a (physio) `USRIOSIZE` and
-//! `VM_PHYS_SIZE`; `SHMMAXPGS` is not there yet.
+//! Status: `ported`. The whole header: the user limits (`USRSTACK`, `MAXTSIZ`, `DFLDSIZ`,
+//! `MAXDSIZ`, `BRKSIZ`, `DFLSSIZ`, `MAXSSIZ`, `STACKGAP_RANDOM`), `SHMMAXPGS`, `USRIOSIZE`,
+//! `KERNEL_BASE`, the user and kernel address bounds (`USER_SPACE_BITS`),
+//! `VM_MIN_STACK_ADDRESS`, `VM_PHYS_SIZE` and the physical segment policy. Generic code
+//! reads them through `machine::VmParam`. arm64 defines no `VM_PIE_*`: `uvm_map_pie` takes
+//! `uvm_map.c`'s defaults, which the contract supplies.
+//!
+//! ## Deviations
+//! - `VM_PHYSSEG_NOADD`, which the C defines empty and tests with `#ifdef`, is a `bool`.
+//! - The `#ifndef` around the limits a kernel configuration may override is not carried:
+//!   GENERIC overrides none.
 
 use crate::arch::arm64::include::param::PAGE_SIZE;
 use crate::uvm::uvm_page::VM_PSTRAT_BSEARCH;
@@ -91,6 +98,8 @@ pub const DFLSSIZ: usize = 2 * 1024 * 1024;
 pub const MAXSSIZ: usize = 32 * 1024 * 1024;
 /// `STACKGAP_RANDOM`.
 pub const STACKGAP_RANDOM: usize = 256 * 1024;
+/// `SHMMAXPGS`: size of shared memory map, in pages (`conf/param.c`'s `SHMMAX` and `SHMALL`).
+pub const SHMMAXPGS: usize = 1024;
 /// `VM_MIN_STACK_ADDRESS`.
 pub const VM_MIN_STACK_ADDRESS: usize = 3 << (USER_SPACE_BITS - 2);
 /// `VM_MIN_KERNEL_ADDRESS`: the start of the kernel address space.
@@ -120,6 +129,8 @@ mod tests {
             ("USER_SPACE_BITS", i64::from(USER_SPACE_BITS)),
             ("VM_PHYSSEG_MAX", VM_PHYSSEG_MAX as i64),
             ("USRIOSIZE", USRIOSIZE as i64),
+            ("SHMMAXPGS", SHMMAXPGS as i64),
+            ("STACKGAP_RANDOM", STACKGAP_RANDOM as i64),
         ];
         for (name, value) in ours {
             assert_eq!(crate::reftest::int(&defs, name), Some(*value), "{name}");

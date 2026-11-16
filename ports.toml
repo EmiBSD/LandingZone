@@ -1114,11 +1114,11 @@ notes = "direct map over Limine's HHDM, pmap_bootstrap adopts the bootloader's P
 [[file]]
 c = "sys/arch/arm64/include/vmparam.h"
 rust = "sys/arch/arm64/include/vmparam.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "45551c8ddb837b4eaa54d2207bfae50f2909cd4a"
 deps = ["sys/arch/arm64/include/param.h"]
-notes = "address-space bounds and physical segment policy; M6-b: USRSTACK and the user limits (MAXTSIZ/DFLDSIZ/MAXDSIZ/BRKSIZ/DFLSSIZ/MAXSSIZ, STACKGAP_RANDOM, VM_MIN_STACK_ADDRESS) through machine::vmparam; M10a: USRIOSIZE and VM_PHYS_SIZE (the physio map), USRIOSIZE in the reference-backed test; SHMMAXPGS not yet"
+notes = "the whole header: the user limits, SHMMAXPGS (TD1), USRIOSIZE, KERNEL_BASE, the address bounds, VM_MIN_STACK_ADDRESS, VM_PHYS_SIZE and the physical segment policy, through machine::VmParam; no VM_PIE_* (uvm_map.c's defaults); VM_PHYSSEG_NOADD is a bool"
 
 [[file]]
 c = "sys/arch/arm64/include/pmap.h"
