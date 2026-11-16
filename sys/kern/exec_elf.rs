@@ -138,12 +138,11 @@ use crate::sys::exec::{
 };
 use crate::sys::exec_elf::aux_id::*;
 use crate::sys::exec_elf::{
-    AuxInfo, DT_TEXTREL, EI_CLASS, EI_DATA, EI_OSABI, EI_VERSION, ELF_AUX_ENTRIES,
-    ELF_MAX_VALID_PHDR, ELF_NO_ADDR, ELFOSABI_OPENBSD, ET_DYN, ET_EXEC, EV_CURRENT, ElfDyn,
-    ElfEhdr, ElfNote, ElfPhdr, NT_OPENBSD_PROF, PF_OPENBSD_MUTABLE, PF_R, PF_W, PF_X, PT_DYNAMIC,
-    PT_GNU_RELRO, PT_INTERP, PT_LOAD, PT_NOTE, PT_OPENBSD_MUTABLE, PT_OPENBSD_NOBTCFI,
-    PT_OPENBSD_RANDOMIZE, PT_OPENBSD_SYSCALLS, PT_OPENBSD_WXNEEDED, PT_PHDR, PT_SHLIB, elf_round,
-    elf_trunc, elfround, is_elf,
+    AuxInfo, DT_TEXTREL, EI_CLASS, EI_DATA, EI_OSABI, EI_VERSION, ELF_AUX_ENTRIES, ELF_NO_ADDR,
+    ELF_TARG_VER, ELFOSABI_OPENBSD, ET_DYN, ET_EXEC, ElfDyn, ElfEhdr, ElfNote, ElfPhdr,
+    NT_OPENBSD_PROF, PF_OPENBSD_MUTABLE, PF_R, PF_W, PF_X, PT_DYNAMIC, PT_GNU_RELRO, PT_INTERP,
+    PT_LOAD, PT_NOTE, PT_OPENBSD_MUTABLE, PT_OPENBSD_NOBTCFI, PT_OPENBSD_RANDOMIZE,
+    PT_OPENBSD_SYSCALLS, PT_OPENBSD_WXNEEDED, PT_PHDR, PT_SHLIB, elfround, is_elf,
 };
 use crate::sys::fcntl::FREAD;
 use crate::sys::malloc::{M_PINSYSCALL, M_TEMP, M_WAITOK, M_ZERO};
@@ -160,8 +159,9 @@ use crate::uvm::uvm_extern::{UVM_UNKNOWN_OFFSET, VmProt};
 use crate::uvm::uvm_map::{VM_MAP_PINSYSCALL_ONCE, uvm_map_hint, uvm_map_mquery, uvm_map_pie};
 use crate::uvm::uvm_param::{round_page, trunc_page};
 
-/// `ELF_TARG_VER`.
-const ELF_TARG_VER: u32 = EV_CURRENT;
+/// `ELF_MAX_VALID_PHDR`: we limit the number of program headers to 32, this should be a
+/// reasonable limit for ELF, the most we have seen so far is 12.
+const ELF_MAX_VALID_PHDR: u16 = 32;
 
 /// `ELF_NOTE_NAME_OPENBSD`: the note name id of "OpenBSD", and of "EmiBSD" (decision 48).
 const ELF_NOTE_NAME_OPENBSD: i32 = 0x01;
@@ -198,6 +198,16 @@ macro_rules! read_image {
 pub static HWCAP: AtomicU64 = AtomicU64::new(0);
 /// `hwcap2`: the continuation, `AUX_hwcap2` (`__HAVE_CPU_HWCAP2`).
 pub static HWCAP2: AtomicU64 = AtomicU64::new(0);
+
+/// `ELF_ROUND(a, b)`: round up to a page boundary.
+const fn elf_round(a: u64, b: u64) -> u64 {
+    (a + b - 1) & !(b - 1)
+}
+
+/// `ELF_TRUNC(a, b)`: round down to a page boundary.
+const fn elf_trunc(a: u64, b: u64) -> u64 {
+    a & !(b - 1)
+}
 
 /// Check header for validity; `ENOEXEC` if error.
 pub fn elf_check_header(ehdr: &ElfEhdr) -> Result<(), Errno> {

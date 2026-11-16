@@ -2760,11 +2760,11 @@ notes = "M8: the whole file: struct futex (on the waiter's stack, linked into it
 [[file]]
 c = "sys/sys/exec_elf.h"
 rust = "sys/sys/exec_elf.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "07494ade2eeba0a8ab405b36f10b0828d09b4092"
 deps = []
-notes = "M6-b: Elf64 Ehdr/Phdr/Note, EI_*, ELFMAG, ELFCLASS64/ELFDATA2LSB/EV_CURRENT/ELFOSABI_OPENBSD, ET_*, EM_AMD64/EM_AARCH64, PT_* (with the OpenBSD ones), PF_*, NT_OPENBSD_*, elfround, IS_ELF/ELF_TRUNC/ELF_ROUND, ELF_MAX_VALID_PHDR; sections, symbols, relocations, dynamic entries, AuxInfo and the 32-bit types are M7; M8: Elf64_Dyn, DT_NULL/DT_TEXTREL, Elf64_Shalf, Aux64Info (to_bytes; the hole after au_id is a named zero field), the AUX_* ids in aux_id, ELF_AUX_ENTRIES, ELF_AUX_WORDS"
+notes = "the whole header (TD1; a script wrote the file from the header, 60 of its 344 defines had come with exec_elf.c and kern_exec.c): the 32-bit and 64-bit scalar types; Elf32/Elf64 Ehdr, Shdr, Sym, Rel, Rela, Relr, Phdr, Dyn (d_un, the union of d_val and d_ptr, is one word), Nhdr and Note; struct elfcore_procinfo; Aux32Info and Aux64Info (the hole after au_id a named zero field, to_bytes), the AUX_* ids in aux_id; 294 constants typed as the member of the 64-bit structures they are compared with (EI_*, ELFMAG*, ELFCLASS*, ELFDATA*, ELFOSABI_*, ET_*, EM_*, EV_*, PN_XNUM, SHN_*, SHT_*, the section names, SHF_*, STN_/STB_/STT_/STV_*, PT_*, PF_*, DT_*, DF_*, NT_*, ELFCORE_PROCINFO_VERSION, ELF_TARG_VER); IS_ELF over the trait ElfIdent (either header); ELF32/ELF64_ST_BIND/TYPE/INFO, ELF_ST_VISIBILITY, ELF32/ELF64_R_SYM/TYPE/INFO as const fns; the ELFSIZE 64 names (Elf_*, ELF_R_*, ELF_ST_*, ELFCLASS, ELF_NO_ADDR, AuxInfo; ELFSIZE is the machine's ARCH_ELFSIZE, checked 64 at compile time); ELF_AUX_ENTRIES/WORDS, ELFROUNDSIZE, elfround. Not declared: CONCAT/ELFNAME/ELFDEFNNAME (token pasting), the ELFSIZE 32 set of names, the mips64el forms of ELF64_R_*, _DYNAMIC (outside the kernel only); ELFMAG is the four bytes without the C string's NUL. ELF_ROUND, ELF_TRUNC and ELF_MAX_VALID_PHDR, which exec_elf.c defines, moved from here to kern/exec_elf.rs. A reference-backed test checks every value and that no define of the header is missing. license: BSD 3-clause (Erik Theisen), kept whole"
 
 [[file]]
 c = "sys/sys/exec.h"
