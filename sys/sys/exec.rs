@@ -60,10 +60,12 @@
 //!
 //! Upstream: sys/sys/exec.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. `struct ps_strings`, `struct exec_vmcmd` with `exec_vmcmd_set`, the
+//! Status: `ported`. `struct ps_strings`, `struct exec_vmcmd` with `exec_vmcmd_set`, the
 //! `VMCMD_*` flags, `struct exec_package` (every member), `struct execsw`, the `EXEC_*`
-//! flags, `ELF_RANDOMIZE_LIMIT` and `exec_maxhdrsz`. The a.out `MID_*` machine ids and the
-//! a.out `struct exec` are not used by any configured format.
+//! flags, `ELF_RANDOMIZE_LIMIT`, `exec_maxhdrsz` and the `a_mid` machine ids (`MID_*`), of
+//! which each machine's `<machine/param.h>` picks its `MID_MACHINE`. The functions the kernel
+//! half declares are `kern/kern_exec.rs`, `kern/exec_subr.rs` and each machine's `setregs`;
+//! `execsw[]` (`EXECSW`) and `stackgap_random` are `kern/kern_exec.rs`.
 //!
 //! ## Deviations
 //! - The executable is a vnode (`ep_vp`, M8) or, for the `init` boot module until a root
@@ -81,6 +83,8 @@
 //!   without their NULs.
 //! - `exec_maxhdrsz` is a `const fn` over the constant exec switch instead of the global
 //!   `init_exec` (`exec_conf.c`) computes at boot.
+//! - `nexecs` is the exec switch's length (`EXECSW.len()`); `VMCMDSET_INIT` is
+//!   `ExecVmcmdSet::new`.
 
 use alloc::vec;
 use alloc::vec::Vec;
@@ -393,7 +397,149 @@ pub const EXEC_NOBTCFI: u32 = 0x0040;
 /// `EXEC_PROFILE`: profiled binary.
 pub const EXEC_PROFILE: u32 = 0x0080;
 
+/// `EXEC_DEFAULT_VMCMD_SETSIZE`: # of cmds in set to start. The set is a `Vec` here, which
+/// grows by itself; the C's starting size is what it is created with.
+pub const EXEC_DEFAULT_VMCMD_SETSIZE: usize = 12;
+
+// a_mid - keep sorted in numerical order for sanity's sake
+// ensure that: 0 < mid < 0x3ff
+
+/// `MID_ZERO`: Unknown - implementation dependent.
+pub const MID_ZERO: u32 = 0;
+/// `MID_SUN010`: Sun 68010/68020 binary.
+pub const MID_SUN010: u32 = 1;
+/// `MID_SUN020`: Sun 68020-only binary.
+pub const MID_SUN020: u32 = 2;
+/// `MID_PC386`: 386 PC binary. (so quoth BFD).
+pub const MID_PC386: u32 = 100;
+/// `MID_ROMPAOS`: Old IBM RT.
+pub const MID_ROMPAOS: u32 = 104;
+/// `MID_I386`: I386 BSD binary.
+pub const MID_I386: u32 = 134;
+/// `MID_M68K`: M68k BSD binary with 8K page sizes.
+pub const MID_M68K: u32 = 135;
+/// `MID_M68K4K`: DO NOT USE: m68k BSD binary with 4K page sizes.
+pub const MID_M68K4K: u32 = 136;
+/// `MID_NS32532`: Ns32532.
+pub const MID_NS32532: u32 = 137;
+/// `MID_SPARC`: Sparc.
+pub const MID_SPARC: u32 = 138;
+/// `MID_PMAX`: Pmax.
+pub const MID_PMAX: u32 = 139;
+/// `MID_VAX1K`: Vax 1k page size.
+pub const MID_VAX1K: u32 = 140;
+/// `MID_ALPHA`: Alpha BSD binary.
+pub const MID_ALPHA: u32 = 141;
+/// `MID_MIPS`: Big-endian MIPS.
+pub const MID_MIPS: u32 = 142;
+/// `MID_ARM6`: ARM6.
+pub const MID_ARM6: u32 = 143;
+/// `MID_SH3`: SH3.
+pub const MID_SH3: u32 = 145;
+/// `MID_POWERPC`: Big-endian PowerPC.
+pub const MID_POWERPC: u32 = 149;
+/// `MID_VAX`: Vax.
+pub const MID_VAX: u32 = 150;
+/// `MID_SPARC64`: LP64 sparc.
+pub const MID_SPARC64: u32 = 151;
+/// `MID_MIPS2`: MIPS2.
+pub const MID_MIPS2: u32 = 152;
+/// `MID_M88K`: M88k BSD binary.
+pub const MID_M88K: u32 = 153;
+/// `MID_HPPA`: Hppa.
+pub const MID_HPPA: u32 = 154;
+/// `MID_AMD64`: AMD64.
+pub const MID_AMD64: u32 = 157;
+/// `MID_MIPS64`: Big-endian MIPS64.
+pub const MID_MIPS64: u32 = 158;
+/// `MID_ARM64`: ARM64.
+pub const MID_ARM64: u32 = 159;
+/// `MID_POWERPC64`: Big-endian 64-bit PowerPC.
+pub const MID_POWERPC64: u32 = 160;
+/// `MID_RISCV64`: Little-endian 64-bit RISC-V.
+pub const MID_RISCV64: u32 = 161;
+/// `MID_HP200`: Hp200 (68010) BSD binary.
+pub const MID_HP200: u32 = 200;
+/// `MID_HP300`: Hp300 (68020+68881) BSD binary.
+pub const MID_HP300: u32 = 300;
+/// `MID_HPUX`: Hp200/300 HP-UX binary.
+pub const MID_HPUX: u32 = 0x20c;
+/// `MID_HPUX800`: Hp800 HP-UX binary pa1.0.
+pub const MID_HPUX800: u32 = 0x20b;
+/// `MID_HPPA11`: Hp700 HP-UX binary pa1.1.
+pub const MID_HPPA11: u32 = 0x210;
+/// `MID_HPPA20`: Hp700 HP-UX binary pa2.0.
+pub const MID_HPPA20: u32 = 0x214;
+
 const _: () = {
     assert!(size_of::<PsStrings>() == 32);
 };
 /* </CODE> */
+
+/* <TESTS> */
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "needs OPENBSD_SRC (just test-ref)"]
+    fn the_machine_ids_and_flags_match_the_c_header() {
+        let defs = crate::reftest::defines("sys/sys/exec.h");
+        let ours: &[(&str, i64)] = &[
+            ("MID_ZERO", MID_ZERO as i64),
+            ("MID_SUN010", MID_SUN010 as i64),
+            ("MID_SUN020", MID_SUN020 as i64),
+            ("MID_PC386", MID_PC386 as i64),
+            ("MID_ROMPAOS", MID_ROMPAOS as i64),
+            ("MID_I386", MID_I386 as i64),
+            ("MID_M68K", MID_M68K as i64),
+            ("MID_M68K4K", MID_M68K4K as i64),
+            ("MID_NS32532", MID_NS32532 as i64),
+            ("MID_SPARC", MID_SPARC as i64),
+            ("MID_PMAX", MID_PMAX as i64),
+            ("MID_VAX1K", MID_VAX1K as i64),
+            ("MID_ALPHA", MID_ALPHA as i64),
+            ("MID_MIPS", MID_MIPS as i64),
+            ("MID_ARM6", MID_ARM6 as i64),
+            ("MID_SH3", MID_SH3 as i64),
+            ("MID_POWERPC", MID_POWERPC as i64),
+            ("MID_VAX", MID_VAX as i64),
+            ("MID_SPARC64", MID_SPARC64 as i64),
+            ("MID_MIPS2", MID_MIPS2 as i64),
+            ("MID_M88K", MID_M88K as i64),
+            ("MID_HPPA", MID_HPPA as i64),
+            ("MID_AMD64", MID_AMD64 as i64),
+            ("MID_MIPS64", MID_MIPS64 as i64),
+            ("MID_ARM64", MID_ARM64 as i64),
+            ("MID_POWERPC64", MID_POWERPC64 as i64),
+            ("MID_RISCV64", MID_RISCV64 as i64),
+            ("MID_HP200", MID_HP200 as i64),
+            ("MID_HP300", MID_HP300 as i64),
+            ("MID_HPUX", MID_HPUX as i64),
+            ("MID_HPUX800", MID_HPUX800 as i64),
+            ("MID_HPPA11", MID_HPPA11 as i64),
+            ("MID_HPPA20", MID_HPPA20 as i64),
+            ("VMCMD_RELATIVE", VMCMD_RELATIVE as i64),
+            ("VMCMD_BASE", VMCMD_BASE as i64),
+            ("VMCMD_STACK", VMCMD_STACK as i64),
+            ("VMCMD_IMMUTABLE", VMCMD_IMMUTABLE as i64),
+            ("VMCMD_TEXTREL", VMCMD_TEXTREL as i64),
+            (
+                "EXEC_DEFAULT_VMCMD_SETSIZE",
+                EXEC_DEFAULT_VMCMD_SETSIZE as i64,
+            ),
+            ("EXEC_INDIR", EXEC_INDIR as i64),
+            ("EXEC_HASFD", EXEC_HASFD as i64),
+            ("EXEC_HASARGL", EXEC_HASARGL as i64),
+            ("EXEC_SKIPARG", EXEC_SKIPARG as i64),
+            ("EXEC_DESTR", EXEC_DESTR as i64),
+            ("EXEC_WXNEEDED", EXEC_WXNEEDED as i64),
+            ("EXEC_NOBTCFI", EXEC_NOBTCFI as i64),
+            ("EXEC_PROFILE", EXEC_PROFILE as i64),
+        ];
+        for (name, value) in ours {
+            assert_eq!(crate::reftest::int(&defs, name), Some(*value), "{name}");
+        }
+    }
+}
+/* </TESTS> */

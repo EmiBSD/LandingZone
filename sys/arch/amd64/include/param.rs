@@ -58,7 +58,6 @@
 //!
 //! ## Deviations
 //! - `_MACHINE` and `_MACHINE_ARCH` (unquoted tokens for the preprocessor) have no counterpart.
-//! - `MID_MACHINE` (`MID_AMD64`) arrives with `sys/sys/exec.h`.
 //! - The `<machine/cpu.h>` / `<machine/psl.h>` includes are not reproduced; those headers are
 //!   modules of their own when ported.
 
@@ -88,6 +87,9 @@ pub const NBPG: usize = PAGE_SIZE;
 pub const PGSHIFT: usize = PAGE_SHIFT;
 /// Byte offset into page.
 pub const PGOFSET: usize = PAGE_MASK;
+
+/// `MID_MACHINE`: this machine's `a_mid` (`<sys/exec.h>`).
+pub const MID_MACHINE: u32 = crate::sys::exec::MID_AMD64;
 
 /// Pages of u-area.
 pub const UPAGES: usize = 6;

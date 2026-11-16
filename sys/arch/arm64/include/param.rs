@@ -58,7 +58,6 @@
 //!
 //! ## Deviations
 //! - `_MACHINE` and `_MACHINE_ARCH` (unquoted tokens for the preprocessor) have no counterpart.
-//! - `MID_MACHINE` (`MID_ARM64`) arrives with `sys/sys/exec.h`.
 //! - `STACKALIGN(p)` is the function [`stackalign`].
 //! - The `<machine/cpu.h>` include is not reproduced; that header is a module of its own when
 //!   ported.
@@ -87,6 +86,9 @@ pub const NBPG: usize = PAGE_SIZE;
 pub const PGSHIFT: usize = PAGE_SHIFT;
 /// Byte offset into page.
 pub const PGOFSET: usize = PAGE_MASK;
+
+/// `MID_MACHINE`: this machine's `a_mid` (`<sys/exec.h>`).
+pub const MID_MACHINE: u32 = crate::sys::exec::MID_ARM64;
 
 /// Pages of u-area.
 pub const UPAGES: usize = 6;

@@ -2769,11 +2769,11 @@ notes = "M6-b: Elf64 Ehdr/Phdr/Note, EI_*, ELFMAG, ELFCLASS64/ELFDATA2LSB/EV_CUR
 [[file]]
 c = "sys/sys/exec.h"
 rust = "sys/sys/exec.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "43e4d139508eac9c5154e47fda35ee9bbc6dc584"
 deps = ["sys/sys/exec_elf.h", "sys/uvm/uvm_extern.h"]
-notes = "M8: ps_strings (to_bytes), exec_vmcmd (ev_proc an enum of the five vmcmds, ev_vp an ExecFile: a vnode or the boot module image), exec_vmcmd_set as a Vec (NEW_VMCMD2 = push with vref, kill_vmcmds = kill with vrele), exec_package with every member (ep_hdr an owned exec_maxhdrsz buffer, ep_interp a namei_pool NameiBuf, ep_pins, ep_execpath; ep_ndp is check_exec's argument, ep_image the module stand-in), execsw, exec_maxhdrsz as a const fn, EXEC_*, VMCMD_*, ELF_RANDOMIZE_LIMIT; the a.out struct exec and MID_* are not used; M14: exec_makecmds_fcn takes the nameidata (ep_ndp) as its third argument, exec_maxhdrsz is max(EXEC_SCRIPT_HDRSZ, sizeof(Elf_Ehdr)), ep_fa holds exec_script.c's fake args"
+notes = "M8: ps_strings (to_bytes), exec_vmcmd (ev_proc an enum of the five vmcmds, ev_vp an ExecFile: a vnode or the boot module image), exec_vmcmd_set as a Vec (NEW_VMCMD2 = push with vref, kill_vmcmds = kill with vrele), exec_package with every member (ep_hdr an owned exec_maxhdrsz buffer, ep_interp a namei_pool NameiBuf, ep_pins, ep_execpath; ep_ndp is check_exec's argument, ep_image the module stand-in), execsw, exec_maxhdrsz as a const fn, EXEC_*, VMCMD_*, ELF_RANDOMIZE_LIMIT; the a.out struct exec and MID_* are not used; M14: exec_makecmds_fcn takes the nameidata (ep_ndp) as its third argument, exec_maxhdrsz is max(EXEC_SCRIPT_HDRSZ, sizeof(Elf_Ehdr)), ep_fa holds exec_script.c's fake args; TD1: the 33 a_mid machine ids (MID_*), with MID_MACHINE in each machine's param.rs, and EXEC_DEFAULT_VMCMD_SETSIZE; every declaration of the kernel half has its definition"
 
 [[file]]
 c = "sys/sys/exec_script.h"
