@@ -9726,67 +9726,67 @@ notes = "M14 A1: the boot argument structures (packed, as_bytes) and BIOS consta
 c = "sys/lib/libsa/aes_xts.c"
 rust = "sys/lib/libsa/aes_xts.rs"
 status = "todo"
-notes = "M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
+notes = "TB: M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
 
 [[file]]
 c = "sys/lib/libsa/bcrypt_pbkdf.c"
 rust = "sys/lib/libsa/bcrypt_pbkdf.rs"
 status = "todo"
-notes = "M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
+notes = "TB: M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
 
 [[file]]
 c = "sys/lib/libsa/blowfish.c"
 rust = "sys/lib/libsa/blowfish.rs"
 status = "todo"
-notes = "M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
+notes = "TB: M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
 
 [[file]]
 c = "sys/lib/libsa/explicit_bzero.c"
 rust = "sys/lib/libsa/explicit_bzero.rs"
 status = "todo"
-notes = "M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
+notes = "TB: M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
 
 [[file]]
 c = "sys/lib/libsa/hmac_sha1.c"
 rust = "sys/lib/libsa/hmac_sha1.rs"
 status = "todo"
-notes = "M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
+notes = "TB: M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
 
 [[file]]
 c = "sys/lib/libsa/pkcs5_pbkdf2.c"
 rust = "sys/lib/libsa/pkcs5_pbkdf2.rs"
 status = "todo"
-notes = "M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
+notes = "TB: M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
 
 [[file]]
 c = "sys/lib/libsa/rijndael.c"
 rust = "sys/lib/libsa/rijndael.rs"
 status = "todo"
-notes = "M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
+notes = "TB: M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
 
 [[file]]
 c = "sys/lib/libsa/sha1.c"
 rust = "sys/lib/libsa/sha1.rs"
 status = "todo"
-notes = "M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
+notes = "TB: M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
 
 [[file]]
 c = "sys/lib/libsa/sha2.c"
 rust = "sys/lib/libsa/sha2.rs"
 status = "todo"
-notes = "M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
+notes = "TB: M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
 
 [[file]]
 c = "sys/lib/libsa/softraid.c"
 rust = "sys/lib/libsa/softraid.rs"
 status = "todo"
-notes = "M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
+notes = "TB: M14 A1: SOFTRAID=yes (bootx64/Makefile) boot from softraid volumes; efiboot's feature softraid mirrors the option and is not ported yet (efiopen refuses sr devices, diskprobe says so)"
 
 [[file]]
 c = "sys/arch/amd64/stand/libsa/softraid_amd64.c"
 rust = "sys/arch/amd64/stand/libsa/softraid_amd64.rs"
 status = "todo"
-notes = "M14 A1: srprobe/sr_strategy/sr_getdisklabel for efiboot's feature softraid; not ported yet"
+notes = "TB: M14 A1: srprobe/sr_strategy/sr_getdisklabel for efiboot's feature softraid; not ported yet"
 
 [[file]]
 c = "sys/lib/libsa/memcmp.c"
@@ -10484,13 +10484,13 @@ notes = "M14 A3, arm64 efiboot (BOOTAA64.EFI, crate efiboot-arm64): the script i
 c = "sys/arch/arm64/stand/efiboot/softraid_arm64.c"
 rust = "sys/arch/arm64/stand/efiboot/softraid_arm64.rs"
 status = "todo"
-notes = "M14 A3, arm64 efiboot (BOOTAA64.EFI, crate efiboot-arm64): srprobe, sr_strategy (AES-XTS), sr_getdisklabel, sropen (crypto unlock), srstrategy, srdiskio, srclose, srioctl: needs libsa softraid.c/aes_xts.c/... (todo); feature softraid of efiboot-arm64 mirrors it: efi_diskprobe says so with the feature, sropen (conf.rs stub) refuses sr devices visibly"
+notes = "TB: M14 A3, arm64 efiboot (BOOTAA64.EFI, crate efiboot-arm64): srprobe, sr_strategy (AES-XTS), sr_getdisklabel, sropen (crypto unlock), srstrategy, srdiskio, srclose, srioctl: needs libsa softraid.c/aes_xts.c/... (todo); feature softraid of efiboot-arm64 mirrors it: efi_diskprobe says so with the feature, sropen (conf.rs stub) refuses sr devices visibly"
 
 [[file]]
 c = "sys/arch/arm64/stand/efiboot/softraid_arm64.h"
 rust = "sys/arch/arm64/stand/efiboot/softraid_arm64.rs"
 status = "todo"
-notes = "M14 A3, arm64 efiboot (BOOTAA64.EFI, crate efiboot-arm64): prototypes of softraid_arm64.c (todo with it)"
+notes = "TB: M14 A3, arm64 efiboot (BOOTAA64.EFI, crate efiboot-arm64): prototypes of softraid_arm64.c (todo with it)"
 
 [[file]]
 c = "sys/arch/arm64/stand/efiboot/Makefile"
@@ -12446,139 +12446,139 @@ notes = "TD6: sys/arch/amd64/conf/files.amd64: \"file arch/amd64/pci/vga_post.c 
 c = "sys/arch/amd64/stand/boot/conf.c"
 rust = "sys/arch/amd64/stand/boot/conf.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/cdboot/conf.c"
 rust = "sys/arch/amd64/stand/cdboot/conf.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/libsa/bioscons.c"
 rust = "sys/arch/amd64/stand/libsa/bioscons.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/libsa/biosdev.c"
 rust = "sys/arch/amd64/stand/libsa/biosdev.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/libsa/biosprobe.c"
 rust = "sys/arch/amd64/stand/libsa/biosprobe.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/libsa/cmd_i386.c"
 rust = "sys/arch/amd64/stand/libsa/cmd_i386.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/libsa/dev_i386.c"
 rust = "sys/arch/amd64/stand/libsa/dev_i386.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/libsa/diskprobe.c"
 rust = "sys/arch/amd64/stand/libsa/diskprobe.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/libsa/exec_i386.c"
 rust = "sys/arch/amd64/stand/libsa/exec_i386.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/libsa/gateA20.c"
 rust = "sys/arch/amd64/stand/libsa/gateA20.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/libsa/machdep.c"
 rust = "sys/arch/amd64/stand/libsa/machdep.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/libsa/memprobe.c"
 rust = "sys/arch/amd64/stand/libsa/memprobe.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/libsa/pxe_net.c"
 rust = "sys/arch/amd64/stand/libsa/pxe_net.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/libsa/pxe.c"
 rust = "sys/arch/amd64/stand/libsa/pxe.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/libsa/time.c"
 rust = "sys/arch/amd64/stand/libsa/time.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/pxeboot/conf.c"
 rust = "sys/arch/amd64/stand/pxeboot/conf.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/pxeboot/devopen.c"
 rust = "sys/arch/amd64/stand/pxeboot/devopen.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/pxeboot/open.c"
 rust = "sys/arch/amd64/stand/pxeboot/open.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/pxeboot/pxe_udp.c"
 rust = "sys/arch/amd64/stand/pxeboot/pxe_udp.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14)"
 
 [[file]]
 c = "sys/arch/amd64/stand/rdboot/cmd.c"
 rust = "sys/arch/amd64/stand/rdboot/cmd.rs"
 status = "todo"
-notes = "no milestone claims it: rdboot, a program linked with libc, libutil and libz (its Makefile's PROG) that runs in a ramdisk kernel's userland and loads the real kernel through kexec (sys/arch/amd64/amd64/kexec.c); the user's pending decision"
+notes = "TB: rdboot, a program linked with libc, libutil and libz (its Makefile's PROG) that runs in a ramdisk kernel's userland and loads the real kernel through kexec (sys/arch/amd64/amd64/kexec.c); ported here, handed to the Userland repository or skipped: the user's decision when TB starts"
 
 [[file]]
 c = "sys/arch/amd64/stand/rdboot/disk.c"
 rust = "sys/arch/amd64/stand/rdboot/disk.rs"
 status = "todo"
-notes = "no milestone claims it: rdboot, a program linked with libc, libutil and libz (its Makefile's PROG) that runs in a ramdisk kernel's userland and loads the real kernel through kexec (sys/arch/amd64/amd64/kexec.c); the user's pending decision"
+notes = "TB: rdboot, a program linked with libc, libutil and libz (its Makefile's PROG) that runs in a ramdisk kernel's userland and loads the real kernel through kexec (sys/arch/amd64/amd64/kexec.c); ported here, handed to the Userland repository or skipped: the user's decision when TB starts"
 
 [[file]]
 c = "sys/arch/amd64/stand/rdboot/rdboot.c"
 rust = "sys/arch/amd64/stand/rdboot/rdboot.rs"
 status = "todo"
-notes = "no milestone claims it: rdboot, a program linked with libc, libutil and libz (its Makefile's PROG) that runs in a ramdisk kernel's userland and loads the real kernel through kexec (sys/arch/amd64/amd64/kexec.c); the user's pending decision"
+notes = "TB: rdboot, a program linked with libc, libutil and libz (its Makefile's PROG) that runs in a ramdisk kernel's userland and loads the real kernel through kexec (sys/arch/amd64/amd64/kexec.c); ported here, handed to the Userland repository or skipped: the user's decision when TB starts"
 
 [[file]]
 c = "sys/arch/amd64/stand/rdboot/vars.c"
 rust = "sys/arch/amd64/stand/rdboot/vars.rs"
 status = "todo"
-notes = "no milestone claims it: rdboot, a program linked with libc, libutil and libz (its Makefile's PROG) that runs in a ramdisk kernel's userland and loads the real kernel through kexec (sys/arch/amd64/amd64/kexec.c); the user's pending decision"
+notes = "TB: rdboot, a program linked with libc, libutil and libz (its Makefile's PROG) that runs in a ramdisk kernel's userland and loads the real kernel through kexec (sys/arch/amd64/amd64/kexec.c); ported here, handed to the Userland repository or skipped: the user's decision when TB starts"
 
 [[file]]
 c = "sys/arch/arm64/arm64/acpiapm.c"
@@ -13346,37 +13346,37 @@ notes = "not-applicable: compiled only by files.arm, files.hppa, files.i386, fil
 c = "sys/lib/libsa/bootp.c"
 rust = "sys/lib/libsa/bootp.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
 
 [[file]]
 c = "sys/lib/libsa/bootparam.c"
 rust = "sys/lib/libsa/bootparam.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
 
 [[file]]
 c = "sys/lib/libsa/getfile.c"
 rust = "sys/lib/libsa/getfile.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
 
 [[file]]
 c = "sys/lib/libsa/getln.c"
 rust = "sys/lib/libsa/getln.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
 
 [[file]]
 c = "sys/lib/libsa/ioctl.c"
 rust = "sys/lib/libsa/ioctl.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
 
 [[file]]
 c = "sys/lib/libsa/nfs.c"
 rust = "sys/lib/libsa/nfs.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
 
 [[file]]
 c = "sys/lib/libsa/nullfs.c"
@@ -13394,7 +13394,7 @@ notes = "not-applicable: only sys/lib/libsa/Makefile names it, which no amd64 or
 c = "sys/lib/libsa/rpc.c"
 rust = "sys/lib/libsa/rpc.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
 
 [[file]]
 c = "sys/lib/libsa/strchr.c"
@@ -13406,7 +13406,7 @@ notes = "provided-by-core: arm64 efiboot's Makefile builds it; Rust's slices and
 c = "sys/lib/libsa/write.c"
 rust = "sys/lib/libsa/write.rs"
 status = "todo"
-notes = "no milestone claims it: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); a BIOS boot path is the user's pending decision; of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
+notes = "TB: one of the BIOS boot programs (boot, cdboot, pxeboot), which EmiBSD does not build (docs/ARCHITECTURE.md, the install media's deviations: only the UEFI loaders were ported in M14); of amd64's and arm64's loaders only sys/arch/amd64/stand/pxeboot/Makefile builds this file"
 
 [[file]]
 c = "sys/miscfs/fifofs/fifo_vnops.c"
