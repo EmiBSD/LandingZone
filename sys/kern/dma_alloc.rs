@@ -1,4 +1,3 @@
-/*	$OpenBSD: dma_alloc.c,v 1.13 2016/09/15 02:00:16 dlg Exp $	 */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

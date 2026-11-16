@@ -1,5 +1,3 @@
-/*	$OpenBSD: pciide_amd_reg.h,v 1.9 2010/08/31 12:50:51 miod Exp $ 	*/
-/*	$NetBSD: pciide_amd_reg.h,v 1.2 2000/07/06 15:08:11 bouyer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

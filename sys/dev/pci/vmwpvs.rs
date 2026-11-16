@@ -1,4 +1,3 @@
-/*	$OpenBSD: vmwpvs.c,v 1.31 2025/08/12 04:09:43 jmatthew Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

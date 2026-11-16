@@ -1,4 +1,3 @@
-/*	$OpenBSD: strlcpy.c,v 1.9 2019/01/25 00:19:26 millert Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,5 +1,3 @@
-/*      $OpenBSD: ata_wdc.c,v 1.54 2024/06/18 09:08:02 jsg Exp $	*/
-/*	$NetBSD: ata_wdc.c,v 1.21 1999/08/09 09:43:11 bouyer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

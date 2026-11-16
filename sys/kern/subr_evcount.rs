@@ -1,4 +1,3 @@
-/*	$OpenBSD: subr_evcount.c,v 1.16 2023/09/16 09:33:27 mpi Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

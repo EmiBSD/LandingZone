@@ -1,4 +1,3 @@
-/*	$OpenBSD: audio.c,v 1.213 2025/11/18 09:30:27 ratchov Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

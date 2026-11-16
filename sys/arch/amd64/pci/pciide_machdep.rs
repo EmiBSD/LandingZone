@@ -1,5 +1,3 @@
-/*	$OpenBSD: pciide_machdep.c,v 1.4 2017/10/14 04:44:43 jsg Exp $	*/
-/*	$NetBSD: pciide_machdep.c,v 1.2 1999/02/19 18:01:27 mycroft Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

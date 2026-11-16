@@ -1,4 +1,3 @@
-/* $OpenBSD: softraid.c,v 1.440 2026/09/29 22:49:58 krw Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

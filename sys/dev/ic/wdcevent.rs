@@ -1,4 +1,3 @@
-/*	$OpenBSD: wdcevent.h,v 1.8 2015/08/17 15:36:29 krw Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

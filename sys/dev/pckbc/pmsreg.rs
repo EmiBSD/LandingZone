@@ -1,6 +1,3 @@
-/* $OpenBSD: pmsreg.h,v 1.18 2020/03/18 22:38:10 bru Exp $ */
-/* $NetBSD: psmreg.h,v 1.1 1998/03/22 15:41:28 drochner Exp $ */
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

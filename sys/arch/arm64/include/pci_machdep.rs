@@ -1,4 +1,3 @@
-/*	$OpenBSD: pci_machdep.h,v 1.13 2025/01/23 11:24:34 kettenis Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

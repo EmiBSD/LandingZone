@@ -1,4 +1,3 @@
-/*	$OpenBSD: efirng.c,v 1.3 2021/06/07 00:04:20 krw Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

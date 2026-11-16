@@ -1,4 +1,3 @@
-/*	$OpenBSD: ipmi_fdt.c,v 1.3 2024/10/09 00:38:26 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/* $FreeBSD: head/sys/boot/efi/include/efi.h 264095 2014-04-04 00:16:46Z emaste $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,5 +1,3 @@
-/*	$OpenBSD: pciide_sii3112_reg.h,v 1.6 2008/02/05 20:22:22 blambert Exp $	*/
-/*	$NetBSD: pciide_sii3112_reg.h,v 1.1 2003/03/20 04:22:50 thorpej Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,6 +1,3 @@
-/*	$OpenBSD: isadmavar.h,v 1.17 2025/06/12 23:35:33 jsg Exp $	*/
-/*	$NetBSD: isadmavar.h,v 1.10 1997/08/04 22:13:33 augustss Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/*	$OpenBSD: diskmap.c,v 1.27 2023/04/13 02:19:05 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/* $OpenBSD: acpidev.h,v 1.45 2024/08/06 17:38:56 kettenis Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

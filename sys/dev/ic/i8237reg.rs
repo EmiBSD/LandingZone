@@ -1,6 +1,3 @@
-/*	$OpenBSD: i8237reg.h,v 1.3 1999/08/04 23:07:49 niklas Exp $	*/
-/*	$NetBSD: i8237reg.h,v 1.5 1996/03/01 22:27:09 mycroft Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

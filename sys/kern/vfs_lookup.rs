@@ -1,5 +1,3 @@
-/*	$OpenBSD: vfs_lookup.c,v 1.95 2026/09/17 18:51:39 deraadt Exp $	*/
-/*	$NetBSD: vfs_lookup.c,v 1.17 1996/02/09 19:00:59 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

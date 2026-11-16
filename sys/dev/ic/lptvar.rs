@@ -1,5 +1,3 @@
-/*	$OpenBSD: lptvar.h,v 1.6 2025/06/25 20:28:09 miod Exp $ */
-/*	$NetBSD: lpt.c,v 1.42 1996/10/21 22:41:14 thorpej Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

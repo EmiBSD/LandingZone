@@ -1,4 +1,3 @@
-/* $OpenBSD: simplebusvar.h,v 1.2 2026/06/22 07:54:19 deraadt Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

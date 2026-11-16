@@ -1,5 +1,3 @@
-/*	$OpenBSD: atavar.h,v 1.25 2025/07/15 13:40:02 jsg Exp $	*/
-/*	$NetBSD: atavar.h,v 1.13 1999/03/10 13:11:43 bouyer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/*	$OpenBSD: gpio.c,v 1.17 2022/04/11 14:30:05 visa Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

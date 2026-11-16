@@ -1,4 +1,3 @@
-/*	$OpenBSD: scsi_message.h,v 1.10 2019/09/27 23:07:42 krw Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>
@@ -25,7 +24,7 @@
 //!
 //! Upstream: sys/scsi/scsi_message.h @ 3ce1f3f79392
 //!
-//! The original file carries no licence text, only its `$OpenBSD$` line (kept above); every
+//! The original file carries no licence text, only its `$OpenBSD$` line (not kept); every
 //! notice in the reference tree is accepted (the user's rule of 2026-10-04).
 //!
 //! ## Deviations

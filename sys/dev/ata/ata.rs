@@ -1,5 +1,3 @@
-/*      $OpenBSD: ata.c,v 1.37 2024/05/26 10:01:01 jsg Exp $      */
-/*      $NetBSD: ata.c,v 1.9 1999/04/15 09:41:09 bouyer Exp $      */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/*	$OpenBSD: select.h,v 1.17 2016/09/12 19:41:20 guenther Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/*	$OpenBSD: sdmmcdevs.h,v 1.9 2022/03/18 11:09:55 miod Exp $	*/
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *

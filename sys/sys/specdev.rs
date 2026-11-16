@@ -1,5 +1,3 @@
-/*	$OpenBSD: specdev.h,v 1.41 2022/06/26 05:20:42 visa Exp $	*/
-/*	$NetBSD: specdev.h,v 1.12 1996/02/13 13:13:01 mycroft Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

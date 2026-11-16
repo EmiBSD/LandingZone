@@ -1,4 +1,3 @@
-/*	$OpenBSD: sys_futex.c,v 1.26 2025/08/18 03:51:45 dlg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

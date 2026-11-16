@@ -1,4 +1,3 @@
-/*	$OpenBSD: mem.c,v 1.40 2026/06/04 05:22:04 mlarkin Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,5 +1,3 @@
-/*	$OpenBSD: openfirm.h,v 1.23 2026/06/22 21:12:12 kettenis Exp $	*/
-/*	$NetBSD: openfirm.h,v 1.1 1996/09/30 16:35:10 ws Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

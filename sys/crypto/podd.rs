@@ -1,4 +1,3 @@
-/*	$OpenBSD: podd.h,v 1.1 2000/02/28 23:13:05 deraadt Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

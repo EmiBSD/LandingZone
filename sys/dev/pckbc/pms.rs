@@ -1,6 +1,3 @@
-/* $OpenBSD: pms.c,v 1.102 2025/07/15 13:40:02 jsg Exp $ */
-/* $NetBSD: psm.c,v 1.11 2000/06/05 22:20:57 sommerfeld Exp $ */
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

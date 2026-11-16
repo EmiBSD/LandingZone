@@ -1,5 +1,3 @@
-/* $OpenBSD: dsdt.h,v 1.82 2024/05/13 01:15:50 jsg Exp $ */
-/* $OpenBSD: dsdt.c,v 1.281 2026/07/31 05:13:46 jsg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

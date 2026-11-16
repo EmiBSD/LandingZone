@@ -1,4 +1,3 @@
-/* $OpenBSD: softraid_raid1.c,v 1.67 2021/05/16 15:12:37 deraadt Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

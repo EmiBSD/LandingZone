@@ -1,5 +1,3 @@
-/*	$OpenBSD: route6.c,v 1.26 2025/07/08 00:47:41 jsg Exp $	*/
-/*	$KAME: route6.c,v 1.22 2000/12/03 00:54:00 itojun Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

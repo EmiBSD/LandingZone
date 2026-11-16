@@ -1,4 +1,3 @@
-/*	$OpenBSD: sigio.h,v 1.4 2020/01/08 16:27:42 visa Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

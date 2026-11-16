@@ -1,5 +1,3 @@
-/*	$OpenBSD: ne2000.c,v 1.28 2022/01/09 05:42:38 jsg Exp $	*/
-/*	$NetBSD: ne2000.c,v 1.12 1998/06/10 01:15:50 thorpej Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

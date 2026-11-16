@@ -1,4 +1,3 @@
-/*	$OpenBSD: set_key.c,v 1.6 2025/10/27 16:56:00 tb Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

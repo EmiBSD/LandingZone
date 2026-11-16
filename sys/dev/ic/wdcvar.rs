@@ -1,5 +1,3 @@
-/*      $OpenBSD: wdcvar.h,v 1.59 2024/06/18 12:37:29 jsg Exp $     */
-/*	$NetBSD: wdcvar.h,v 1.17 1999/04/11 20:50:29 bouyer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

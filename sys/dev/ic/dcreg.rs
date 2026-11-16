@@ -1,4 +1,3 @@
-/*	$OpenBSD: dcreg.h,v 1.54 2022/01/09 05:42:38 jsg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

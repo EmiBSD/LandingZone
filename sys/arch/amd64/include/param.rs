@@ -1,4 +1,3 @@
-/*	$OpenBSD: param.h,v 1.30 2025/07/07 18:33:36 kettenis Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

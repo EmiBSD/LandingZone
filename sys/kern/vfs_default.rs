@@ -1,4 +1,3 @@
-/*	$OpenBSD: vfs_default.c,v 1.52 2025/04/15 05:51:51 jsg Exp $  */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

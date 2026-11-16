@@ -1,5 +1,3 @@
-/*	$OpenBSD: isavar.h,v 1.59 2024/03/31 09:49:33 miod Exp $	*/
-/*	$NetBSD: isavar.h,v 1.26 1997/06/06 23:43:57 thorpej Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

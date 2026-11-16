@@ -1,4 +1,3 @@
-/* $FreeBSD: head/sys/boot/efi/include/efiprot.h 163898 2006-11-02 02:42:48Z marcel $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

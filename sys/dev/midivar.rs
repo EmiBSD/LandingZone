@@ -1,4 +1,3 @@
-/*	$OpenBSD: midivar.h,v 1.15 2024/10/14 00:47:36 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

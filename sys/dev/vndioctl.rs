@@ -1,5 +1,3 @@
-/*	$OpenBSD: vndioctl.h,v 1.12 2023/05/14 18:34:02 krw Exp $	*/
-/*	$NetBSD: vndioctl.h,v 1.5 1995/01/25 04:46:30 cgd Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

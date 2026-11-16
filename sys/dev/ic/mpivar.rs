@@ -1,4 +1,3 @@
-/*	$OpenBSD: mpivar.h,v 1.41 2020/07/22 13:16:04 krw Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

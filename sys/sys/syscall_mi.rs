@@ -1,4 +1,3 @@
-/*	$OpenBSD: syscall_mi.h,v 1.37 2024/12/27 11:57:16 mpi Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/* $OpenBSD: kern_clockintr.c,v 1.71 2024/11/07 16:02:29 miod Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

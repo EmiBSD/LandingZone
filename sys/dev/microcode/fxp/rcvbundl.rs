@@ -1,4 +1,3 @@
-/*	$OpenBSD: rcvbundl.h,v 1.2 2005/04/24 20:41:34 brad Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

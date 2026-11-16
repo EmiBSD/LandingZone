@@ -1,5 +1,3 @@
-/*	$OpenBSD: un.h,v 1.14 2015/07/18 15:00:01 guenther Exp $	*/
-/*	$NetBSD: un.h,v 1.11 1996/02/04 02:12:47 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,6 +1,3 @@
-/* $OpenBSD: pckbc.c,v 1.55 2023/08/26 15:01:00 jmc Exp $ */
-/* $NetBSD: pckbc.c,v 1.5 2000/06/09 04:58:35 soda Exp $ */
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

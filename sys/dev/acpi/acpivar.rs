@@ -1,4 +1,3 @@
-/*	$OpenBSD: acpivar.h,v 1.141 2026/03/11 16:18:42 kettenis Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,5 +1,3 @@
-/*	$OpenBSD: uipc_domain.c,v 1.70 2025/06/12 20:37:58 deraadt Exp $	*/
-/*	$NetBSD: uipc_domain.c,v 1.14 1996/02/09 19:00:44 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

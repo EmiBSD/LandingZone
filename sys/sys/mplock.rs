@@ -1,4 +1,3 @@
-/*	$OpenBSD: mplock.h,v 1.14 2024/07/03 01:36:50 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

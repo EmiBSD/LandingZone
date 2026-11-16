@@ -1,5 +1,3 @@
-/*	$OpenBSD: pciide.c,v 1.368 2026/04/07 00:15:41 jsg Exp $	*/
-/*	$NetBSD: pciide.c,v 1.127 2001/08/03 01:31:08 tsutsui Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

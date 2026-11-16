@@ -1,4 +1,3 @@
-/*	$OpenBSD: cmd_i386.c,v 1.4 2025/09/16 05:07:33 yasuoka Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

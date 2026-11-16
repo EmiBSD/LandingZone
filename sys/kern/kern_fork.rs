@@ -1,5 +1,3 @@
-/*	$OpenBSD: kern_fork.c,v 1.272 2026/04/04 08:46:30 jsg Exp $	*/
-/*	$NetBSD: kern_fork.c,v 1.29 1996/02/09 18:59:34 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

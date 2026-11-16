@@ -1,4 +1,3 @@
-/*	$OpenBSD: uwacom.c,v 1.8 2023/08/12 20:47:06 miod Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

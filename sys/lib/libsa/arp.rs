@@ -1,5 +1,3 @@
-/*	$OpenBSD: arp.c,v 1.13 2021/03/12 10:22:46 jsg Exp $	*/
-/*	$NetBSD: arp.c,v 1.15 1996/10/13 02:28:58 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

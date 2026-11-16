@@ -23,7 +23,6 @@
 //! order:
 //!
 //! ```text
-//! /* $OpenBSD: ... */           ported files: the id lines, then
 //! /* <LICENSES> */              the author's block, then the original notice, verbatim
 //! /* </LICENSES> */
 //! /* <CODE> */                  the `//!` docs, inner attributes, `use` lines, code
@@ -36,8 +35,11 @@
 //! licence policy `ports.toml` gives each path. Reading rule:
 //! `sed -n '/<CODE>/,/<\/CODE>/p' file.rs`.
 //!
-//! Outside the zones there are only blank lines and, before the first zone, block comments (the
-//! `$OpenBSD$` id lines, a "generated, do not edit" banner). Anything else is an error.
+//! Outside the zones there are only blank lines and, before the first zone, a block comment (a
+//! "generated, do not edit" banner). Anything else is an error. So is a version-control id
+//! line (`/* $OpenBSD: ... $ */`, `$NetBSD$`, `$FreeBSD$`, `$KAME$`) outside the code: the
+//! port keeps none (the user's decision of 2026-11-15), since the `Upstream:` line and
+//! `ports.toml`'s `upstream_blob` name the revision that was ported.
 //! "Has test code" means the file declares a `mod tests` (inline); a `#[test]` or a `mod tests`
 //! in the CODE zone is an error, as is a TESTS zone without a `mod tests`.
 
@@ -103,6 +105,26 @@ fn declares_tests_mod(line: &str) -> bool {
     let t = t.strip_prefix("pub ").unwrap_or(t);
     t.strip_prefix("mod tests")
         .is_some_and(|r| r.trim_start().starts_with(['{', ';']))
+}
+
+/// Whether the trimmed line `t` is a version-control id comment on a line of its own
+/// (`/* $OpenBSD: x.c,v 1.1 ... $ */`, `/* $NetBSD$ */`).
+fn is_id_line(t: &str) -> bool {
+    let Some(inner) = t.strip_prefix("/*").and_then(|r| r.strip_suffix("*/")) else {
+        return false;
+    };
+    let Some(id) = inner
+        .trim()
+        .strip_prefix('$')
+        .and_then(|r| r.strip_suffix('$'))
+    else {
+        return false;
+    };
+    let tag = id.split(':').next().unwrap_or(id);
+    matches!(
+        tag,
+        "OpenBSD" | "NetBSD" | "FreeBSD" | "KAME" | "Id" | "Header"
+    )
 }
 
 /// The lines of a block, without the blank lines around it.
@@ -207,6 +229,11 @@ pub(crate) fn check(rel: &str, src: &str, lic: Licenses) -> Vec<String> {
                         "{rel}:{n}: </{name}> closes a zone that is not open"
                     ));
                 }
+            }
+            None if cur.is_none_or(|z| z == LICENSES) && is_id_line(line.trim()) => {
+                errs.push(format!(
+                    "{rel}:{n}: a version-control id line; the port keeps none"
+                ));
             }
             None => match cur {
                 Some(z) => content[z].push(line),
@@ -334,11 +361,8 @@ mod tests {
     }
 
     #[test]
-    fn a_ported_file_has_id_lines_licences_and_code() {
-        let mut v = vec![
-            "/*\t$OpenBSD: x.c,v 1.1 2020/01/01 00:00:00 a Exp $\t*/",
-            "/* <LICENSES> */",
-        ];
+    fn a_ported_file_has_licences_and_code() {
+        let mut v = vec!["/* <LICENSES> */"];
         v.extend(AUTHOR_BLOCK.lines());
         v.extend([
             "",
@@ -355,6 +379,39 @@ mod tests {
         let e = check("a.rs", &s, Licenses::Own);
         assert_eq!(e.len(), 1, "{e:?}");
         assert!(e[0].contains("only the author's block goes there"));
+    }
+
+    #[test]
+    fn a_version_control_id_line_is_an_error() {
+        for (at_top, id) in [
+            (
+                true,
+                "/*\t$OpenBSD: x.c,v 1.1 2020/01/01 00:00:00 a Exp $\t*/",
+            ),
+            (true, "/* $NetBSD$ */"),
+            (
+                false,
+                "/*\t$FreeBSD: x.c,v 1.1 2020/01/01 00:00:00 a Exp $\t*/",
+            ),
+        ] {
+            let mut v = Vec::new();
+            if at_top {
+                v.push(id);
+            }
+            v.push("/* <LICENSES> */");
+            v.extend(AUTHOR_BLOCK.lines());
+            v.push("");
+            if !at_top {
+                v.push(id);
+            }
+            v.extend(["/* Copyright. */", "/* </LICENSES> */", "", "/* <CODE> */"]);
+            v.extend(["fn f() {}", "/* </CODE> */"]);
+            let e = check("a.rs", &file(&v), Licenses::Original);
+            assert_eq!(e.len(), 1, "{e:?}");
+            assert!(e[0].contains("version-control id line"), "{e:?}");
+        }
+        assert!(!is_id_line("/* $OpenBSD is the upstream$ of this */"));
+        assert!(!is_id_line("/* Copyright. */"));
     }
 
     #[test]

@@ -1,5 +1,3 @@
-/*	$OpenBSD: unpcb.h,v 1.45 2022/11/26 17:51:18 mvs Exp $	*/
-/*	$NetBSD: unpcb.h,v 1.6 1994/06/29 06:46:08 cgd Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

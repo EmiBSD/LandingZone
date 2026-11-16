@@ -1,4 +1,3 @@
-/* $OpenBSD: pcb.h,v 1.6 2024/03/30 09:17:51 kettenis Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

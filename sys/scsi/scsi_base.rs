@@ -1,5 +1,3 @@
-/*	$OpenBSD: scsi_base.c,v 1.285 2026/04/22 12:28:08 claudio Exp $	*/
-/*	$NetBSD: scsi_base.c,v 1.43 1997/04/02 02:29:36 mycroft Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

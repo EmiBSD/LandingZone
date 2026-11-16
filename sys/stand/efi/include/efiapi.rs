@@ -1,4 +1,3 @@
-/* $FreeBSD: head/sys/boot/efi/include/efiapi.h 278234 2015-02-05 07:19:30Z rpaulo $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

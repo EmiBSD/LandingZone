@@ -1,5 +1,3 @@
-/*	$OpenBSD: syscall.h,v 1.286 2026/08/12 15:05:21 naddy Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,5 +1,3 @@
-/*	$OpenBSD: blf.h,v 1.7 2021/11/29 01:04:45 djm Exp $	*/
-/*	$OpenBSD: blf.c,v 1.9 2022/08/28 11:11:25 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

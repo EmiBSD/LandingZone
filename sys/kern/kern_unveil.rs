@@ -1,4 +1,3 @@
-/*	$OpenBSD: kern_unveil.c,v 1.57 2026/04/11 17:04:55 deraadt Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

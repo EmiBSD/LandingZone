@@ -1,5 +1,3 @@
-/* $OpenBSD: wskbdvar.h,v 1.4 2022/02/16 06:23:42 anton Exp $ */
-/* $NetBSD: wskbdvar.h,v 1.8 1999/12/01 23:22:59 augustss Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

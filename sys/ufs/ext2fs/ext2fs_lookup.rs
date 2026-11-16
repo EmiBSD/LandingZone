@@ -1,5 +1,3 @@
-/*	$OpenBSD: ext2fs_lookup.c,v 1.48 2024/09/20 02:00:46 jsg Exp $	*/
-/*	$NetBSD: ext2fs_lookup.c,v 1.16 2000/08/03 20:29:26 thorpej Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>
@@ -16,9 +14,6 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-/*	$OpenBSD: ext2fs_lookup.c,v 1.48 2024/09/20 02:00:46 jsg Exp $	*/
-/*	$NetBSD: ext2fs_lookup.c,v 1.16 2000/08/03 20:29:26 thorpej Exp $	*/
 
 /*
  * Modified for NetBSD 1.2E

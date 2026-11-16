@@ -1,4 +1,3 @@
-/*	$OpenBSD: timetc.h,v 1.3 2022/09/22 04:57:08 robert Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

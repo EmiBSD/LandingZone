@@ -1,4 +1,3 @@
-/*	$OpenBSD: pf_lb.c,v 1.78 2026/05/12 09:34:00 henning Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

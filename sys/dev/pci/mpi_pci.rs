@@ -1,4 +1,3 @@
-/*	$OpenBSD: mpi_pci.c,v 1.27 2024/05/24 06:02:58 jsg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

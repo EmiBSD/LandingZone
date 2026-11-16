@@ -1,5 +1,3 @@
-/*	$OpenBSD: uvm_meter.c,v 1.56 2026/02/17 03:28:41 deraadt Exp $	*/
-/*	$NetBSD: uvm_meter.c,v 1.21 2001/07/14 06:36:03 matt Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

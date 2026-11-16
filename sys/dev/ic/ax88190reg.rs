@@ -1,5 +1,3 @@
-/*	$OpenBSD: ax88190reg.h,v 1.3 2008/06/26 05:42:15 ray Exp $	*/
-/*	$NetBSD$	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

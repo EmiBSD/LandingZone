@@ -1,5 +1,3 @@
-/*	$OpenBSD: tmpfs_subr.c,v 1.28 2026/03/29 09:37:33 kirill Exp $	*/
-/*	$NetBSD: tmpfs_subr.c,v 1.79 2012/03/13 18:40:50 elad Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

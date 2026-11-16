@@ -1,6 +1,3 @@
-/* $OpenBSD: pckbcvar.h,v 1.17 2023/07/25 10:00:44 miod Exp $ */
-/* $NetBSD: pckbcvar.h,v 1.4 2000/06/09 04:58:35 soda Exp $ */
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

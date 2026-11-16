@@ -1,4 +1,3 @@
-/*	$OpenBSD: kern_smr.c,v 1.18 2025/07/28 05:25:44 dlg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

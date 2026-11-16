@@ -1,4 +1,3 @@
-/*	$OpenBSD: bio.c,v 1.20 2026/08/11 16:25:29 deraadt Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

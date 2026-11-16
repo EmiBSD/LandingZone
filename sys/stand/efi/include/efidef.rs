@@ -1,4 +1,3 @@
-/* $FreeBSD: head/sys/boot/efi/include/efidef.h 279038 2015-02-20 01:40:55Z imp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

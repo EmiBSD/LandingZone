@@ -1,4 +1,3 @@
-/*	$OpenBSD: fpu.c,v 1.4 2025/02/18 09:18:57 kettenis Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

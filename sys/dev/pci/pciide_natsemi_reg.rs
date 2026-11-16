@@ -1,4 +1,3 @@
-/*	$OpenBSD: pciide_natsemi_reg.h,v 1.9 2022/08/29 06:08:04 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

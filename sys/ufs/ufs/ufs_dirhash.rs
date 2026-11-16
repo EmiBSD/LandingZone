@@ -1,4 +1,3 @@
-/* $OpenBSD: ufs_dirhash.c,v 1.43 2024/01/09 03:15:59 guenther Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

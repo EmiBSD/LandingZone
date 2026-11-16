@@ -1,5 +1,3 @@
-/*	$OpenBSD: spinlock.h,v 1.3 2017/09/05 02:40:54 guenther Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

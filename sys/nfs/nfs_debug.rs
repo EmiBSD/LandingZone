@@ -1,4 +1,3 @@
-/*	$OpenBSD: nfs_debug.c,v 1.8 2026/05/23 22:13:17 kirill Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

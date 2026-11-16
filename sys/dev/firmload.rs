@@ -1,4 +1,3 @@
-/*	$OpenBSD: firmload.c,v 1.16 2018/08/13 23:12:39 deraadt Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/*	$OpenBSD: pciide_ite_reg.h,v 1.1 2003/12/20 08:03:55 grange Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

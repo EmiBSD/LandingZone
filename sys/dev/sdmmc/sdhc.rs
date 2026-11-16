@@ -1,4 +1,3 @@
-/*	$OpenBSD: sdhc.c,v 1.78 2024/10/19 21:10:03 hastings Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

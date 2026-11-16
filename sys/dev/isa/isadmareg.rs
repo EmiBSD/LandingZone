@@ -1,6 +1,3 @@
-/*	$OpenBSD: isadmareg.h,v 1.5 1998/01/20 18:40:30 niklas Exp $	*/
-/*	$NetBSD: isadmareg.h,v 1.4 1995/06/28 04:31:48 cgd Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

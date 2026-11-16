@@ -1,4 +1,3 @@
-/*	$OpenBSD: sdmmcvar.h,v 1.34 2020/08/14 14:49:04 kettenis Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,5 +1,3 @@
-/*	$OpenBSD: uipc_socket.c,v 1.389 2026/06/11 19:21:51 bluhm Exp $	*/
-/*	$NetBSD: uipc_socket.c,v 1.21 1996/02/04 02:17:52 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

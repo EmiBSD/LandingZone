@@ -1,4 +1,3 @@
-/*	$OpenBSD: plrtc.c,v 1.4 2022/10/17 19:09:46 kettenis Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

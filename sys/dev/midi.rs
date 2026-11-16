@@ -1,4 +1,3 @@
-/*	$OpenBSD: midi.c,v 1.58 2024/12/30 02:46:00 guenther Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

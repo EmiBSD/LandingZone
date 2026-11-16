@@ -1,4 +1,3 @@
-/*	$OpenBSD: ip_id.c,v 1.27 2026/06/21 21:17:07 mvs Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

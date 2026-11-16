@@ -1,5 +1,3 @@
-/*	$OpenBSD: wd.c,v 1.136 2026/06/24 17:03:05 krw Exp $ */
-/*	$NetBSD: wd.c,v 1.193 1999/02/28 17:15:27 explorer Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

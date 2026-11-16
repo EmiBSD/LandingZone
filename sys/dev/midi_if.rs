@@ -1,5 +1,3 @@
-/*	$OpenBSD: midi_if.h,v 1.10 2022/03/21 19:22:40 miod Exp $	*/
-/*	$NetBSD: midi_if.h,v 1.3 1998/11/25 22:17:07 augustss Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

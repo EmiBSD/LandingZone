@@ -1,5 +1,3 @@
-/*      $OpenBSD: wdcreg.h,v 1.16 2006/05/07 21:15:47 miod Exp $     */
-/*	$NetBSD: wdcreg.h,v 1.22 1999/03/07 14:02:54 bouyer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

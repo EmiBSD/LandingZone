@@ -1,5 +1,3 @@
-/*	$OpenBSD: nec765reg.h,v 1.4 2003/06/02 23:28:02 millert Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

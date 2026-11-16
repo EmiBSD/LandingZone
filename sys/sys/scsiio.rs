@@ -1,5 +1,3 @@
-/*	$OpenBSD: scsiio.h,v 1.10 2012/09/05 17:17:47 deraadt Exp $	*/
-/*	$NetBSD: scsiio.h,v 1.3 1994/06/29 06:45:09 cgd Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>
@@ -26,7 +24,7 @@
 //! Upstream: sys/sys/scsiio.h @ 3ce1f3f79392
 //!
 //! The original file carries no licence text, only its `$OpenBSD$` and `$NetBSD$` lines
-//! (kept above); the user accepted it for kernel ports on 2026-10-04.
+//! (not kept); the user accepted it for kernel ports on 2026-10-04.
 //!
 //! ## Deviations
 //! - The structures are `#[repr(C)]` ABI types with LP64 sizes and offsets checked at

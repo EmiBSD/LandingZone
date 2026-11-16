@@ -1,4 +1,3 @@
-/* $OpenBSD: xform_ipcomp.c,v 1.8 2019/01/09 12:11:38 mpi Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

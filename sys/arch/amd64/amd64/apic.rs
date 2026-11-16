@@ -1,5 +1,3 @@
-/*	$OpenBSD: apic.c,v 1.6 2015/03/14 03:38:46 jsg Exp $	*/
-/* $NetBSD: apic.c,v 1.1 2003/02/26 21:26:11 fvdl Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,5 +1,3 @@
-/*	$OpenBSD: vfs_vnops.c,v 1.128 2026/06/12 12:20:25 kirill Exp $	*/
-/*	$NetBSD: vfs_vnops.c,v 1.20 1996/02/04 02:18:41 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

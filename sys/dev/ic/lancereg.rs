@@ -1,5 +1,3 @@
-/*	$OpenBSD: lancereg.h,v 1.4 2025/07/14 23:49:08 jsg Exp $	*/
-/*	$NetBSD: lancereg.h,v 1.11 2003/11/02 11:07:45 wiz Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

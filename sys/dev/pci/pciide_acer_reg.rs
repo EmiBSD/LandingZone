@@ -1,5 +1,3 @@
-/*	$OpenBSD: pciide_acer_reg.h,v 1.8 2010/07/23 07:47:13 jsg Exp $	*/
-/*	$NetBSD: pciide_acer_reg.h,v 1.4 2001/07/26 20:02:22 bouyer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

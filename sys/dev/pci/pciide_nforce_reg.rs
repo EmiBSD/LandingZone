@@ -1,4 +1,3 @@
-/*	$OpenBSD: pciide_nforce_reg.h,v 1.3 2004/09/24 07:38:38 grange Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

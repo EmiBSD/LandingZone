@@ -1,4 +1,3 @@
-/*	$OpenBSD: pfkeyv2_parsemessage.c,v 1.64 2025/05/14 14:32:15 mvs Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

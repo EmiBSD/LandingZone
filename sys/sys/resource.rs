@@ -1,5 +1,3 @@
-/*	$OpenBSD: resource.h,v 1.15 2025/01/29 20:04:02 deraadt Exp $	*/
-/*	$NetBSD: resource.h,v 1.14 1996/02/09 18:25:27 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

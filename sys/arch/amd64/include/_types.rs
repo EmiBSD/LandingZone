@@ -1,4 +1,3 @@
-/*	$OpenBSD: _types.h,v 1.20 2026/08/31 10:58:08 tb Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/*	$OpenBSD: if_cdce.c,v 1.83 2024/05/23 03:21:08 jsg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

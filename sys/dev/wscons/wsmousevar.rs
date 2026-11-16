@@ -1,5 +1,3 @@
-/* $OpenBSD: wsmousevar.h,v 1.15 2017/06/18 13:21:48 bru Exp $ */
-/* $NetBSD: wsmousevar.h,v 1.4 2000/01/08 02:57:24 takemura Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

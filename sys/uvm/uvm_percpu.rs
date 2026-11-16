@@ -1,4 +1,3 @@
-/*	$OpenBSD: uvm_percpu.h,v 1.3 2024/05/01 12:54:27 mpi Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

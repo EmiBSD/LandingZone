@@ -1,4 +1,3 @@
-/*	$OpenBSD: in6_pcb.c,v 1.152 2025/09/16 09:19:16 florian Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

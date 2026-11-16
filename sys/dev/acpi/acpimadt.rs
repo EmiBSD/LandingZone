@@ -1,4 +1,3 @@
-/* $OpenBSD: acpimadt.c,v 1.41 2025/09/16 12:18:10 hshoexer Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

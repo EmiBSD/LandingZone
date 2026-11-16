@@ -1,6 +1,3 @@
-/* $OpenBSD: pckbd.c,v 1.51 2023/08/13 21:54:02 miod Exp $ */
-/* $NetBSD: pckbd.c,v 1.24 2000/06/05 22:20:57 sommerfeld Exp $ */
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

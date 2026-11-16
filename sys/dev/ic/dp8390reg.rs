@@ -1,5 +1,3 @@
-/*	$OpenBSD: dp8390reg.h,v 1.9 2003/10/21 18:58:49 jmc Exp $	*/
-/*	$NetBSD: dp8390reg.h,v 1.3 1997/04/29 04:32:08 scottr Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,5 +1,3 @@
-/*	$OpenBSD: kern_prot.c,v 1.87 2026/06/23 20:04:50 cludwig Exp $	*/
-/*	$NetBSD: kern_prot.c,v 1.33 1996/02/09 18:59:42 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

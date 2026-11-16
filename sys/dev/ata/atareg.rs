@@ -1,5 +1,3 @@
-/*	$OpenBSD: atareg.h,v 1.14 2010/07/23 07:47:13 jsg Exp $	*/
-/*	$NetBSD: atareg.h,v 1.5 1999/01/18 20:06:24 bouyer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

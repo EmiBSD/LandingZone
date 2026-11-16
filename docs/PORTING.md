@@ -22,8 +22,9 @@ Before coding, write down:
 
 ## 3. Header template
 
-Every ported file starts like this (`sys/lib/libkern/strlcpy.rs`). The `$OpenBSD$` line and the
-licence block are copied verbatim from the C file; the licence block sits between the
+Every ported file starts like this (`sys/lib/libkern/strlcpy.rs`). The licence block is copied
+verbatim from the C file (its `$OpenBSD$` id line is not: `Upstream:` and `ports.toml`'s
+`upstream_blob` name the revision); the licence block sits between the
 `/* <LICENSES> */` and `/* </LICENSES> */` marker lines. Everything else is inside
 `/* <CODE> */` ... `/* </CODE> */`, and the tests, inline, in `/* <TESTS> */` ... `/* </TESTS> */`
 at the end (only in files that have tests). `cargo xtask ports check` validates the markers, their
@@ -34,7 +35,6 @@ no licence text gets `license = "none"` on its `ports.toml` entry and the author
 ported file, read its code zone (`sed -n '/<CODE>/,/<\/CODE>/p' <file>`).
 
 ```rust
-/*	$OpenBSD: strlcpy.c,v 1.9 2019/01/25 00:19:26 millert Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

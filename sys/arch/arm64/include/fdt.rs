@@ -1,4 +1,3 @@
-/* $OpenBSD: fdt.h,v 1.7 2020/07/14 15:34:14 patrick Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

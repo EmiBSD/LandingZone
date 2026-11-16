@@ -1,4 +1,3 @@
-/*	$OpenBSD: ahcireg.h,v 1.6 2024/04/23 13:09:21 jsg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,6 +1,3 @@
-/*	$OpenBSD: fpu.h,v 1.20 2024/04/14 09:59:04 kettenis Exp $	*/
-/*	$NetBSD: fpu.h,v 1.1 2003/04/26 18:39:40 fvdl Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

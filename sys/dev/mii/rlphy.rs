@@ -1,4 +1,3 @@
-/*	$OpenBSD: rlphy.c,v 1.35 2025/05/09 13:53:10 jcs Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

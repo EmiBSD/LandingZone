@@ -1,4 +1,3 @@
-/*	$OpenBSD: event.h,v 1.74 2025/05/10 09:44:39 visa Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

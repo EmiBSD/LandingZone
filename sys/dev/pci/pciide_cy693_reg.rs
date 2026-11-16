@@ -1,5 +1,3 @@
-/*	$OpenBSD: pciide_cy693_reg.h,v 1.9 2022/01/09 05:42:58 jsg Exp $	*/
-/*	$NetBSD: pciide_cy693_reg.h,v 1.4 2000/05/15 08:46:01 bouyer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -33,7 +33,7 @@ the AGENT-RULES.md your prompt names. Merge the branch your prompt names.
 - Tables: ioconf entries (both archs where GENERIC has them, before the `cpu*` entry and the
   free slots, contiguous), ports.toml rows (`deps`, `status`, `upstream_commit`,
   `upstream_blob`, exactly one `notes` key), `docs/C_TO_RUST.md` rows already decided.
-- Every `.rs` keeps the zones: `$OpenBSD$` line, `/* <LICENSES> */` with the author's ISC
+- Every `.rs` keeps the zones (and no `$OpenBSD$` id line): `/* <LICENSES> */` with the author's ISC
   block first and the original notice whole after one blank line, `/* <CODE> */` with `//!`
   docs (`Upstream:` line, `## Deviations`), `/* <TESTS> */` inline.
 

@@ -1,4 +1,3 @@
-/*	$OpenBSD: timetc.h,v 1.14 2023/02/04 19:19:35 cheloha Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

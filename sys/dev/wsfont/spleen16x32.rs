@@ -1,4 +1,3 @@
-/*	$OpenBSD: spleen16x32.h,v 1.8 2020/07/31 20:14:47 fcambus Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

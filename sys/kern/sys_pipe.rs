@@ -1,4 +1,3 @@
-/*	$OpenBSD: sys_pipe.c,v 1.149 2025/08/04 04:59:31 guenther Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

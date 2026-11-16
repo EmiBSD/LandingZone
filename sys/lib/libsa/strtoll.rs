@@ -1,4 +1,3 @@
-/* $OpenBSD: strtoll.c,v 1.1 2006/09/18 21:12:57 mpf Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

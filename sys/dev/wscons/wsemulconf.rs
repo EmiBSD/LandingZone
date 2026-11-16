@@ -1,5 +1,3 @@
-/* $OpenBSD: wsemulconf.c,v 1.10 2020/05/10 20:50:55 kettenis Exp $ */
-/* $NetBSD: wsemulconf.c,v 1.4 2000/01/05 11:19:37 drochner Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

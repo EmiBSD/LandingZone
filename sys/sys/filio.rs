@@ -1,5 +1,3 @@
-/*	$OpenBSD: filio.h,v 1.5 2007/06/01 22:30:48 deraadt Exp $	*/
-/*	$NetBSD: filio.h,v 1.5 1994/06/29 06:44:14 cgd Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

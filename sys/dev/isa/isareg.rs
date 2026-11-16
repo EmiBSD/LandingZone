@@ -1,5 +1,3 @@
-/*	$OpenBSD: isareg.h,v 1.5 2025/07/14 10:13:54 jsg Exp $	*/
-/*	$NetBSD: isareg.h,v 1.5 1995/04/17 12:09:13 cgd Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

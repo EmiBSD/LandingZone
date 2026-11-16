@@ -1,4 +1,3 @@
-/*	$OpenBSD: mpi.c,v 1.226 2023/07/06 10:17:43 visa Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

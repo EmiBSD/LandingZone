@@ -1,4 +1,3 @@
-/* $OpenBSD: ast.c,v 1.9 2026/03/08 17:07:31 deraadt Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

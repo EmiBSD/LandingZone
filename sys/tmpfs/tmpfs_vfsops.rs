@@ -1,5 +1,3 @@
-/*	$OpenBSD: tmpfs_vfsops.c,v 1.21 2025/11/21 09:49:33 mvs Exp $	*/
-/*	$NetBSD: tmpfs_vfsops.c,v 1.52 2011/09/27 01:10:43 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

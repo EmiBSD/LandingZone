@@ -1,5 +1,3 @@
-/* $OpenBSD: pcppivar.h,v 1.3 2002/03/14 01:26:56 millert Exp $ */
-/* $NetBSD: pcppivar.h,v 1.1 1998/04/15 20:26:18 drochner Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/* $OpenBSD: pmap.c,v 1.113 2025/07/12 08:35:32 kettenis Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

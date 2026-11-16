@@ -1,4 +1,3 @@
-/*	$OpenBSD: if_fxp_pci.c,v 1.68 2024/05/24 06:02:53 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

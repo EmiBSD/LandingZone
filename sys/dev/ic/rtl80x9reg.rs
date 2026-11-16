@@ -1,5 +1,3 @@
-/*	$OpenBSD: rtl80x9reg.h,v 1.4 2014/11/24 02:03:37 brad Exp $	*/
-/*	$NetBSD: rtl80x9reg.h,v 1.2 1998/10/31 00:31:43 thorpej Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

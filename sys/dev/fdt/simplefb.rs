@@ -1,4 +1,3 @@
-/*	$OpenBSD: simplefb.c,v 1.23 2026/09/18 03:33:29 kettenis Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

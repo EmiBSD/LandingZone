@@ -1,4 +1,3 @@
-/*	$OpenBSD: udf_vfsops.c,v 1.73 2025/09/20 13:53:36 mpi Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

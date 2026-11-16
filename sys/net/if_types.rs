@@ -1,5 +1,3 @@
-/*	$OpenBSD: if_types.h,v 1.25 2026/03/23 08:42:22 jsg Exp $	*/
-/*	$NetBSD: if_types.h,v 1.17 2000/10/26 06:51:31 onoe Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/* $OpenBSD: frame.h,v 1.3 2018/06/30 15:23:37 deraadt Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

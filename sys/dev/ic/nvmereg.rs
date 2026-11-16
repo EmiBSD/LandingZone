@@ -1,4 +1,3 @@
-/*	$OpenBSD: nvmereg.h,v 1.16 2024/09/13 09:57:34 jmatthew Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

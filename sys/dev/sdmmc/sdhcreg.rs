@@ -1,4 +1,3 @@
-/*	$OpenBSD: sdhcreg.h,v 1.10 2023/10/01 08:56:24 kettenis Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

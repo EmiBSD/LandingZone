@@ -1,4 +1,3 @@
-/*	$OpenBSD: pciide_svwsata_reg.h,v 1.4 2006/02/10 21:45:41 kettenis Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

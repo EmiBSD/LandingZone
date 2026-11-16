@@ -1,4 +1,3 @@
-/*	$OpenBSD: hexdump.c,v 1.1 2019/11/28 00:17:13 bluhm Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

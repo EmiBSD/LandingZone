@@ -1,4 +1,3 @@
-/*	$OpenBSD: sdmmc_mem.c,v 1.39 2026/06/12 03:56:30 mglocker Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

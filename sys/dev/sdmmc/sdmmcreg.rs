@@ -1,4 +1,3 @@
-/*	$OpenBSD: sdmmcreg.h,v 1.13 2020/08/24 15:06:10 kettenis Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

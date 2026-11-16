@@ -1,4 +1,3 @@
-/*	$OpenBSD: ichiic.c,v 1.58 2025/08/21 03:06:20 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

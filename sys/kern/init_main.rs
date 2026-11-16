@@ -1,5 +1,3 @@
-/*	$OpenBSD: init_main.c,v 1.331 2026/01/01 07:00:57 jsg Exp $	*/
-/*	$NetBSD: init_main.c,v 1.84.4.1 1996/06/02 09:08:06 mrg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

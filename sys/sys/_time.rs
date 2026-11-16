@@ -1,4 +1,3 @@
-/*	$OpenBSD: _time.h,v 1.10 2022/10/25 16:30:30 millert Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

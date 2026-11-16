@@ -1,7 +1,3 @@
-/*	$OpenBSD: ip_ecn.h,v 1.7 2018/11/14 23:55:04 dlg Exp $	*/
-/*	$KAME: ip_ecn.h,v 1.5 2000/03/27 04:58:38 sumikawa Exp $	*/
-/*	$OpenBSD: ip_ecn.c,v 1.10 2025/07/08 00:47:41 jsg Exp $	*/
-/*	$KAME: ip_ecn.c,v 1.9 2000/10/01 12:44:48 itojun Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

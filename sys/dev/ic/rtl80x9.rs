@@ -1,5 +1,3 @@
-/*	$OpenBSD: rtl80x9.c,v 1.12 2021/03/07 06:21:38 jsg Exp $	*/
-/*	$NetBSD: rtl80x9.c,v 1.1 1998/10/31 00:44:33 thorpej Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

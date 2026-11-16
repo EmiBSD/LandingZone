@@ -25,8 +25,9 @@ sparse-checkout add|set ...`, a user decision recorded in `docs/ROADMAP.md`.
   re-express. Identifiers, constants, data layouts and the *meaning* of comments are preserved;
   the text is yours.
 - When discussing C code with the user, cite it as `reference/openbsd-src/sys/<path>:<line>`.
-- Every ported `.rs` file starts with the original `/* $OpenBSD: ... $ */` line and the complete
-  original copyright and license block, verbatim, as `/* ... */` comments. Then the `//!` docs.
+- Every ported `.rs` file keeps the complete original copyright and license block, verbatim, as
+  `/* ... */` comments. Then the `//!` docs. The `/* $OpenBSD: ... $ */` id line is not copied
+  (the user's decision of 2026-11-15; a line inside a notice's own text stays with the notice).
   Never shorten, reword, relicense or add restrictions to license text. BSD-3 non-endorsement and
   ISC/BSD notice obligations apply to this project's distribution; `LICENSE` explains how.
 - Every licence or notice in the pinned tree is accepted, kept whole (`scope-and-stubs.md`, the

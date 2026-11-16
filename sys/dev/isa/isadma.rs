@@ -1,6 +1,3 @@
-/*	$OpenBSD: isadma.c,v 1.39 2025/07/23 01:14:54 jsg Exp $	*/
-/*	$NetBSD: isadma.c,v 1.32 1997/09/05 01:48:33 thorpej Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

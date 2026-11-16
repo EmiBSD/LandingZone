@@ -1,5 +1,3 @@
-/*	$OpenBSD: pucvar.h,v 1.18 2024/05/24 04:36:26 jsg Exp $	*/
-/*	$NetBSD: pucvar.h,v 1.2 1999/02/06 06:29:54 cgd Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

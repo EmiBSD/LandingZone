@@ -1,4 +1,3 @@
-/* $OpenBSD: fuse_file.c,v 1.12 2026/06/20 13:45:13 helg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

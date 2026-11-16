@@ -1,4 +1,3 @@
-/*	$OpenBSD: vfs_biomem.c,v 1.55 2026/06/10 00:04:38 beck Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

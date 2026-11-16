@@ -1,4 +1,3 @@
-/*       $OpenBSD: vfs_sync.c,v 1.73 2024/10/18 05:52:32 miod Exp $  */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

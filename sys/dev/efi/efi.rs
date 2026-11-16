@@ -1,4 +1,3 @@
-/* $OpenBSD: efi.h,v 1.4 2023/01/14 12:11:11 kettenis Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,6 +1,3 @@
-/*	$OpenBSD: i8042reg.h,v 1.9 2015/05/05 16:27:20 shadchin Exp $	*/
-/*	$NetBSD: i8042reg.h,v 1.7 1998/01/18 14:41:37 drochner Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

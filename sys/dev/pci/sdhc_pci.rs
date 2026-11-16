@@ -1,4 +1,3 @@
-/*	$OpenBSD: sdhc_pci.c,v 1.28 2025/12/24 12:34:15 kettenis Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

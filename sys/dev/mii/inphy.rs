@@ -1,4 +1,3 @@
-/*	$OpenBSD: inphy.c,v 1.23 2022/04/06 18:59:29 naddy Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>
@@ -15,8 +14,6 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-/*	$NetBSD: inphy.c,v 1.18 2000/02/02 23:34:56 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.

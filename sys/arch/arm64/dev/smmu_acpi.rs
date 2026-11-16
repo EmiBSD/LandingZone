@@ -1,4 +1,3 @@
-/* $OpenBSD: smmu_acpi.c,v 1.14 2026/01/24 16:07:09 kettenis Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

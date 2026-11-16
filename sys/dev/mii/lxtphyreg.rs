@@ -1,5 +1,3 @@
-/*	$OpenBSD: lxtphyreg.h,v 1.3 2022/01/09 05:42:44 jsg Exp $	*/
-/*	$NetBSD: lxtphyreg.h,v 1.1 1998/10/24 00:33:17 thorpej Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

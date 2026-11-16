@@ -1,4 +1,3 @@
-/*	$OpenBSD: dc.c,v 1.159 2024/11/05 18:58:59 miod Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

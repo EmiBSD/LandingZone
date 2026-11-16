@@ -1,4 +1,3 @@
-/* $OpenBSD: fuse_vnops.c,v 1.79 2026/07/10 14:43:48 helg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,5 +1,3 @@
-/*	$OpenBSD: netisr.h,v 1.62 2025/10/30 17:30:46 mvs Exp $	*/
-/*	$NetBSD: netisr.h,v 1.12 1995/08/12 23:59:24 mycroft Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

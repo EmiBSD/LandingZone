@@ -1,4 +1,3 @@
-/*	$OpenBSD: siop.out,v 1.9 2007/04/13 18:16:17 krw Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

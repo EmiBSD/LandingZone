@@ -1,4 +1,3 @@
-/* $OpenBSD: fusebuf.h,v 1.17 2026/06/17 13:29:01 helg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

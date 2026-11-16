@@ -1,5 +1,3 @@
-/*	$OpenBSD: curve25519.h,v 1.2 2020/07/22 13:54:30 tobhe Exp $	*/
-/*	$OpenBSD: curve25519.c,v 1.2 2020/07/22 13:54:30 tobhe Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

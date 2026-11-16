@@ -1,4 +1,3 @@
-/*	$OpenBSD: udf.h,v 1.21 2016/06/19 11:54:33 natano Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

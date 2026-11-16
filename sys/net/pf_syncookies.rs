@@ -1,4 +1,3 @@
-/*	$OpenBSD: pf_syncookies.c,v 1.10 2025/07/07 02:28:50 jsg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

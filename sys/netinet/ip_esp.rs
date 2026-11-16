@@ -1,5 +1,3 @@
-/*	$OpenBSD: ip_esp.h,v 1.48 2025/01/01 13:44:22 bluhm Exp $	*/
-/*	$OpenBSD: ip_esp.c,v 1.202 2026/09/22 14:20:07 bluhm Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

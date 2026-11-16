@@ -1,4 +1,3 @@
-/*	$OpenBSD: inphyreg.h,v 1.6 2024/09/06 10:54:08 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>
@@ -15,8 +14,6 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-/*	$NetBSD: inphyreg.h,v 1.1 1998/08/11 00:00:28 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.

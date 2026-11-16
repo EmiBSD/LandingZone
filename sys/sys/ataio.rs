@@ -1,5 +1,3 @@
-/*	$OpenBSD: ataio.h,v 1.5 2003/09/26 21:43:32 miod Exp $	*/
-/*	$NetBSD: ataio.h,v 1.2 1998/11/23 22:58:23 kenh Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>
@@ -25,7 +23,7 @@
 //! Upstream: sys/sys/ataio.h @ 3ce1f3f79392
 //!
 //! The original file carries no licence text, only its `$OpenBSD$` and `$NetBSD$` lines
-//! (kept above); every notice in the reference tree is accepted (the user's rule of
+//! (not kept); every notice in the reference tree is accepted (the user's rule of
 //! 2026-10-04).
 //!
 //! ## Deviations

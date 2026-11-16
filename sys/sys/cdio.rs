@@ -1,5 +1,3 @@
-/*	$OpenBSD: cdio.h,v 1.17 2017/10/24 09:36:13 jsg Exp $	*/
-/*	$NetBSD: cdio.h,v 1.11 1996/02/19 18:29:04 scottr Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>
@@ -26,7 +24,7 @@
 //! Upstream: sys/sys/cdio.h @ 3ce1f3f79392
 //!
 //! The original file carries no licence text, only its `$OpenBSD$` and `$NetBSD$` lines
-//! (kept above); every notice in the reference tree is accepted (the user's rule of
+//! (not kept); every notice in the reference tree is accepted (the user's rule of
 //! 2026-10-04).
 //!
 //! ## Deviations

@@ -4022,7 +4022,7 @@ status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "06146f4d7a38999202e7a966e96be99bb6535e28"
 deps = ["sys/sys/sigio.h", "sys/sys/rwlock.h", "sys/sys/time.h"]
-notes = "licence: John S. Dyson's, accepted by the user on 2026-10-03 (kept right after the $OpenBSD$ line, as the notice wants it at the beginning of the file). PIPE_SIZE/BIG_PIPE_SIZE (usize), PIPE_* state bits (u32), struct pipebuf (Cells; the member in is r#in; buffer a raw pointer, null for NULL), struct pipe (Cells under pipe_lock; pipe_lock/pipe_peer/pipe_pair raw pointers into the pair, Pipe::lock accessor; set_state/clear_state/has_state helpers); pipe_klist a Klist since kern_event.c; pipe_init is in sys_pipe.rs; reference-backed test"
+notes = "licence: John S. Dyson's, accepted by the user on 2026-10-03 (kept at the beginning of the file, as the notice wants it). PIPE_SIZE/BIG_PIPE_SIZE (usize), PIPE_* state bits (u32), struct pipebuf (Cells; the member in is r#in; buffer a raw pointer, null for NULL), struct pipe (Cells under pipe_lock; pipe_lock/pipe_peer/pipe_pair raw pointers into the pair, Pipe::lock accessor; set_state/clear_state/has_state helpers); pipe_klist a Klist since kern_event.c; pipe_init is in sys_pipe.rs; reference-backed test"
 
 [[file]]
 c = "sys/kern/sys_pipe.c"
@@ -4895,7 +4895,7 @@ status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "8a154db560e094524fe9bc69bec2f3705bcf8d79"
 deps = []
-notes = "M13: no licence text in the original (its $OpenBSD$/$NetBSD$ lines kept). struct mp_bus and struct mp_intr_map are defined by the machine contract sys/machine/mpconfig.rs (generic dev/acpi code builds them) and re-exported here (mb_intr_print/mb_intr_cfg wait for mpbios.c); the extern globals are mainbus.rs's"
+notes = "M13: no licence text in the original. struct mp_bus and struct mp_intr_map are defined by the machine contract sys/machine/mpconfig.rs (generic dev/acpi code builds them) and re-exported here (mb_intr_print/mb_intr_cfg wait for mpbios.c); the extern globals are mainbus.rs's"
 
 [[file]]
 c = "sys/arch/amd64/include/apicvar.h"
@@ -5143,7 +5143,7 @@ status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "bb0729037b123dc414d36c99ab18fe608f18832b"
 deps = []
-notes = "license: none (no licence text; its $OpenBSD$/$NetBSD$ lines kept); M13 (vga): every FG_*/BG_* attribute define as u32; test-ref with assert_complete"
+notes = "license: none (no licence text); M13 (vga): every FG_*/BG_* attribute define as u32; test-ref with assert_complete"
 
 [[file]]
 c = "sys/dev/ic/pcdisplayvar.h"
@@ -6210,7 +6210,7 @@ rust = "sys/scsi/scsi_message.rs"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "93fbc87c4a6a7f84398c2ef4b33295ea5704cfb7"
-notes = "license: none (no licence text; only the $OpenBSD$ line, kept); M13, the whole header for siop(4): every MSG_* message and extended-message value as u8; IS1BYTEMSG/IS2BYTEMSG/ISEXTMSG/MSG_IDENTIFY/MSG_ISIDENTIFY as const fns (is1bytemsg, ..., msg_identify with a bool disc); host test and a test-ref of the defines"
+notes = "license: none (no licence text); M13, the whole header for siop(4): every MSG_* message and extended-message value as u8; IS1BYTEMSG/IS2BYTEMSG/ISEXTMSG/MSG_IDENTIFY/MSG_ISIDENTIFY as const fns (is1bytemsg, ..., msg_identify with a bool disc); host test and a test-ref of the defines"
 
 [[file]]
 c = "sys/scsi/scsiconf.c"
@@ -6228,7 +6228,7 @@ status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "a217355934c2cc181c034ffdcb87877a26601d00"
 deps = ["sys/sys/ioccom.h"]
-notes = "M10a: license: none (only the $OpenBSD$/$NetBSD$ lines, kept; accepted by the user 2026-10-04); scsireq_t (Scsireq, the hole after cmdlen named _pad0, databuf a usize user address), struct scsi_addr (type is r#type), struct sbioc_device (sd_cookie a raw pointer as biovar's bio_cookie), all AbiPod with LP64 sizes and offsets asserted; SENSEBUFLEN, CMDBUFLEN, SCCMD_* (flags u64, retsts u8), SC_DB_*, TYPE_*, SCIOCCOMMAND/SCIOCDEBUG/SCIOCRESET/SCIOCIDENTIFY/SBIOCPROBE/SBIOCDETACH via _iowr/_iow/_io/_ior; host test of the ioctl numbers, test-ref of the defines"
+notes = "M10a: license: none (no licence text; accepted by the user 2026-10-04); scsireq_t (Scsireq, the hole after cmdlen named _pad0, databuf a usize user address), struct scsi_addr (type is r#type), struct sbioc_device (sd_cookie a raw pointer as biovar's bio_cookie), all AbiPod with LP64 sizes and offsets asserted; SENSEBUFLEN, CMDBUFLEN, SCCMD_* (flags u64, retsts u8), SC_DB_*, TYPE_*, SCIOCCOMMAND/SCIOCDEBUG/SCIOCRESET/SCIOCIDENTIFY/SBIOCPROBE/SBIOCDETACH via _iowr/_iow/_io/_ior; host test of the ioctl numbers, test-ref of the defines"
 
 [[file]]
 c = "sys/sys/ataio.h"
@@ -6237,7 +6237,7 @@ status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "fe79794876094b7657c14abe1a3e0cc48f2a89a2"
 deps = ["sys/sys/ioccom.h"]
-notes = "M10a: license: none (only the $OpenBSD$/$NetBSD$ lines, kept; every notice in the reference tree accepted by the user 2026-10-04); atareq_t (Atareq, holes named _pad0/_pad1, databuf a usize user address) and atagettrace_t (Atagettrace, buf a usize), AbiPod with LP64 sizes and offsets asserted; ATACMD_* (flags u64, retsts u8), ATAIOCCOMMAND, ATAIOGETTRACE; needed by scsi_ioctl.c; host test of the ioctl numbers, test-ref of the defines"
+notes = "M10a: license: none (no licence text; every notice in the reference tree accepted by the user 2026-10-04); atareq_t (Atareq, holes named _pad0/_pad1, databuf a usize user address) and atagettrace_t (Atagettrace, buf a usize), AbiPod with LP64 sizes and offsets asserted; ATACMD_* (flags u64, retsts u8), ATAIOCCOMMAND, ATAIOGETTRACE; needed by scsi_ioctl.c; host test of the ioctl numbers, test-ref of the defines"
 
 [[file]]
 c = "sys/scsi/scsi_ioctl.c"
@@ -7185,7 +7185,7 @@ status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "02069c4539d745699e0a3b896319f82471676c59"
 deps = ["sys/sys/ioccom.h"]
-notes = "license: none (only the $OpenBSD$/$NetBSD$ lines, kept as they are); M10c: CDIOREADMSADDR; M13: the whole header, for cd(4): union msf_lba is MsfLba (four bytes, msf/lba/addr views as methods, lba in the CPU's byte order), struct cd_toc_entry (the control:4/addr_type:4 bit-fields are the byte `ac` with accessors, little-endian arm), struct cd_sub_channel_header/q_data/position_data/media_catalog/track_info and cd_sub_channel_info (the anonymous union `what` is the Rust union CdSubChannelWhat), the ioc_* requests and every CDIOC*/CDIOREAD*/CDIOCPLAY* ioctl number, the DVD structures (dvd_layer .. dvd_manufact, union dvd_struct as DvdStruct, union dvd_authinfo as DvdAuthinfo with typed accessors, DVD_READ_STRUCT/DVD_WRITE_STRUCT/DVD_AUTH, GPCMD_*, DVD_STRUCT_*, DVD_LU_*/DVD_HOST_*, DVD_KEY_SIZE, DVD_CHALLENGE_SIZE and the DVD_CPM/CP_SEC/CGMS values); license: none (only the $OpenBSD$/$NetBSD$ lines, kept; every notice in the reference tree accepted by the user 2026-10-04); every structure repr(C) with the C's LP64 size and offsets asserted, the compiler's holes named _pad*, so each is AbiPod (read and written as bytes by ioctl_arg/ioctl_ret); data pointers (ioc_read_subchannel.data, ioc_read_toc_entry.data) are usize user addresses; host tests (ioctl numbers, nibbles and MSF views, the unions) and a test-ref of the defines"
+notes = "license: none (no licence text); M10c: CDIOREADMSADDR; M13: the whole header, for cd(4): union msf_lba is MsfLba (four bytes, msf/lba/addr views as methods, lba in the CPU's byte order), struct cd_toc_entry (the control:4/addr_type:4 bit-fields are the byte `ac` with accessors, little-endian arm), struct cd_sub_channel_header/q_data/position_data/media_catalog/track_info and cd_sub_channel_info (the anonymous union `what` is the Rust union CdSubChannelWhat), the ioc_* requests and every CDIOC*/CDIOREAD*/CDIOCPLAY* ioctl number, the DVD structures (dvd_layer .. dvd_manufact, union dvd_struct as DvdStruct, union dvd_authinfo as DvdAuthinfo with typed accessors, DVD_READ_STRUCT/DVD_WRITE_STRUCT/DVD_AUTH, GPCMD_*, DVD_STRUCT_*, DVD_LU_*/DVD_HOST_*, DVD_KEY_SIZE, DVD_CHALLENGE_SIZE and the DVD_CPM/CP_SEC/CGMS values); license: none (no licence text; every notice in the reference tree accepted by the user 2026-10-04); every structure repr(C) with the C's LP64 size and offsets asserted, the compiler's holes named _pad*, so each is AbiPod (read and written as bytes by ioctl_arg/ioctl_ret); data pointers (ioc_read_subchannel.data, ioc_read_toc_entry.data) are usize user addresses; host tests (ioctl numbers, nibbles and MSF views, the unions) and a test-ref of the defines"
 
 [[file]]
 c = "sys/isofs/udf/ecma167-udf.h"

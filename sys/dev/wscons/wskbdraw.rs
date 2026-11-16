@@ -1,4 +1,3 @@
-/*	$OpenBSD: wskbdraw.h,v 1.4 2023/07/24 19:28:40 miod Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

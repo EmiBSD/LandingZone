@@ -1,5 +1,3 @@
-/*	$OpenBSD: fcntl.h,v 1.23 2025/08/04 04:59:30 guenther Exp $	*/
-/*	$NetBSD: fcntl.h,v 1.8 1995/03/26 20:24:12 jtc Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

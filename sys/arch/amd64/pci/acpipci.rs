@@ -1,4 +1,3 @@
-/*	$OpenBSD: acpipci.c,v 1.13 2026/08/10 15:14:57 hshoexer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

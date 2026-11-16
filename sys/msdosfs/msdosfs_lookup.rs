@@ -1,5 +1,3 @@
-/*	$OpenBSD: msdosfs_lookup.c,v 1.35 2022/08/23 20:37:16 cheloha Exp $	*/
-/*	$NetBSD: msdosfs_lookup.c,v 1.34 1997/10/18 22:12:27 ws Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

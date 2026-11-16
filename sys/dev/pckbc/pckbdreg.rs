@@ -1,6 +1,3 @@
-/* $OpenBSD: pckbdreg.h,v 1.3 2023/08/13 21:54:02 miod Exp $ */
-/* $NetBSD: pckbdreg.h,v 1.2 1998/04/07 13:43:16 hannken Exp $ */
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

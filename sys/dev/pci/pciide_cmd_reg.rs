@@ -1,5 +1,3 @@
-/*	$OpenBSD: pciide_cmd_reg.h,v 1.12 2024/09/06 10:54:08 jsg Exp $	*/
-/*	$NetBSD: pciide_cmd_reg.h,v 1.9 2000/08/02 20:23:46 bouyer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

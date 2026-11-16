@@ -1,4 +1,3 @@
-/*	$OpenBSD: sdmmc_ioreg.h,v 1.11 2018/08/09 13:50:15 patrick Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

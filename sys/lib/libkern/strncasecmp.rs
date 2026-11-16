@@ -1,4 +1,3 @@
-/*	$OpenBSD: strncasecmp.c,v 1.6 2014/06/10 04:16:57 deraadt Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

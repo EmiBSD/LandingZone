@@ -1,5 +1,3 @@
-/*	$OpenBSD: eapreg.h,v 1.4 2012/03/30 08:18:19 ratchov Exp $ */
-/*	$NetBSD: eapreg.h,v 1.10 2005/02/13 23:58:38 fredb Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

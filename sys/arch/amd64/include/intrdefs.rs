@@ -1,6 +1,3 @@
-/*	$OpenBSD: intrdefs.h,v 1.25 2025/11/10 12:34:52 dlg Exp $	*/
-/*	$NetBSD: intrdefs.h,v 1.2 2003/05/04 22:01:56 fvdl Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

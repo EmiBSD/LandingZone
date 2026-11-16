@@ -1,5 +1,3 @@
-/*	$OpenBSD: in_proto.c,v 1.127 2025/07/19 16:40:40 mvs Exp $	*/
-/*	$NetBSD: in_proto.c,v 1.14 1996/02/18 18:58:32 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,6 +1,3 @@
-/*	$OpenBSD: pckbc_isa.c,v 1.19 2015/08/18 06:54:00 stsp Exp $	*/
-/*	$NetBSD: pckbc_isa.c,v 1.2 2000/03/23 07:01:35 thorpej Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

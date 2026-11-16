@@ -1,5 +1,3 @@
-/*	$OpenBSD: in6_src.c,v 1.104 2025/07/18 08:39:14 mvs Exp $	*/
-/*	$KAME: in6_src.c,v 1.36 2001/02/06 04:08:17 itojun Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

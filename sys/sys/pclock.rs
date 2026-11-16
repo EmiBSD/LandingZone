@@ -1,4 +1,3 @@
-/*	$OpenBSD: pclock.h,v 1.1 2025/05/31 10:24:50 dlg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

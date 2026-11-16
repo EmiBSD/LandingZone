@@ -1,4 +1,3 @@
-/*	$OpenBSD: nvmevar.h,v 1.33 2026/05/27 15:04:14 jcs Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

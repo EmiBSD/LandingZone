@@ -1,4 +1,3 @@
-/*	$OpenBSD: if_re_pci.c,v 1.59 2024/08/31 16:23:09 deraadt Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

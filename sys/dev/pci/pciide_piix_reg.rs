@@ -1,5 +1,3 @@
-/*	$OpenBSD: pciide_piix_reg.h,v 1.13 2022/01/09 05:42:58 jsg Exp $	*/
-/*	$NetBSD: pciide_piix_reg.h,v 1.5 2001/01/05 15:29:40 bouyer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

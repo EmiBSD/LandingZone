@@ -1,4 +1,3 @@
-/*	$OpenBSD: smbiosvar.h,v 1.14 2025/07/15 01:09:32 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

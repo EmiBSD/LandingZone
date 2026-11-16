@@ -1,4 +1,3 @@
-/*	$OpenBSD: rd.c,v 1.14 2022/04/06 18:59:27 naddy Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

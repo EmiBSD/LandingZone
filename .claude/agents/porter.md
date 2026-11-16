@@ -35,7 +35,7 @@ prompt names.
 3. Study how the tree already does the same thing (`grep -rn` the sibling drivers or
    subsystems) and copy its conventions before inventing one. A new idiom is a new
    `docs/C_TO_RUST.md` row in the same commit.
-4. Write `sys/<same path>.rs`: `$OpenBSD$` line, `/* <LICENSES> */` with the author's ISC block
+4. Write `sys/<same path>.rs`: no `$OpenBSD$` id line, `/* <LICENSES> */` with the author's ISC block
    first and the original notice(s) whole after one blank line, `/* <CODE> */` with `//!` docs
    (`Upstream: <c path> @ <12-hex>`, `## Deviations`) in the section order of
    `rust-kernel.md`, `/* <TESTS> */` with inline host tests for every testable piece (register

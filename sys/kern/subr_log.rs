@@ -1,5 +1,3 @@
-/*	$OpenBSD: subr_log.c,v 1.81 2025/06/03 00:20:31 dlg Exp $	*/
-/*	$NetBSD: subr_log.c,v 1.11 1996/03/30 22:24:44 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

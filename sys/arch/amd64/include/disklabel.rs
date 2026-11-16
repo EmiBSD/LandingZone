@@ -1,4 +1,3 @@
-/*	$OpenBSD: disklabel.h,v 1.11 2015/09/30 14:57:03 krw Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

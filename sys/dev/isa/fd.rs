@@ -1,6 +1,3 @@
-/*	$OpenBSD: fd.c,v 1.111 2025/11/17 14:27:43 jsg Exp $	*/
-/*	$NetBSD: fd.c,v 1.90 1996/05/12 23:12:03 mycroft Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

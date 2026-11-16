@@ -1,4 +1,3 @@
-/* $OpenBSD: agintc.c,v 1.66 2026/09/08 19:48:28 kettenis Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

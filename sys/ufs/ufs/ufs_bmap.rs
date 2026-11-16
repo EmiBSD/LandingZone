@@ -1,5 +1,3 @@
-/*	$OpenBSD: ufs_bmap.c,v 1.37 2021/12/12 09:14:59 visa Exp $	*/
-/*	$NetBSD: ufs_bmap.c,v 1.3 1996/02/09 22:36:00 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

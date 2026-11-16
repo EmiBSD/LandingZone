@@ -1,5 +1,3 @@
-/*	$OpenBSD: tcp_seq.h,v 1.6 2007/06/15 18:23:06 markus Exp $	*/
-/*	$NetBSD: tcp_seq.h,v 1.6 1995/03/26 20:32:35 jtc Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

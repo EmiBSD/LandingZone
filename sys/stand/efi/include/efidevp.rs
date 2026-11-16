@@ -1,4 +1,3 @@
-/* $FreeBSD: head/sys/boot/efi/include/efidevp.h 312314 2017-01-16 20:57:01Z tsoome $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

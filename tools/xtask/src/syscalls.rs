@@ -440,12 +440,6 @@ fn ported_syscalls(root: &Path) -> Result<BTreeMap<String, String>> {
     Ok(found)
 }
 
-/// The `$OpenBSD$` id line of a reference file.
-fn id_line(root: &Path, rel: &str) -> Result<String> {
-    let text = fs::read_to_string(root.join("reference/openbsd-src/sys").join(rel))?;
-    Ok(text.lines().next().unwrap_or_default().to_string())
-}
-
 /// The pinned commit, from `reference/PINNED.md`.
 fn pin(root: &Path) -> Result<String> {
     let text = fs::read_to_string(root.join("reference/PINNED.md"))?;
@@ -477,8 +471,7 @@ pub fn generate(root: &Path) -> Result<Vec<(&'static str, String)>> {
 
     // --- sys/sys/syscall.rs ---------------------------------------------------------------
     let mut numbers = String::new();
-    numbers.push_str(&id_line(root, "sys/syscall.h")?);
-    numbers.push_str("\n\n//! `<sys/syscall.h>`: system call numbers.\n//!\n");
+    numbers.push_str("//! `<sys/syscall.h>`: system call numbers.\n//!\n");
     numbers.push_str(&banner("sys/sys/syscall.h"));
     numbers.push_str("\n#![allow(non_upper_case_globals)] // the C names: SYS_write\n\n");
     for e in &entries {
@@ -510,8 +503,7 @@ pub fn generate(root: &Path) -> Result<Vec<(&'static str, String)>> {
 
     // --- sys/sys/syscallargs.rs ----------------------------------------------------------
     let mut args = String::new();
-    args.push_str(&id_line(root, "sys/syscallargs.h")?);
-    args.push_str("\n\n//! `<sys/syscallargs.h>`: system call argument lists.\n//!\n");
+    args.push_str("//! `<sys/syscallargs.h>`: system call argument lists.\n//!\n");
     args.push_str(&banner("sys/sys/syscallargs.h"));
     args.push_str(
         "//!\n//! ## Deviations\n\
@@ -582,8 +574,7 @@ pub fn generate(root: &Path) -> Result<Vec<(&'static str, String)>> {
 
     // --- sys/kern/init_sysent.rs ---------------------------------------------------------
     let mut sysent = String::new();
-    sysent.push_str(&id_line(root, "kern/init_sysent.c")?);
-    sysent.push_str("\n\n//! System call switch table.\n//!\n");
+    sysent.push_str("//! System call switch table.\n//!\n");
     sysent.push_str(&banner("sys/kern/init_sysent.c"));
     sysent.push_str(
         "//!\n//! ## Deviations\n\
@@ -693,8 +684,7 @@ pub fn generate(root: &Path) -> Result<Vec<(&'static str, String)>> {
 
     // --- sys/kern/syscalls.rs ------------------------------------------------------------
     let mut names = String::new();
-    names.push_str(&id_line(root, "kern/syscalls.c")?);
-    names.push_str("\n\n//! System call names.\n//!\n");
+    names.push_str("//! System call names.\n//!\n");
     names.push_str(&banner("sys/kern/syscalls.c"));
     names.push_str("\nuse crate::sys::syscall::SYS_MAXSYSCALL;\n\n");
     names.push_str("/// `syscallnames[]`: the name of every system call number.\n");
@@ -721,15 +711,14 @@ pub fn generate(root: &Path) -> Result<Vec<(&'static str, String)>> {
     ])
 }
 
-/// The generated source in the zones of `layout.rs`: the `$OpenBSD$` id line, the author's
-/// block alone in `<LICENSES>` (the C files carry no notice, `license = "none"` in ports.toml),
-/// then everything else in `<CODE>`.
+/// The generated source in the zones of `layout.rs`: the author's block alone in
+/// `<LICENSES>` (the C files carry no notice, `license = "none"` in ports.toml), then
+/// everything else in `<CODE>`. No version-control id line: the port keeps none.
 fn zoned(src: &str) -> String {
-    let (id, rest) = src.split_once('\n').unwrap_or((src, ""));
     let author = crate::layout::AUTHOR_BLOCK;
     format!(
-        "{id}\n\n/* <LICENSES> */\n{author}/* </LICENSES> */\n\n/* <CODE> */\n{}\n/* </CODE> */\n",
-        rest.trim()
+        "/* <LICENSES> */\n{author}/* </LICENSES> */\n\n/* <CODE> */\n{}\n/* </CODE> */\n",
+        src.trim()
     )
 }
 

@@ -1,5 +1,3 @@
-/*	$OpenBSD: hfsc.h,v 1.15 2026/03/19 14:59:05 sthen Exp $	*/
-/*	$OpenBSD: hfsc.c,v 1.53 2026/03/19 14:59:05 sthen Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

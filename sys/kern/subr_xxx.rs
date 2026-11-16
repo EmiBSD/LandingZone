@@ -1,5 +1,3 @@
-/*	$OpenBSD: subr_xxx.c,v 1.20 2026/04/22 01:51:37 jsg Exp $	*/
-/*	$NetBSD: subr_xxx.c,v 1.10 1996/02/04 02:16:51 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

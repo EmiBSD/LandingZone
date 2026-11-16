@@ -1,4 +1,3 @@
-/*	$OpenBSD: exec.h,v 1.7 2017/02/08 05:09:25 guenther Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

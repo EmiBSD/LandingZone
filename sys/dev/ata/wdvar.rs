@@ -1,5 +1,3 @@
-/*	$OpenBSD: wdvar.h,v 1.21 2014/07/09 12:56:28 mpi Exp $	*/
-/*	$NetBSD: wdvar.h,v 1.3 1998/11/11 19:38:27 bouyer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

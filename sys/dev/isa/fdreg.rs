@@ -1,6 +1,3 @@
-/*	$OpenBSD: fdreg.h,v 1.13 2025/11/13 20:59:14 deraadt Exp $	*/
-/*	$NetBSD: fdreg.h,v 1.8 1995/06/28 04:30:57 cgd Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

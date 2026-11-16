@@ -1,4 +1,3 @@
-/*	$OpenBSD: sdmmc.c,v 1.62 2024/08/18 15:03:01 deraadt Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

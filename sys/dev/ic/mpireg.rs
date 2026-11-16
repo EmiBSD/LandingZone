@@ -1,4 +1,3 @@
-/*	$OpenBSD: mpireg.h,v 1.45 2014/03/25 05:41:44 dlg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

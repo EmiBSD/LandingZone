@@ -1,4 +1,3 @@
-/*	$OpenBSD: sdmmcchip.h,v 1.15 2023/04/19 02:01:02 dlg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

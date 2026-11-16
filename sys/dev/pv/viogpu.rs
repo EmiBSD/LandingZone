@@ -1,4 +1,3 @@
-/*	$OpenBSD: viogpu.c,v 1.13 2026/01/12 18:15:33 helg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

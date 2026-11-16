@@ -1,5 +1,3 @@
-/*	$OpenBSD: dp8390.c,v 1.63 2022/01/09 05:42:38 jsg Exp $	*/
-/*	$NetBSD: dp8390.c,v 1.13 1998/07/05 06:49:11 jonathan Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/* $OpenBSD: agtimer.c,v 1.30 2026/05/04 20:43:41 kettenis Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

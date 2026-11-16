@@ -1,4 +1,3 @@
-/*	$OpenBSD: ipsec_input.c,v 1.223 2026/05/07 14:58:03 claudio Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

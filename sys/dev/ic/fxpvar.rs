@@ -1,4 +1,3 @@
-/*	$OpenBSD: fxpvar.h,v 1.38 2022/01/09 05:42:38 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>
@@ -15,8 +14,6 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-/*	$NetBSD: if_fxpvar.h,v 1.1 1997/06/05 02:01:58 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1995, David Greenman

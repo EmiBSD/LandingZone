@@ -1,5 +1,3 @@
-/*	$OpenBSD: ufs_vfsops.c,v 1.21 2025/09/20 13:53:36 mpi Exp $	*/
-/*	$NetBSD: ufs_vfsops.c,v 1.4 1996/02/09 22:36:12 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

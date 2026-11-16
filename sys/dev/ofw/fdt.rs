@@ -1,4 +1,3 @@
-/*	$OpenBSD: fdt.c,v 1.41 2026/07/19 03:15:38 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

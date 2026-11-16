@@ -1,5 +1,3 @@
-/*      $OpenBSD: pciide_rdc_reg.h,v 1.1 2014/07/13 23:19:51 sasano Exp $    */
-/*      $NetBSD: rdcide_reg.h,v 1.1 2011/04/04 14:33:51 bouyer Exp $    */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

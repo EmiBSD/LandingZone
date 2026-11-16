@@ -1,5 +1,3 @@
-/* $OpenBSD: wseventvar.h,v 1.15 2025/07/18 17:34:29 mvs Exp $ */
-/* $NetBSD: wseventvar.h,v 1.1 1998/03/22 14:24:03 drochner Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

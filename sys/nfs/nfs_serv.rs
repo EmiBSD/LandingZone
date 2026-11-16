@@ -1,5 +1,3 @@
-/*	$OpenBSD: nfs_serv.c,v 1.150 2026/07/02 02:51:14 jsg Exp $	*/
-/*     $NetBSD: nfs_serv.c,v 1.34 1997/05/12 23:37:12 fvdl Exp $       */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

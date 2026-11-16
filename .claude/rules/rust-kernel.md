@@ -40,9 +40,9 @@ paths:
 - Every `pub` item has a doc comment (`missing_docs` is warn; `just clippy` uses `-D warnings`).
 - File layout (M15): every `.rs` under `sys/` and `tools/` is split into zones, each opened and
   closed by a comment line of its own, in this order, and nothing else sits outside them but
-  blank lines and the leading `/* $OpenBSD ... */` id lines (or a generated-file banner):
-  - `/* <LICENSES> */` ... `/* </LICENSES> */`: every file. The `/* $OpenBSD ... */` line(s)
-    stay above the opening marker. The author's ISC block comes first (`scope-and-stubs.md`,
+  blank lines and a generated file's banner (no `/* $OpenBSD ... */` id lines: the port keeps
+  none since 2026-11-15, and `ports check` refuses one):
+  - `/* <LICENSES> */` ... `/* </LICENSES> */`: every file. The author's ISC block comes first (`scope-and-stubs.md`,
     authorship), then, after one blank line, a port's original licence block(s), verbatim
     (the markers only mark). A port of a C file with no licence text
     (`license = "none"`), an `[[extra]]` and every untracked file hold the author's block alone;

@@ -1,4 +1,3 @@
-/*	$OpenBSD: efifbvar.h,v 1.10 2019/05/04 11:34:47 kettenis Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

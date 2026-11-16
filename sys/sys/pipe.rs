@@ -1,4 +1,3 @@
-/*	$OpenBSD: pipe.h,v 1.29 2022/07/09 12:48:21 visa Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

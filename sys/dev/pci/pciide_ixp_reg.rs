@@ -1,5 +1,3 @@
-/* 	$OpenBSD: pciide_ixp_reg.h,v 1.2 2008/06/26 05:42:17 ray Exp $	*/
-/* $NetBSD: pciide_ixp_reg.h,v 1.2 2005/02/27 00:27:33 perry Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

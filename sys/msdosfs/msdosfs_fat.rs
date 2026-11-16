@@ -1,5 +1,3 @@
-/*	$OpenBSD: msdosfs_fat.c,v 1.36 2023/06/16 08:42:08 sf Exp $	*/
-/*	$NetBSD: msdosfs_fat.c,v 1.26 1997/10/17 11:24:02 ws Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

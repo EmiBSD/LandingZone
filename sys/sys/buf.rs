@@ -1,5 +1,3 @@
-/*	$OpenBSD: buf.h,v 1.123 2026/08/03 03:27:45 jsg Exp $	*/
-/*	$NetBSD: buf.h,v 1.25 1997/04/09 21:12:17 mycroft Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

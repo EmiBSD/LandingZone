@@ -1,5 +1,3 @@
-/*	$OpenBSD: poly1305.h,v 1.2 2020/07/22 13:54:30 tobhe Exp $	*/
-/*	$OpenBSD: poly1305.c,v 1.2 2020/07/22 13:54:30 tobhe Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

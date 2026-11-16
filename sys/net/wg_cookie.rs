@@ -1,5 +1,3 @@
-/*	$OpenBSD: wg_cookie.h,v 1.2 2020/12/09 05:53:33 tb Exp $ */
-/*	$OpenBSD: wg_cookie.c,v 1.5 2023/08/18 08:11:47 jsg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

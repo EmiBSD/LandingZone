@@ -1,4 +1,3 @@
-/*	$OpenBSD: sig_machdep.c,v 1.9 2023/04/16 10:14:59 kettenis Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

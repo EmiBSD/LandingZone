@@ -18,7 +18,9 @@ Everything in this repository (code, comments, docs, commits) is in English.
 - Generic code (`kern/`, `uvm/`, `dev/`, `sys/`) reaches arch code ONLY through `crate::machine`.
   `crate::arch::amd64` / `crate::arch::arm64` are never named outside `sys/arch/` and `sys/machine/`.
 - `reference/` is read-only. Never edit it, never copy C verbatim (`.claude/rules/reference-readonly.md`).
-- Every ported file keeps the original `$OpenBSD$` line and the full copyright/license block.
+- Every ported file keeps the full original copyright/license block. The version-control id
+  lines (`$OpenBSD$`, `$NetBSD$`, ...) are not kept (the user's decision of 2026-11-15):
+  `Upstream:` and `ports.toml`'s `upstream_blob` name the revision.
 - Every `.rs` opens its `<LICENSES>` zone with the author's ISC block, "Copyright (c) 2026 Emilio
   Navarrete Lineros <enavarre@outlook.com>": first, before the original notice (latest change
   first), or alone. Derivative works and migrations of this code keep it first in every file;

@@ -1,5 +1,3 @@
-/*	$OpenBSD: am79900reg.h,v 1.3 2024/09/01 03:08:56 jsg Exp $	*/
-/*	$NetBSD: am79900reg.h,v 1.7 2005/02/27 00:27:00 perry Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

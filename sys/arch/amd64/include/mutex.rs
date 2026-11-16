@@ -1,5 +1,3 @@
-/*	$OpenBSD: mutex.h,v 1.11 2018/01/25 15:06:29 mpi Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

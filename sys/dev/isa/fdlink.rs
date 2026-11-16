@@ -1,5 +1,3 @@
-/*	$OpenBSD: fdlink.h,v 1.9 2007/04/10 17:47:55 miod Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

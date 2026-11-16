@@ -1,5 +1,3 @@
-/*	$OpenBSD: pciidevar.h,v 1.22 2024/05/13 01:15:51 jsg Exp $	*/
-/*	$NetBSD: pciidevar.h,v 1.6 2001/01/12 16:04:00 bouyer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

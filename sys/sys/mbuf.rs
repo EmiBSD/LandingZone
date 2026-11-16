@@ -1,5 +1,3 @@
-/*	$OpenBSD: mbuf.h,v 1.271 2026/07/03 11:51:57 dlg Exp $	*/
-/*	$NetBSD: mbuf.h,v 1.19 1996/02/09 18:25:14 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

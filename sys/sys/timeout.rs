@@ -1,4 +1,3 @@
-/*	$OpenBSD: timeout.h,v 1.51 2025/05/23 23:56:14 dlg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

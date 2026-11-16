@@ -1,5 +1,3 @@
-/*      $OpenBSD: eap.c,v 1.66 2024/09/01 03:08:56 jsg Exp $ */
-/*	$NetBSD: eap.c,v 1.46 2001/09/03 15:07:37 reinoud Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

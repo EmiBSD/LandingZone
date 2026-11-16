@@ -1,4 +1,3 @@
-/* $OpenBSD: softraid_raid6.c,v 1.74 2025/06/13 13:00:49 jsg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

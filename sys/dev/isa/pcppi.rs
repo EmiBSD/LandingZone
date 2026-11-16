@@ -1,5 +1,3 @@
-/* $OpenBSD: pcppi.c,v 1.19 2022/04/06 18:59:28 naddy Exp $ */
-/* $NetBSD: pcppi.c,v 1.1 1998/04/15 20:26:18 drochner Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/* $OpenBSD: self_reloc.c,v 1.2 2018/10/20 11:57:43 kettenis Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/*	$OpenBSD: ichreg.h,v 1.8 2022/01/09 05:42:46 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

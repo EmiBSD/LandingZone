@@ -1,5 +1,3 @@
-/*	$OpenBSD: cy82c693.c,v 1.9 2024/05/24 06:02:53 jsg Exp $	*/
-/* $NetBSD: cy82c693.c,v 1.1 2000/06/06 03:07:39 thorpej Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

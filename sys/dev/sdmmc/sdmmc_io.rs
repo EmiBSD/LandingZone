@@ -1,4 +1,3 @@
-/*	$OpenBSD: sdmmc_io.c,v 1.42 2020/12/26 03:45:57 cheloha Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

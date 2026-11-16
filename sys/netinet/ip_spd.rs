@@ -1,4 +1,3 @@
-/* $OpenBSD: ip_spd.c,v 1.122 2025/07/08 00:47:41 jsg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

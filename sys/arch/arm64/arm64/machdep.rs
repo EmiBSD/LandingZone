@@ -1,4 +1,3 @@
-/* $OpenBSD: machdep.c,v 1.101 2026/09/06 18:25:22 mglocker Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/*	$OpenBSD: kern_sched.c,v 1.116 2026/04/09 01:30:02 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

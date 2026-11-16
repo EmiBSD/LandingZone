@@ -1,4 +1,3 @@
-/* $OpenBSD: kern_intrmap.c,v 1.4 2025/06/13 09:48:45 jsg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

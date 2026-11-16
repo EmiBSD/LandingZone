@@ -1,4 +1,3 @@
-/*	$OpenBSD: putchar.c,v 1.1 2014/07/13 09:26:08 jasper Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

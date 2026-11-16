@@ -1,4 +1,3 @@
-/*	$OpenBSD: siginfo.h,v 1.14 2024/02/21 15:53:07 deraadt Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

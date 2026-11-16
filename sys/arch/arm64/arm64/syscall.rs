@@ -1,4 +1,3 @@
-/* $OpenBSD: syscall.c,v 1.20 2026/03/08 17:07:31 deraadt Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

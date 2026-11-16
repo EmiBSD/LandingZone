@@ -1,5 +1,3 @@
-/*	$OpenBSD: errno.h,v 1.25 2017/09/05 03:06:26 jsg Exp $	*/
-/*	$NetBSD: errno.h,v 1.10 1996/01/20 01:33:53 jtc Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/*	$OpenBSD: exec_i386.c,v 1.12 2024/10/04 22:21:28 bluhm Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,5 +1,3 @@
-/*	$OpenBSD: if_ne_pci.c,v 1.22 2024/05/24 06:02:56 jsg Exp $	*/
-/*	$NetBSD: if_ne_pci.c,v 1.8 1998/07/05 00:51:24 jonathan Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

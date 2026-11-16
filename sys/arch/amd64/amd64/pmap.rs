@@ -1,5 +1,3 @@
-/*	$OpenBSD: pmap.c,v 1.191 2026/06/04 05:22:04 mlarkin Exp $	*/
-/*	$NetBSD: pmap.c,v 1.3 2003/05/08 18:13:13 thorpej Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

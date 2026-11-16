@@ -1,5 +1,3 @@
-/*	$OpenBSD: mtio.h,v 1.9 2007/06/01 18:44:48 krw Exp $	*/
-/*	$NetBSD: mtio.h,v 1.14 1997/04/15 06:50:19 lukem Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

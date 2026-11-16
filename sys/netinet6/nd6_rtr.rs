@@ -1,5 +1,3 @@
-/*	$OpenBSD: nd6_rtr.c,v 1.176 2025/07/08 00:47:41 jsg Exp $	*/
-/*	$KAME: nd6_rtr.c,v 1.97 2001/02/07 11:09:13 itojun Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

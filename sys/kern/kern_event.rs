@@ -1,4 +1,3 @@
-/*	$OpenBSD: kern_event.c,v 1.206 2026/06/01 18:24:58 mvs Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

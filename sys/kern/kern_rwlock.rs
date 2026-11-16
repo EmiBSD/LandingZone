@@ -1,4 +1,3 @@
-/*	$OpenBSD: kern_rwlock.c,v 1.58 2025/07/21 20:36:41 bluhm Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

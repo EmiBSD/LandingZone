@@ -1,5 +1,3 @@
-/*	$OpenBSD: exec_script.h,v 1.6 2018/02/07 20:31:57 tedu Exp $	*/
-/*	$NetBSD: exec_script.h,v 1.6 1995/03/26 20:24:11 jtc Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

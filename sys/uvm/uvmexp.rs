@@ -1,5 +1,3 @@
-/*	$OpenBSD: uvmexp.h,v 1.27 2026/03/08 17:06:10 deraadt Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

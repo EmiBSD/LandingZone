@@ -1,5 +1,3 @@
-/*	$OpenBSD: azalia_codec.c,v 1.189 2022/09/08 01:35:39 jsg Exp $	*/
-/*	$NetBSD: azalia_codec.c,v 1.8 2006/05/10 11:17:27 kent Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

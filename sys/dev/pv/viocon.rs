@@ -1,4 +1,3 @@
-/*	$OpenBSD: viocon.c,v 1.19 2025/11/03 09:36:39 jan Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

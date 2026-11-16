@@ -1,4 +1,3 @@
-/*      $OpenBSD: kern_watchdog.c,v 1.16 2022/08/14 01:58:27 jsg Exp $        */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

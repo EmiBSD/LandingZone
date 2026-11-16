@@ -1,5 +1,3 @@
-/*	$OpenBSD: blake2s.h,v 1.3 2023/02/03 18:31:16 miod Exp $	*/
-/*	$OpenBSD: blake2s.c,v 1.3 2023/02/03 18:31:16 miod Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

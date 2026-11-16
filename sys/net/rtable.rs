@@ -1,5 +1,3 @@
-/*	$OpenBSD: rtable.h,v 1.36 2025/07/15 09:55:49 dlg Exp $ */
-/*	$OpenBSD: rtable.c,v 1.95 2025/07/16 13:48:38 jsg Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

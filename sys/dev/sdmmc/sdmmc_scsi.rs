@@ -1,5 +1,3 @@
-/*	$OpenBSD: sdmmc_scsi.h,v 1.3 2006/07/18 04:10:35 uwe Exp $	*/
-/*	$OpenBSD: sdmmc_scsi.c,v 1.63 2023/04/19 01:46:10 dlg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

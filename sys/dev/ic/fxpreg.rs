@@ -1,4 +1,3 @@
-/*	$OpenBSD: fxpreg.h,v 1.15 2024/09/04 07:54:52 mglocker Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,5 +1,3 @@
-/*	$OpenBSD: if_ethersubr.c,v 1.308 2025/12/19 02:04:13 dlg Exp $	*/
-/*	$NetBSD: if_ethersubr.c,v 1.19 1996/05/07 02:40:30 thorpej Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

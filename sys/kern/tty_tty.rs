@@ -1,5 +1,3 @@
-/*	$OpenBSD: tty_tty.c,v 1.34 2025/04/17 12:01:26 jsg Exp $	*/
-/*	$NetBSD: tty_tty.c,v 1.13 1996/03/30 22:24:46 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

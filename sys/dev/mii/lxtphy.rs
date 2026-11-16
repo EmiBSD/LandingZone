@@ -1,5 +1,3 @@
-/*	$OpenBSD: lxtphy.c,v 1.23 2022/04/06 18:59:29 naddy Exp $	*/
-/*	$NetBSD: lxtphy.c,v 1.19 2000/02/02 23:34:57 thorpej Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

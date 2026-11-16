@@ -1,5 +1,3 @@
-/*	$OpenBSD: mainbus.c,v 1.54 2025/09/16 12:18:10 hshoexer Exp $	*/
-/*	$NetBSD: mainbus.c,v 1.1 2003/04/26 18:39:29 fvdl Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/*	$OpenBSD: lpt_isa.c,v 1.17 2022/04/06 18:59:28 naddy Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,5 +1,3 @@
-/*	$OpenBSD: sys_machdep.c,v 1.21 2025/10/30 18:23:30 jca Exp $	*/
-/*	$NetBSD: sys_machdep.c,v 1.1 2003/04/26 18:39:32 fvdl Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

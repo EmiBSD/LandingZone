@@ -1,4 +1,3 @@
-/*	$OpenBSD: udf_extern.h,v 1.16 2025/07/07 00:55:15 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/*	$OpenBSD: if_cdcereg.h,v 1.9 2024/01/04 08:41:59 kevlo Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

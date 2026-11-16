@@ -1,5 +1,3 @@
-/*	$OpenBSD: in_var.h,v 1.48 2026/07/30 14:57:46 bluhm Exp $	*/
-/*	$NetBSD: in_var.h,v 1.16 1996/02/13 23:42:15 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

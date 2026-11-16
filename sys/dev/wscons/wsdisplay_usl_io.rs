@@ -1,6 +1,3 @@
-/* $OpenBSD: wsdisplay_usl_io.h,v 1.4 2016/04/24 17:30:31 matthieu Exp $ */
-/* $NetBSD: wsdisplay_usl_io.h,v 1.1 1998/06/11 22:00:04 drochner Exp $ */
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>
@@ -27,7 +24,7 @@
 //! Upstream: sys/dev/wscons/wsdisplay_usl_io.h @ 3ce1f3f79392
 //!
 //! ## Deviations
-//! - The header has no licence text; its `$OpenBSD$` and `$NetBSD$` lines are kept.
+//! - The header has no licence text, only its `$OpenBSD$` and `$NetBSD$` lines (not kept).
 //! - The `_IO*` numbers are `sys/sys/ioccom.rs`'s `const fn`s; `vtmode_t` is
 //!   [`VtMode`]; `unchar`/`ushort` are `u8`/`u16`.
 

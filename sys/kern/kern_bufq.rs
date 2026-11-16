@@ -1,4 +1,3 @@
-/*	$OpenBSD: kern_bufq.c,v 1.36 2025/05/17 10:13:40 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

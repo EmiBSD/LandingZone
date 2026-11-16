@@ -1,5 +1,3 @@
-/*	$OpenBSD: ioapic.c,v 1.34 2025/09/16 12:18:10 hshoexer Exp $	*/
-/* 	$NetBSD: ioapic.c,v 1.6 2003/05/15 13:30:31 fvdl Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

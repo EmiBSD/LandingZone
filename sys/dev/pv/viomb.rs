@@ -1,5 +1,3 @@
-/* $OpenBSD: viomb.c,v 1.13 2024/12/20 22:18:27 sf Exp $	 */
-/* $NetBSD: viomb.c,v 1.1 2011/10/30 12:12:21 hannken Exp $	 */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

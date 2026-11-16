@@ -1,4 +1,3 @@
-/*	$OpenBSD: pciide_jmicron_reg.h,v 1.1 2007/03/21 12:20:30 jsg Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

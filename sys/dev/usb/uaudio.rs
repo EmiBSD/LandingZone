@@ -1,4 +1,3 @@
-/*	$OpenBSD: uaudio.c,v 1.189 2026/09/24 13:57:25 ratchov Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

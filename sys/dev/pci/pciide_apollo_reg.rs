@@ -1,5 +1,3 @@
-/*	$OpenBSD: pciide_apollo_reg.h,v 1.10 2010/07/23 07:47:13 jsg Exp $	*/
-/*	$NetBSD: pciide_apollo_reg.h,v 1.8 2001/01/05 18:04:43 bouyer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

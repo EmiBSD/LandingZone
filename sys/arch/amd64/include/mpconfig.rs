@@ -1,5 +1,3 @@
-/*	$OpenBSD: mpconfig.h,v 1.8 2011/10/21 20:48:11 kettenis Exp $	*/
-/*	$NetBSD: mpconfig.h,v 1.2 2003/05/11 00:05:52 fvdl Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>
@@ -25,7 +23,7 @@
 //! Upstream: sys/arch/amd64/include/mpconfig.h @ 3ce1f3f79392
 //!
 //! The original file carries no licence text, only its `$OpenBSD$` and `$NetBSD$` lines
-//! (kept above); every notice in the reference tree is accepted (the user's rule of
+//! (not kept); every notice in the reference tree is accepted (the user's rule of
 //! 2026-10-04).
 //!
 //! ## Deviations

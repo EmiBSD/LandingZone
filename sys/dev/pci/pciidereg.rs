@@ -1,5 +1,3 @@
-/*	$OpenBSD: pciidereg.h,v 1.10 2013/11/26 20:33:17 deraadt Exp $	*/
-/*	$NetBSD: pciidereg.h,v 1.6 2000/11/14 18:42:58 thorpej Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

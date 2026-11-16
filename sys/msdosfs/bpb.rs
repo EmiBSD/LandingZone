@@ -1,5 +1,3 @@
-/*	$OpenBSD: bpb.h,v 1.7 2015/10/23 10:45:31 krw Exp $	*/
-/*	$NetBSD: bpb.h,v 1.6 1997/10/17 11:23:35 ws Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

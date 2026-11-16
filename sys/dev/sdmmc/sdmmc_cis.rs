@@ -1,4 +1,3 @@
-/*	$OpenBSD: sdmmc_cis.c,v 1.8 2020/04/29 09:44:49 patrick Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

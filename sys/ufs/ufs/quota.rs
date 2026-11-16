@@ -1,5 +1,3 @@
-/*	$OpenBSD: quota.h,v 1.12 2013/07/03 04:58:40 guenther Exp $	*/
-/*	$NetBSD: quota.h,v 1.6 1995/03/26 20:38:17 jtc Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

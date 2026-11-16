@@ -1,5 +1,3 @@
-/*	$OpenBSD: namei.h,v 1.55 2026/09/17 18:51:39 deraadt Exp $	*/
-/*	$NetBSD: namei.h,v 1.11 1996/02/09 18:25:20 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

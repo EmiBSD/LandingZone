@@ -1,4 +1,3 @@
-/*	$OpenBSD: crypto.c,v 1.92 2021/10/24 14:50:42 tobhe Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

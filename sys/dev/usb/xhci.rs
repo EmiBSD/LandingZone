@@ -1,4 +1,3 @@
-/* $OpenBSD: xhci.c,v 1.136 2025/03/01 14:43:03 kirill Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

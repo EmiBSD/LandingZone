@@ -1,4 +1,3 @@
-/* $OpenBSD: strtol.c,v 1.6 2003/08/11 06:23:09 deraadt Exp $ */
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

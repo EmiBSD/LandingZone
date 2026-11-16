@@ -1,5 +1,3 @@
-/*	$OpenBSD: spkr.c,v 1.27 2022/04/06 18:59:29 naddy Exp $	*/
-/*	$NetBSD: spkr.c,v 1.1 1998/04/15 20:26:18 drochner Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

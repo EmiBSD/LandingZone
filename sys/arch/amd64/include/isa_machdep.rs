@@ -1,6 +1,3 @@
-/*	$OpenBSD: isa_machdep.h,v 1.11 2024/05/22 05:51:49 jsg Exp $	*/
-/*	$NetBSD: isa_machdep.h,v 1.2 2003/05/09 23:51:28 fvdl Exp $	*/
-
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/*	$OpenBSD: udf_vnops.c,v 1.76 2026/06/30 14:04:03 kirill Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

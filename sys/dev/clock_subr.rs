@@ -1,5 +1,3 @@
-/*	$OpenBSD: clock_subr.h,v 1.8 2022/10/12 13:39:50 kettenis Exp $	*/
-/*	$NetBSD: clock_subr.h,v 1.2 1997/03/15 18:11:17 is Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

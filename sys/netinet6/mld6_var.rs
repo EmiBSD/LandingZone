@@ -1,5 +1,3 @@
-/*	$OpenBSD: mld6_var.h,v 1.10 2026/02/26 00:53:18 bluhm Exp $	*/
-/*	$KAME: mld6_var.h,v 1.4 2000/03/25 07:23:54 sumikawa Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

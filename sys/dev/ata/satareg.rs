@@ -1,5 +1,3 @@
-/*	$OpenBSD: satareg.h,v 1.4 2025/07/15 13:40:02 jsg Exp $	*/
-/*	$NetBSD: satareg.h,v 1.3 2004/05/23 23:07:59 wiz Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

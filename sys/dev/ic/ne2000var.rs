@@ -1,5 +1,3 @@
-/*	$OpenBSD: ne2000var.h,v 1.9 2008/06/26 05:42:16 ray Exp $	*/
-/*	$NetBSD: ne2000var.h,v 1.2 1997/10/14 22:54:12 thorpej Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

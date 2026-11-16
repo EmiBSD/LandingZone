@@ -1,5 +1,3 @@
-/*	$OpenBSD: kern_proc.c,v 1.103 2025/09/25 08:46:50 mvs Exp $	*/
-/*	$NetBSD: kern_proc.c,v 1.14 1996/02/09 18:59:41 christos Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

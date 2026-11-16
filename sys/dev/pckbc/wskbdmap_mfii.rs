@@ -1,7 +1,3 @@
-/*	$OpenBSD: wskbdmap_mfii.c,v 1.49 2025/11/09 16:21:56 matthieu Exp $ */
-/*	$NetBSD: wskbdmap_mfii.c,v 1.15 2000/05/19 16:40:04 drochner Exp $	*/
-/*	$OpenBSD: wskbdmap_mfii.h,v 1.2 2008/06/26 05:42:17 ray Exp $ */
-/*	$NetBSD: wskbdmap_mfii.h,v 1.1 1998/09/17 18:21:04 drochner Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

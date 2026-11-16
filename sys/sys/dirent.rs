@@ -1,5 +1,3 @@
-/*	$OpenBSD: dirent.h,v 1.11 2013/12/13 18:09:27 zhuk Exp $	*/
-/*	$NetBSD: dirent.h,v 1.12 1996/04/09 20:55:25 cgd Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

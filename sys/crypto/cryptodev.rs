@@ -1,4 +1,3 @@
-/*	$OpenBSD: cryptodev.h,v 1.82 2022/05/03 09:18:11 claudio Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

@@ -1,4 +1,3 @@
-/*	$OpenBSD: pluart_fdt.c,v 1.8 2022/06/27 13:03:32 anton Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

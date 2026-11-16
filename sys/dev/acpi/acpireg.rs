@@ -1,4 +1,3 @@
-/*	$OpenBSD: acpireg.h,v 1.65 2026/03/27 03:56:15 hshoexer Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

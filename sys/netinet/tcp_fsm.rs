@@ -1,5 +1,3 @@
-/*	$OpenBSD: tcp_fsm.h,v 1.10 2024/12/20 21:30:17 bluhm Exp $	*/
-/*	$NetBSD: tcp_fsm.h,v 1.6 1994/10/14 16:01:48 mycroft Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>

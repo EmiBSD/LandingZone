@@ -1,4 +1,3 @@
-/*	$OpenBSD: wsemul_subr.c,v 1.2 2023/03/06 17:14:44 miod Exp $	*/
 /* <LICENSES> */
 /*
  * Copyright (c) 2026 Emilio Navarrete Lineros <enavarre@outlook.com>
