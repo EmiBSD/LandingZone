@@ -2280,11 +2280,11 @@ notes = "M5: struct ucred (Cells after cr_refcnt), struct xucred; kern_prot.c: N
 [[file]]
 c = "sys/arch/amd64/include/pcb.h"
 rust = "sys/arch/amd64/include/pcb.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "d974172cf0fcdf6a8d38ea2710c3ed5e58a3ca54"
 deps = ["sys/arch/amd64/include/fpu.h"]
-notes = "M5: struct pcb (Cells; the save area an UnsafeCell), copy_from for cpu_fork; reset_segs is M6"
+notes = "struct pcb (Cells; the save area an UnsafeCell, on its 64-byte boundary), copy_from for cpu_fork; reset_segs is amd64/machdep.rs (TD1: read again whole, nothing missing)"
 
 [[file]]
 c = "sys/arch/amd64/include/spinlock.h"

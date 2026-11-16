@@ -84,8 +84,8 @@
 //!
 //! Upstream: sys/arch/amd64/include/pcb.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M5 ports `struct pcb`; `reset_segs` comes with user-mode
-//! threads (M6).
+//! Status: `ported`. `struct pcb`; `reset_segs`, which the header declares, is defined in
+//! `amd64/machdep.rs`, as in the C.
 //!
 //! ## Deviations
 //! - The fields the context switch and the fault paths write are `Cell`s; the FPU save area
