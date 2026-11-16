@@ -2074,11 +2074,11 @@ notes = "M8: the user ABI (EVFILT_*, EV_SET as ev_set, struct kevent (AbiPod), E
 [[file]]
 c = "sys/sys/timetc.h"
 rust = "sys/sys/timetc.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "f2ad324795887d042a19539cd69c31c4d4ce5faa"
 deps = ["sys/sys/time.h", "sys/sys/queue.h"]
-notes = "M5: struct timecounter (driver-written fields are Cells; M13: tc_name too, set to dv_xname by acpitimer/acpihpet), struct timekeep, TK_VERSION; tc_lock (rwlock) and timekeep_object (M6) are not here"
+notes = "struct timecounter (driver-written fields are Cells; tc_name too, set to dv_xname by acpitimer/acpihpet), struct timekeep, TK_VERSION; tc_lock, timecounter and the eleven functions are kern_tc.rs, timekeep_object and timekeep kern_exec.rs (TD1: read again whole, nothing missing)"
 
 [[file]]
 c = "sys/sys/pclock.h"

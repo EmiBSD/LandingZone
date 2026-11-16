@@ -43,9 +43,12 @@
 //!
 //! Upstream: sys/sys/timetc.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M5 ports `struct timecounter`, `struct timekeep` and
-//! `TK_VERSION`; the functions are in `kern/kern_tc.rs`, with `tc_lock` (`TC_LOCK`, the C's
-//! `extern`). `timekeep_object` (the page shared with userland, M6) is not here.
+//! Status: `ported`. `struct timecounter`, `struct timekeep` and `TK_VERSION`. What the
+//! header declares is defined where the C defines it: `tc_lock` (`TC_LOCK`), `timecounter`
+//! and the eleven functions (`tc_getfrequency`, `tc_getprecision`, `tc_init`,
+//! `tc_reset_quality`, `tc_setclock`, `tc_setrealtimeclock`, `tc_ticktock`,
+//! `inittimecounter`, `sysctl_tc`, `tc_adjfreq`, `tc_adjtime`) in `kern/kern_tc.rs`;
+//! `timekeep_object` and `timekeep` (the page shared with userland) in `kern/kern_exec.rs`.
 //!
 //! A timecounter is a binary counter which has two properties:
 //! - it runs at a fixed, known frequency.
