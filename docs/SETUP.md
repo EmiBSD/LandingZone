@@ -24,8 +24,8 @@ rustfmt; nothing falls back to another toolchain. Homebrew stays for what is not
 ## Verify
 
 ```sh
-just cargo --version               # cargo 1.99.1 (EmiBSD DevTools 1.99.1+emibsd.5)
-just --evaluate RUSTC              # ~/devel/emibsd/toolchains/rust-1.99.1+emibsd.5-aarch64-apple-darwin-arm64/bin/rustc
+just cargo --version               # cargo 1.99.1 (EmiBSD DevTools 1.99.1+emibsd.6)
+just --evaluate RUSTC              # ~/devel/emibsd/toolchains/rust-1.99.1+emibsd.6-aarch64-apple-darwin-arm64/bin/rustc
 ls "$(brew --prefix qemu)/share/qemu/"edk2-{x86_64,aarch64}-code.fd
 ls "$(brew --prefix limine)/share/limine/"BOOT{X64,AA64}.EFI
 just test                          # host build of bsd + libkern
@@ -146,8 +146,8 @@ uses ports 8443 (trusted), 8444 (echo) and 8445 (untrusted); they must be free.
 
 `just toolchain` installs the EmiBSD toolchains that DevTools releases
 (github.com/EmiBSD/DevTools; the user's decision of 2026-10-31, taken over from the Kernel
-repository on 2026-11-01): `llvm-23.1.4+emibsd.6` and `rust-1.99.1+emibsd.5` (bumped from
-`+emibsd.1` on 2026-11-15, after DevTools replaced its releases), one tarball per target
+repository on 2026-11-01): `llvm-23.1.4+emibsd.7` and `rust-1.99.1+emibsd.6` (bumped on
+2026-11-16 from `+emibsd.6` and `+emibsd.5`, whose native rustc had no BTI: EXT-228), one tarball per target
 architecture since DevTools' D-0008 (2026-11-02), pinned by tag and sha256 in the justfile,
 fetched with `gh release download` (never "latest"), checked before unpacking, and unpacked
 unmodified into `~/devel/emibsd/toolchains` (`EMIBSD_TOOLCHAINS` overrides it). Nothing is

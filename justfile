@@ -25,12 +25,12 @@ arm64 := "aarch64-emibsd-none-softfloat"
 # userland's linker and binutils, and efiboot's objcopy, since the Rust releases have no
 # llvm-tools). `just toolchain` installs them (docs/SETUP.md, "DevTools toolchain").
 toolchain_dir := env("EMIBSD_TOOLCHAINS", env("HOME") / "devel/emibsd/toolchains")
-devtools_llvm := "llvm-23.1.4+emibsd.6"
-devtools_rust := "rust-1.99.1+emibsd.5"
-devtools_llvm_sha256_arm64 := "921c7992bb47f63adab07a7ee0fa1bca38e415e540ec7bf623d0b9e030452cf8"
-devtools_rust_sha256_arm64 := "9fcf8ba87be979d0aefcc790d604ca3ab7e097893850d2c566c11c7cc7c720c7"
-devtools_llvm_sha256_amd64 := "6f18473f2a960a8ba6df8784d4b5d1595f32c715218bee993d6940338d6feb14"
-devtools_rust_sha256_amd64 := "6f22d3a4fade27779fb27a858e801250adbc0e02f6183652ce5ba890fc9c8fe9"
+devtools_llvm := "llvm-23.1.4+emibsd.7"
+devtools_rust := "rust-1.99.1+emibsd.6"
+devtools_llvm_sha256_arm64 := "317ecf91c61fc67d8e6ebcdc401f40eb5236414b38b08bffb43229e52bca117f"
+devtools_rust_sha256_arm64 := "d8c2eea3392e926cdff657a2350fd8771e456076825fc83bbfc77dfee82dc5d7"
+devtools_llvm_sha256_amd64 := "7590776479331045e581494988df9945fc1ae2d2b0b8ccc020374a2cb3725060"
+devtools_rust_sha256_amd64 := "7f705ae8589b63b89270ded8ad293086dc3643387e40086c41e3384e43f4342d"
 rust_amd64 := toolchain_dir / devtools_rust + "-aarch64-apple-darwin-amd64"
 rust_arm64 := toolchain_dir / devtools_rust + "-aarch64-apple-darwin-arm64"
 export PATH := rust_arm64 / "bin" + ":" + env("PATH", "/usr/bin:/bin:/opt/homebrew/bin")
