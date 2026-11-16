@@ -1963,10 +1963,10 @@ notes = "re-exports the OF_* functions fdt.c implements, and OFMAXPARAM; struct 
 [[file]]
 c = "sys/arch/arm64/include/fdt.h"
 rust = "sys/arch/arm64/include/fdt.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "af2721fdadabcbf787241bb0c891aeeb9091c54a"
-notes = "M4: struct fdt_attach_args (slices for fa_reg/fa_intr; M7b: fa_dmat) and the fdt_intr_* aliases that exist; stdout_node/stdout_speed/fdt_cons_bs_tag/fdt_find_cons are arm64/machdep.rs behind the machine::fdt contract; the imap/msi aliases come with PCI (M5); ; M12: the fdt_intr_establish_imap/_imap_cpu/_msi/_msi_cpu aliases (and the machine::fdt contract's fdt_intr_establish_imap_cpu/_msi_cpu, None on amd64 and host)"
+notes = "struct fdt_attach_args (slices for fa_reg/fa_intr, a byte string for fa_name) and the fifteen fdt_intr_* aliases of arm64/intr.rs's arm_intr_* functions; stdout_node, stdout_speed and fdt_find_cons are arm64/machdep.rs, fdt_cons_bs_tag arm64/bus_space.rs, reached by generic code through the machine::fdt contract (TD1: read again whole, nothing missing)"
 
 [[file]]
 c = "sys/arch/arm64/dev/ampintc.c"

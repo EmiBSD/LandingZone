@@ -37,13 +37,17 @@
 //!
 //! Upstream: sys/arch/arm64/include/fdt.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M4 ports `struct fdt_attach_args` and the `fdt_intr_*` aliases
-//! of the `arm_intr_*_fdt` functions that exist; `stdout_node`, `stdout_speed`,
-//! `fdt_cons_bs_tag` and `fdt_find_cons` are `arm64/machdep.rs` (and the `machine::fdt`
-//! contract). M12 adds the `imap`/`msi` aliases, with PCI.
+//! Status: `ported`. `struct fdt_attach_args` and the fifteen `fdt_intr_*` aliases of the
+//! `arm_intr_*` functions (`arm64/intr.rs`). What the header declares besides is defined
+//! where the C defines it: `stdout_node`, `stdout_speed` and `fdt_find_cons` in
+//! `arm64/machdep.rs` (`STDOUT_NODE`, `STDOUT_SPEED`), `fdt_cons_bs_tag` in
+//! `arm64/bus_space.rs` (`FDT_CONS_BS_TAG`); generic code reaches them through the
+//! `machine::fdt` contract.
 //!
 //! ## Deviations
 //! - `fa_reg`/`fa_nreg` and `fa_intr`/`fa_nintr` are slices; `fa_name` is a byte string.
+//! - `_ARM32_BUS_DMA_PRIVATE`, which the header defines before `<machine/bus.h>` to get the
+//!   private half of the DMA tag, has no counterpart: `bus.rs` has one definition of the tag.
 
 pub use crate::arch::arm64::arm64::intr::{
     arm_intr_disable as fdt_intr_disable, arm_intr_disestablish_fdt as fdt_intr_disestablish,
