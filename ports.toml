@@ -4882,11 +4882,11 @@ notes = "M13: every register and bit (IOAPIC_BASE_DEFAULT, IOAPIC_REG/DATA, ID, 
 [[file]]
 c = "sys/arch/amd64/include/mpbiosreg.h"
 rust = "sys/arch/amd64/include/mpbiosreg.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "3a4fea6af08c43617491f28091dc5741d7f80b51"
 deps = []
-notes = "M13: MPS_INTTYPE_*, MPS_INTPO_*, MPS_INTTR_*, MPS_INT (const fn) and MPS_ALL_APICS, what acpimadt, acpiprt, ioapic and lapic use; the MP table structures come with mpbios.c"
+notes = "the whole header: BIOS_BASE/SIZE/COUNT and MPS_MCT_* (TD1), MPS_INTTYPE_*, MPS_INTPO_*, MPS_INTTR_*, MPS_INT (const fn), MPS_ALL_APICS, and (TD1) the six table structures (mpbios_fps, mpbios_cth, mpbios_proc, mpbios_bus, mpbios_ioapic, mpbios_int; repr(C), sizes checked at compile time) with MP_FP_SIG, MPFPS_FLAG_IMCR, MP_CT_SIG, PROCENTRY_FLAG_*, IOAPICENTRY_FLAG_EN; their reader, mpbios.c, is TD6"
 
 [[file]]
 c = "sys/arch/amd64/include/mpconfig.h"

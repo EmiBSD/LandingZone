@@ -53,14 +53,42 @@
 //!
 //! Upstream: sys/arch/amd64/include/mpbiosreg.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. M13 ports the interrupt types and flags (`MPS_INTTYPE_*`, `MPS_INTPO_*`,
-//! `MPS_INTTR_*`, `MPS_INT`) and `MPS_ALL_APICS`, which `acpimadt`, `acpiprt`, `ioapic.c`
-//! and `lapic.c` use. The table structures (`struct mpbios_fps`, `mpbios_cth`,
-//! `mpbios_proc`, `mpbios_bus`, `mpbios_ioapic`, `mpbios_int`) and their constants come
-//! with `mpbios.c`.
+//! Status: `ported`. The whole header: where the BIOS is mapped (`BIOS_*`), the types of a
+//! configuration table entry (`MPS_MCT_*`), the interrupt types and flags (`MPS_INTTYPE_*`,
+//! `MPS_INTPO_*`, `MPS_INTTR_*`, `MPS_INT`), and the six structures of the tables with the
+//! constants the header defines among their members: the floating pointer structure
+//! (`struct mpbios_fps`), the configuration table header (`mpbios_cth`) and the processor,
+//! bus, I/O APIC and interrupt entries. `acpimadt`, `acpiprt`, `ioapic.c` and `lapic.c` use
+//! the interrupt flags; the structures are read by `mpbios.c`, which is not ported (TD6).
 //!
 //! ## Deviations
 //! - `MPS_INT(p,t)` is a `const fn` with a lower-case name.
+//! - The structures are `#[repr(C)]` with the C's member names; their sizes, which the
+//!   MultiProcessor Specification fixes, are checked at compile time.
+
+/// `BIOS_BASE`: where the BIOS ROM is mapped.
+pub const BIOS_BASE: usize = 0xf0000;
+/// `BIOS_SIZE`: its size.
+pub const BIOS_SIZE: usize = 0x10000;
+/// `BIOS_COUNT`.
+pub const BIOS_COUNT: usize = BIOS_SIZE;
+
+// Multiprocessor config table entry types.
+
+/// `MPS_MCT_CPU`: a processor entry.
+pub const MPS_MCT_CPU: i32 = 0;
+/// `MPS_MCT_BUS`: a bus entry.
+pub const MPS_MCT_BUS: i32 = 1;
+/// `MPS_MCT_IOAPIC`: an I/O APIC entry.
+pub const MPS_MCT_IOAPIC: i32 = 2;
+/// `MPS_MCT_IOINT`: an I/O interrupt assignment entry.
+pub const MPS_MCT_IOINT: i32 = 3;
+/// `MPS_MCT_LINT`: a local interrupt assignment entry.
+pub const MPS_MCT_LINT: i32 = 4;
+/// `MPS_MCT_NTYPES`: how many entry types there are.
+pub const MPS_MCT_NTYPES: i32 = 5;
+
+// Interrupt types
 
 /// `MPS_INTTYPE_INT`.
 pub const MPS_INTTYPE_INT: i32 = 0;
@@ -101,6 +129,160 @@ pub const fn mps_int(p: i32, t: i32) -> i32 {
 
 /// `MPS_ALL_APICS`: an interrupt entry for every (local or I/O) APIC.
 pub const MPS_ALL_APICS: i32 = 0xff;
+
+/// `MP_FP_SIG`: string defined by the Intel MP Spec as identifying the MP table (`_MP_`).
+pub const MP_FP_SIG: u32 = 0x5f50_4d5f;
+/// `MPFPS_FLAG_IMCR`: IMCR present (`mpfb2`).
+pub const MPFPS_FLAG_IMCR: u8 = 0x80;
+
+/// `struct mpbios_fps`: MP Floating Pointer Structure.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MpbiosFps {
+    /// `signature`: [`MP_FP_SIG`].
+    pub signature: u32,
+    /// `pap`: the physical address of the configuration table.
+    pub pap: u32,
+    /// `length`.
+    pub length: u8,
+    /// `spec_rev`.
+    pub spec_rev: u8,
+    /// `checksum`.
+    pub checksum: u8,
+    /// `mpfb1`: system configuration.
+    pub mpfb1: u8,
+    /// `mpfb2`: flags.
+    pub mpfb2: u8,
+    /// `mpfb3`: unused.
+    pub mpfb3: u8,
+    /// `mpfb4`: unused.
+    pub mpfb4: u8,
+    /// `mpfb5`: unused.
+    pub mpfb5: u8,
+}
+
+/// `MP_CT_SIG`: the configuration table's signature (`PCMP`).
+pub const MP_CT_SIG: u32 = 0x504d_4350;
+
+/// `struct mpbios_cth`: MP Configuration Table Header.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MpbiosCth {
+    /// `signature`: [`MP_CT_SIG`].
+    pub signature: u32,
+    /// `base_len`.
+    pub base_len: u16,
+    /// `spec_rev`.
+    pub spec_rev: u8,
+    /// `checksum`.
+    pub checksum: u8,
+    /// `oem_id`.
+    pub oem_id: [u8; 8],
+    /// `product_id`.
+    pub product_id: [u8; 12],
+    /// `oem_table_pointer`.
+    pub oem_table_pointer: u32,
+    /// `oem_table_size`.
+    pub oem_table_size: u16,
+    /// `entry_count`.
+    pub entry_count: u16,
+    /// `apic_address`.
+    pub apic_address: u32,
+    /// `ext_len`.
+    pub ext_len: u16,
+    /// `ext_cksum`.
+    pub ext_cksum: u8,
+    /// `reserved`.
+    pub reserved: u8,
+}
+
+/// `PROCENTRY_FLAG_EN`: the processor is usable (`cpu_flags`).
+pub const PROCENTRY_FLAG_EN: u8 = 0x01;
+/// `PROCENTRY_FLAG_BP`: the processor is the bootstrap processor (`cpu_flags`).
+pub const PROCENTRY_FLAG_BP: u8 = 0x02;
+
+/// `struct mpbios_proc`: a processor entry.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MpbiosProc {
+    /// `type`: [`MPS_MCT_CPU`].
+    pub type_: u8,
+    /// `apic_id`.
+    pub apic_id: u8,
+    /// `apic_version`.
+    pub apic_version: u8,
+    /// `cpu_flags`: `PROCENTRY_FLAG_*`.
+    pub cpu_flags: u8,
+    /// `cpu_signature`.
+    pub cpu_signature: u32,
+    /// `feature_flags`.
+    pub feature_flags: u32,
+    /// `reserved1`.
+    pub reserved1: u32,
+    /// `reserved2`.
+    pub reserved2: u32,
+}
+
+/// `struct mpbios_bus`: a bus entry.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MpbiosBus {
+    /// `type`: [`MPS_MCT_BUS`].
+    pub type_: u8,
+    /// `bus_id`.
+    pub bus_id: u8,
+    /// `bus_type`: the bus's name, padded with spaces.
+    pub bus_type: [u8; 6],
+}
+
+/// `IOAPICENTRY_FLAG_EN`: the I/O APIC is usable (`apic_flags`).
+pub const IOAPICENTRY_FLAG_EN: u8 = 0x01;
+
+/// `struct mpbios_ioapic`: an I/O APIC entry.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MpbiosIoapic {
+    /// `type`: [`MPS_MCT_IOAPIC`].
+    pub type_: u8,
+    /// `apic_id`.
+    pub apic_id: u8,
+    /// `apic_version`.
+    pub apic_version: u8,
+    /// `apic_flags`: `IOAPICENTRY_FLAG_*`.
+    pub apic_flags: u8,
+    /// `apic_address`.
+    pub apic_address: u32,
+}
+
+/// `struct mpbios_int`: an interrupt assignment entry, I/O or local.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MpbiosInt {
+    /// `type`: [`MPS_MCT_IOINT`] or [`MPS_MCT_LINT`].
+    pub type_: u8,
+    /// `int_type`: `MPS_INTTYPE_*`.
+    pub int_type: u8,
+    /// `int_flags`: [`mps_int`]'s polarity and trigger.
+    pub int_flags: u16,
+    /// `src_bus_id`.
+    pub src_bus_id: u8,
+    /// `src_bus_irq`.
+    pub src_bus_irq: u8,
+    /// `dst_apic_id`: an APIC's id, or [`MPS_ALL_APICS`].
+    pub dst_apic_id: u8,
+    /// `dst_apic_int`.
+    pub dst_apic_int: u8,
+}
+
+// The sizes the MultiProcessor Specification gives the structures.
+const _: () = {
+    assert!(size_of::<MpbiosFps>() == 16);
+    assert!(size_of::<MpbiosCth>() == 44);
+    assert!(size_of::<MpbiosProc>() == 20);
+    assert!(size_of::<MpbiosBus>() == 8);
+    assert!(size_of::<MpbiosIoapic>() == 8);
+    assert!(size_of::<MpbiosInt>() == 8);
+};
 /* </CODE> */
 
 /* <TESTS> */
@@ -124,6 +306,20 @@ mod tests {
             ("MPS_INTTR_LEVEL", i64::from(MPS_INTTR_LEVEL)),
             ("MPS_INTTR_SHIFT", i64::from(MPS_INTTR_SHIFT)),
             ("MPS_ALL_APICS", i64::from(MPS_ALL_APICS)),
+            ("MPS_MCT_CPU", i64::from(MPS_MCT_CPU)),
+            ("MPS_MCT_BUS", i64::from(MPS_MCT_BUS)),
+            ("MPS_MCT_IOAPIC", i64::from(MPS_MCT_IOAPIC)),
+            ("MPS_MCT_IOINT", i64::from(MPS_MCT_IOINT)),
+            ("MPS_MCT_LINT", i64::from(MPS_MCT_LINT)),
+            ("MPS_MCT_NTYPES", i64::from(MPS_MCT_NTYPES)),
+            ("BIOS_BASE", BIOS_BASE as i64),
+            ("BIOS_SIZE", BIOS_SIZE as i64),
+            ("MP_FP_SIG", i64::from(MP_FP_SIG)),
+            ("MP_CT_SIG", i64::from(MP_CT_SIG)),
+            ("MPFPS_FLAG_IMCR", i64::from(MPFPS_FLAG_IMCR)),
+            ("PROCENTRY_FLAG_EN", i64::from(PROCENTRY_FLAG_EN)),
+            ("PROCENTRY_FLAG_BP", i64::from(PROCENTRY_FLAG_BP)),
+            ("IOAPICENTRY_FLAG_EN", i64::from(IOAPICENTRY_FLAG_EN)),
         ];
         for (name, value) in ours {
             assert_eq!(crate::reftest::int(&defs, name), Some(*value), "{name}");
