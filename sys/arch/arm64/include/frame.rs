@@ -37,12 +37,16 @@
 //!
 //! Upstream: sys/arch/arm64/include/frame.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M2 ports `struct callframe`, M4 `struct trapframe` (`clockframe` is the
-//! same struct), M5 `struct switchframe`, `kern_sig.c` `struct sigframe` (with the hole after
-//! `sf_signum` spelled out as `_pad`). M2's note: `struct callframe`, what the frame-pointer chain is made
-//! of (`stp x29, x30, [sp, #-16]!` leaves the caller's frame and the link register at `x29`).
-//! `struct trapframe` and `struct switchframe` arrive with the trap and context-switch code
-//! (M4, M5).
+//! Status: `ported`. The header's four structures: `struct trapframe` (`trapframe_t`, what
+//! `exception.S` saves; `clockframe` is its other name, [`Clockframe`]), `struct sigframe` (what `sendsig` pushes for signal delivery),
+//! `struct switchframe` (the frame inside `cpu_switch()`) and `struct callframe` (one link of
+//! the frame-pointer chain: `stp x29, x30, [sp, #-16]!` leaves the caller's frame and the
+//! link register at `x29`). `TF_SIZE` and `SWITCHFRAME_SZ`, which the C takes from
+//! `genassym.cf`, are consts here, checked against the layout at compile time.
+//!
+//! ## Deviations
+//! - The hole the C compiler leaves after `sf_signum` is a named field, `_pad`, so that
+//!   `struct sigframe` has no implicit padding and can be copied out as bytes (`AbiPod`).
 
 use crate::arch::arm64::include::signal::Sigcontext;
 use crate::machine::copy::AbiPod;
@@ -97,6 +101,9 @@ impl Default for Trapframe {
         Self::new()
     }
 }
+
+/// `clockframe`: `#define clockframe trapframe`, what `hardclock` is handed.
+pub type Clockframe = Trapframe;
 
 /// `struct sigframe`: what `sendsig` builds on the user stack for `sigcode`.
 #[repr(C)]

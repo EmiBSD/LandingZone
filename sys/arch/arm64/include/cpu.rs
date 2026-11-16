@@ -69,7 +69,6 @@ use core::ptr;
 use core::sync::atomic::{AtomicI32, AtomicPtr, AtomicU32, Ordering};
 
 use crate::arch::arm64::arm64::cpu::OppTable;
-use crate::arch::arm64::include::frame::Trapframe;
 use crate::arch::arm64::include::pcb::Pcb;
 use crate::arch::arm64::include::pmap::Pmap;
 use crate::sys::clockintr::Clockqueue;
@@ -432,7 +431,8 @@ pub const CTL_MACHDEP_NAMES: [Option<(&str, i32)>; CPU_MAXID as usize] = [
 ];
 
 /// `struct clockframe`: all the `CLKF_*` macros take a struct clockframe * as an argument.
-pub type Clockframe = Trapframe;
+/// `#define clockframe trapframe`, here as in `<machine/frame.h>`.
+pub use crate::arch::arm64::include::frame::Clockframe;
 
 /// `curcpu()`: this CPU's `cpu_info`, from `TPIDR_EL1` (set by `initarm` for the boot CPU
 /// and by `cpu_start_secondary` for the others).

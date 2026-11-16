@@ -935,10 +935,10 @@ notes = "M11a: the whole file: cpu_implementers[] and the cpu_cores_*[] tables, 
 [[file]]
 c = "sys/arch/arm64/include/frame.h"
 rust = "sys/arch/arm64/include/frame.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "0a69dd3403987e520037a73279fb1d8bcfcba146"
-notes = "M2: struct callframe; M4: struct trapframe (trapframe_t), TF_SIZE; switchframe is M5; M5-b2: struct switchframe, SWITCHFRAME_SZ; kern_sig.c: struct sigframe (the hole after sf_signum as _pad; AbiPod)"
+notes = "struct trapframe (trapframe_t), struct sigframe (the hole after sf_signum as _pad; AbiPod), struct switchframe, struct callframe; TF_SIZE and SWITCHFRAME_SZ (genassym.cf's) as consts with compile-time layout checks (TD1: read again whole, nothing missing)"
 
 [[file]]
 c = "sys/dev/fdt/pluart_fdt.c"
