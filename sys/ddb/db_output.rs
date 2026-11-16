@@ -60,25 +60,29 @@
 //! `db_printf` and `db_vprintf`, declared in the header, are implemented in
 //! `kern/subr_prf.rs` as in C.
 //!
-//! Status: `wip`.
+//! Status: `db_output.h` `ported`: everything it declares is here or, for `db_printf` and
+//! `db_vprintf`, in `kern/subr_prf.rs`. `db_output.c` `wip`: `stacktrace_print`
+//! (`<sys/stacktrace.h>`, for witness(4)) is not ported; it prints each saved pc with
+//! `db_printsym`, and ddb's symbols (`db_sym.c`) are TD2's.
 //!
 //! ## Deviations
 //! - The counters are atomics; ddb runs one CPU at a time.
-//! - `db_stack_dump` tells a recursive traceback from a parallel one by `cpu_info`, which
-//!   arrives with M5; with one CPU every second entry is "Faulted in traceback".
 //! - `db_more`'s `q` calls `db_error(0)`, which cannot unwind out of `db_printf` here
 //!   (`docs/C_TO_RUST.md`, the `db_error` row): it sets [`DB_QUIT`] instead, which drops
 //!   every character `db_putchar` is given until `db_command_loop` clears it before its next
 //!   prompt. The command runs to its end, silently.
-//! - `db_format` returns the formatted bytes as a slice of `buf`; its `#` alternate form is
-//!   Rust's (`0x`, `0o`), which differs from C's `%#lo` (`0`) for octal.
+//! - `db_format` returns the formatted bytes as a slice of `buf`. Its `#` alternate form is
+//!   kprintf's, written out by hand (Rust's own `{:#o}` and `{:#x}` say `0o` and prefix a
+//!   zero).
 
-use core::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use core::ptr;
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering};
 
 use crate::ddb::db_command::db_error;
 use crate::dev::cons::{cngetc, cnputc};
 use crate::kern::subr_prf::{printf, snprintf};
 use crate::machine::Machine;
+use crate::machine::cpu::{CpuInfo, curcpu};
 use crate::machine::db_machdep::{DbMachdep, db_stack_trace_print};
 
 /// Maximum line.
@@ -257,36 +261,45 @@ pub fn db_format(buf: &mut [u8], val: i64, format: i32, alt: bool, width: usize)
     } else {
         ("", val as u64)
     };
-    if format == DB_FORMAT_Z || radix == 16 {
-        if alt {
-            snprintf(buf, format_args!("{sign}{val:#width$x}"));
-        } else {
-            snprintf(buf, format_args!("{sign}{val:width$x}"));
-        }
+    // The digits, then what kprintf's `#` adds to them: `0x` before a hexadecimal number
+    // that is not zero, a `0` before an octal one that does not start with one, nothing
+    // before a decimal one. The field width counts the prefix, as `%#*lx` does.
+    let mut digits = [0u8; 24];
+    let (prefix, n) = if format == DB_FORMAT_Z || radix == 16 {
+        let n = snprintf(&mut digits, format_args!("{val:x}"));
+        (if alt && val != 0 { "0x" } else { "" }, n)
     } else if radix == 8 {
-        if alt {
-            snprintf(buf, format_args!("{sign}{val:#width$o}"));
-        } else {
-            snprintf(buf, format_args!("{sign}{val:width$o}"));
-        }
+        let n = snprintf(&mut digits, format_args!("{val:o}"));
+        (if alt && val != 0 { "0" } else { "" }, n)
     } else {
-        snprintf(buf, format_args!("{sign}{val:width$}"));
-    }
+        ("", snprintf(&mut digits, format_args!("{val}")))
+    };
+    let digits = core::str::from_utf8(&digits[..n]).unwrap_or("");
+    let pad = width.saturating_sub(prefix.len() + digits.len());
+    snprintf(buf, format_args!("{sign}{:pad$}{prefix}{digits}", ""));
     let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
     &buf[..end]
 }
 
-/// `db_stack_dump`: prints a stack trace of the current CPU through `printf`, guarding against
-/// a fault while tracing.
+/// `db_stack_dump`: prints a stack trace of the current CPU through `printf`. One CPU traces
+/// at a time: `intrace` names it, so a fault inside the traceback (the same CPU comes back)
+/// is told from another CPU that wants its own (suppressed).
 pub fn db_stack_dump() {
-    static INTRACE: AtomicBool = AtomicBool::new(false);
-
+    static INTRACE: AtomicPtr<CpuInfo> = AtomicPtr::new(ptr::null_mut());
     fn pr(args: core::fmt::Arguments<'_>) {
         printf(args);
     }
+    let ci = ptr::from_ref(curcpu()).cast_mut();
 
-    if INTRACE.swap(true, Ordering::AcqRel) {
-        printf(format_args!("Faulted in traceback, aborting...\n"));
+    // atomic_cas_ptr(&intrace, NULL, ci)
+    if let Err(tracing) =
+        INTRACE.compare_exchange(ptr::null_mut(), ci, Ordering::SeqCst, Ordering::SeqCst)
+    {
+        if tracing == ci {
+            printf(format_args!("Faulted in traceback, aborting...\n"));
+        } else {
+            printf(format_args!("Parallel traceback, suppressed...\n"));
+        }
         return;
     }
 
@@ -299,7 +312,8 @@ pub fn db_stack_dump() {
         pr,
     );
     printf(format_args!("End of stack trace.\n"));
-    INTRACE.store(false, Ordering::Release);
+    // membar_producer(); intrace = NULL;
+    INTRACE.store(ptr::null_mut(), Ordering::Release);
 }
 
 /// `db_resize`: sets the page size.
@@ -355,6 +369,26 @@ mod tests {
         assert_eq!(db_format(&mut buf, 8, DB_FORMAT_Z, false, 0), b"8");
         DB_RADIX.store(10, Ordering::Relaxed);
         assert_eq!(db_format(&mut buf, -12, DB_FORMAT_R, false, 0), b"-12");
+        DB_RADIX.store(16, Ordering::Relaxed);
+    }
+
+    /// kprintf's `#`: `0x` unless the value is zero, a leading `0` for octal, nothing for
+    /// decimal; the width counts the prefix and the sign stays outside the field.
+    #[test]
+    fn the_alternate_form_is_kprintfs() {
+        let _g = crate::ddb::db_lex::db_test_lock();
+        let mut buf = [0u8; DB_FORMAT_BUF_SIZE];
+        DB_RADIX.store(16, Ordering::Relaxed);
+        assert_eq!(db_format(&mut buf, 255, DB_FORMAT_R, true, 0), b"0xff");
+        assert_eq!(db_format(&mut buf, 0, DB_FORMAT_R, true, 0), b"0");
+        assert_eq!(db_format(&mut buf, 255, DB_FORMAT_Z, true, 6), b"  0xff");
+        assert_eq!(db_format(&mut buf, -255, DB_FORMAT_R, true, 6), b"-  0xff");
+        DB_RADIX.store(8, Ordering::Relaxed);
+        assert_eq!(db_format(&mut buf, 8, DB_FORMAT_R, true, 0), b"010");
+        assert_eq!(db_format(&mut buf, 0, DB_FORMAT_R, true, 0), b"0");
+        assert_eq!(db_format(&mut buf, 8, DB_FORMAT_R, true, 5), b"  010");
+        DB_RADIX.store(10, Ordering::Relaxed);
+        assert_eq!(db_format(&mut buf, 12, DB_FORMAT_R, true, 4), b"  12");
         DB_RADIX.store(16, Ordering::Relaxed);
     }
 }

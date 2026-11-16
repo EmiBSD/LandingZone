@@ -638,10 +638,10 @@ notes = "M2: main() skeleton in the C's order (consinit, copyright, then every s
 [[file]]
 c = "sys/ddb/db_output.h"
 rust = "sys/ddb/db_output.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "2abbfbba61625c6f63b44e40b86f85d64911af99"
-notes = "db_printf/db_vprintf are implemented in kern/subr_prf.rs as in C; DB_FORMAT_* and db_format are here"
+notes = "db_force_whitespace, db_putchar, db_print_position, db_end_line, db_resize, DB_FORMAT_*, db_format and db_stack_dump are db_output.rs; db_printf/db_vprintf are implemented in kern/subr_prf.rs as in C (TD1: read again whole, every declaration has its definition)"
 
 [[file]]
 c = "sys/ddb/db_output.c"
@@ -650,7 +650,7 @@ status = "wip"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "d6abed2745b54d54969f09fa35f82a95fdfea32b"
 deps = ["sys/ddb/db_output.h", "sys/dev/cons.h", "sys/kern/subr_prf.c"]
-notes = "M2: db_force_whitespace, db_more, db_putchar, db_print_position, db_end_line, db_format, db_stack_dump, db_resize; counters are atomics; db_stack_dump cannot tell a parallel traceback from a recursive one without cpu_info (M5); db_more's q calls db_error(0) and sets DB_QUIT, which silences output until the next prompt (no longjmp); db_format's # alternate form is Rust's"
+notes = "db_force_whitespace, db_more, db_putchar, db_print_position, db_end_line, db_format, db_stack_dump, db_resize; counters are atomics; TD1: db_stack_dump names the tracing CPU (atomic_cas_ptr on intrace) and tells a faulted traceback from a parallel one, db_format's # form is kprintf's (0x unless zero, a leading 0 for octal); db_more's q calls db_error(0) and sets DB_QUIT, which silences output until the next prompt (no longjmp); left: stacktrace_print (sys/stacktrace.h, for witness(4)), which needs db_printsym of db_sym.c (TD2)"
 
 [[file]]
 c = "sys/ddb/db_usrreq.c"
