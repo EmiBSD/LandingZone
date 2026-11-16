@@ -59,8 +59,11 @@
 //! The (first generation) amd64 MMU is a 4-level MMU which maps 2^48 bytes of virtual memory.
 //! The pagesize we use is 4K (4096 \[0x1000\] bytes), although 2M pages are also supported.
 //!
-//! Status: `wip`. Milestone M3 ports the entry types, the level geometry, the PDE/PTE bits and
-//! `x86_round_pdr`; the EPT bits and `PGK_VALUE` come with vmm.
+//! Status: `ported`. The whole header: the entry types, the level geometry, the PDE/PTE
+//! bits with the protection-key mask and `PGK_VALUE`, the EPT entry bits, the cacheability
+//! bits under PAT, the short forms of the protection codes, the page-fault error-code bits
+//! and `x86_round_pdr`. `pg_xo`, `pg_nx`, `pg_crypt` and `pg_g_kern`, which the header
+//! declares, are `amd64/pmap.rs`'s, as `pmap.c`'s.
 
 /// `pd_entry_t`: a page directory entry (levels 2 to 4).
 pub type PdEntry = u64;
@@ -154,6 +157,31 @@ pub const PG_FRAME: u64 = 0x000f_ffff_ffff_f000;
 /// `PG_LGFRAME`: large (2M) page frame mask.
 pub const PG_LGFRAME: u64 = 0x000f_ffff_ffe0_0000;
 
+/// `PGK_VALUE`: the protection-key rights register: key0 is normal.
+pub const PGK_VALUE: u64 = 0xffff_fffc;
+
+// EPT PTE bits
+
+/// `EPT_R`: readable.
+pub const EPT_R: u64 = 1 << 0;
+/// `EPT_W`: writable.
+pub const EPT_W: u64 = 1 << 1;
+/// `EPT_X`: executable.
+pub const EPT_X: u64 = 1 << 2;
+/// `EPT_WB`: the write-back memory type.
+pub const EPT_WB: u64 = 6 << 3;
+/// `EPT_PS`: a large page.
+pub const EPT_PS: u64 = 1 << 7;
+
+// Cacheability bits when we are using PAT
+
+/// `PG_WB`: the default.
+pub const PG_WB: u64 = 0;
+/// `PG_WC`: WT and CD is WC.
+pub const PG_WC: u64 = PG_WT;
+/// `PG_UC`: hard UC.
+pub const PG_UC: u64 = PG_WT | PG_N;
+
 /// `PGEX_P`: protection violation (vs. no mapping).
 pub const PGEX_P: u64 = 0x01;
 /// `PGEX_W`: exception during a write cycle.
@@ -216,6 +244,10 @@ mod tests {
             ("PG_PATLG", PG_PATLG as i64),
             ("PG_FRAME", PG_FRAME as i64),
             ("PG_LGFRAME", PG_LGFRAME as i64),
+            ("PGK_VALUE", PGK_VALUE as i64),
+            ("PG_WB", PG_WB as i64),
+            ("PG_WC", PG_WC as i64),
+            ("PG_UC", PG_UC as i64),
             ("PGEX_P", PGEX_P as i64),
             ("PGEX_W", PGEX_W as i64),
             ("PGEX_I", PGEX_I as i64),

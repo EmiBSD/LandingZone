@@ -1053,11 +1053,11 @@ notes = "wakeup(9) and wakeup_one(9) report themselves unported: nothing sleeps 
 [[file]]
 c = "sys/arch/amd64/include/pte.h"
 rust = "sys/arch/amd64/include/pte.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "7d7608efe46d2784b47b60eb6284f205d1d53a9e"
 deps = ["sys/arch/amd64/include/param.h"]
-notes = "pd_entry_t/pt_entry_t, the level shifts, masks and frames, NBPD_*, the PG_* bits, PG_UCMINUS, x86_round_pdr, the PGEX_* error-code bits; the EPT bits and PGK_VALUE come with vmm; M14: PG_KR, PG_KW (locore0.S)"
+notes = "the whole header: pd_entry_t/pt_entry_t, the level shifts, masks and frames, NBPD_*, the PG_* bits, PGK_VALUE and the EPT_* bits (TD1), the PAT cacheability bits (PG_WB, PG_WC, PG_UCMINUS, PG_UC; TD1 the three that were missing), PG_KR/PG_KW, the PGEX_* error-code bits, x86_round_pdr; pg_xo/pg_nx/pg_crypt/pg_g_kern are pmap.rs"
 
 [[file]]
 c = "sys/arch/amd64/include/specialreg.h"
