@@ -64,11 +64,11 @@ notes = "includes of time/resource/ucred/uio/srp/signal.h not re-exported; MIN/M
 [[file]]
 c = "sys/sys/limits.h"
 rust = "sys/sys/limits.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "0ec868ae384da4434b3db35c9f8bd9bd892e7a1b"
 deps = []
-notes = "M6-b: the integer limits, SSIZE_MAX and SIZE_MAX (machine/limits.h of both targets, LP64, given here); the FLT_* legacy values are not kernel material"
+notes = "the integer limits, MB_LEN_MAX, LONG_BIT, WORD_BIT, and SSIZE_MAX/SIZE_MAX (machine/limits.h of both targets, LP64, given here); TD1: CHAR_MAX/CHAR_MIN follow the machine (char is unsigned on arm64: 0xff and 0; signed on amd64), as i32; the FLT_*/DBL_* legacy names are under __XPG_VISIBLE < 600, false in the kernel"
 
 [[file]]
 c = "sys/sys/_null.h"
