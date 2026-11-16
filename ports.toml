@@ -2109,11 +2109,11 @@ notes = "M5-a: CP_*/CPUSTATES, struct cpustats, SCHED_NQS/SCHED_PPQ/NICE_WEIGHT/
 [[file]]
 c = "sys/sys/smr.h"
 rust = "sys/sys/smr.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "aebd6d748d593b01524f7cb7805da54ac4f60e91"
 deps = ["sys/sys/queue.h"]
-notes = "M11a: struct smr_entry, smr_entry_list, smr_init, smr_call, smr_barrier, smr_flush, SMR_ASSERT_CRITICAL/NONCRITICAL, SMR_PTR_GET (Acquire load)/SMR_PTR_GET_LOCKED/SMR_PTR_SET_LOCKED (Release store) as SmrPtr<T>; M11e: SMR_SLIST_* (SmrSlistEntry/SmrSlistHead over queue_adapter!, Acquire/Release links, a removed element keeps its link) for bpf.c and if_pflow.c, with a host test; not ported: SMR_LIST/SMR_TAILQ (users not configured: if_pppoe.c, if_etherbridge.c, carp)"
+notes = "the whole header: struct smr_entry, smr_entry_list, smr_init, smr_call, smr_barrier, smr_flush, SMR_ASSERT_CRITICAL/NONCRITICAL, SMR_PTR_GET (Acquire load)/SMR_PTR_GET_LOCKED/SMR_PTR_SET_LOCKED (Release store) as SmrPtr<T> (M11a); the three list families over queue_adapter!, the C's names without the family prefix: SMR_SLIST_* (SmrSlistEntry/SmrSlistHead; M11e for bpf.c and if_pflow.c, TD1 the rest: next_locked, insert_after_locked, remove_after_locked, remove_head_locked), SMR_LIST_* (SmrListEntry/SmrListHead) and SMR_TAILQ_* (SmrTailqEntry/SmrTailqHead, last_locked through the entry as the C reads it; TD1, no user configured yet: if_pppoe.c, if_etherbridge.c, carp). The links are atomics: the forward ones read with Acquire and published with Release (membar_producer), the backward ones and a queue's last Relaxed (only the lock's holder touches them); a removed element keeps its forward link; _FOREACH_LOCKED and _FOREACH_SAFE_LOCKED are one iterator; an empty tail queue stores a null last that means its own first link (the initializer cannot take the head's address in a const). Host tests for each family. The functions the header declares are kern/kern_smr.rs's. license: ISC (Visa Hankala) and BSD 3-clause (the Regents, queue.h), kept whole"
 
 [[file]]
 c = "sys/sys/timeout.h"
