@@ -3468,6 +3468,15 @@ gen-syscalls:
 check-syscalls:
     {{xtask}} gen-syscalls --check
 
+# Rewrite the device id tables from their headers at the pin (sys/dev/pci/pcidevs.rs,
+# sys/dev/usb/usbdevs.rs, sys/dev/mii/miidevs.rs: every #define of pcidevs.h, usbdevs.h and
+# miidevs.h, which OpenBSD generates with devlist2h.awk). Rerun after a pin bump moves one.
+gen-devs:
+    {{xtask}} gen-devs
+
+check-devs:
+    {{xtask}} gen-devs --check
+
 drift:
     {{xtask}} ports drift
 
@@ -3596,7 +3605,7 @@ smoke-cd80:
     @[ "{{amd64_frozen}}" = true ] || test -f target/install/amd64/cd80.iso || { echo "smoke-cd80: no cd80.iso; run just cd-iso-amd64"; exit 1; }
     {{xtask}} cd80 {{smp}} --arch amd64
 
-ci: fmt clippy test build smoke check-ports check-syscalls
+ci: fmt clippy test build smoke check-ports check-syscalls check-devs
 
 # `ci` with every `{{smp}}` recipe on four processors (`EMIBSD_NCPU=4`), not only the `smp4`
 # group: four CPUs make the MP races likelier. Then the installer end to end on both archs, also
