@@ -52,10 +52,12 @@
 //!
 //! Upstream: sys/sys/mman.h @ 3ce1f3f79392
 //!
-//! Status: `ported` for the kernel. Milestone M3 needs the protections and the inheritance and
-//! advice codes that `uvm` encodes into its map flags; M7a adds the `MAP_*` flags,
-//! `MAP_FLAGMASK`, `MS_*` and `MCL_*` for `uvm_mmap.c`. The userland prototypes and
-//! `MAP_FAILED` are not the kernel's.
+//! Status: `ported`. Everything the kernel sees: the protections (`PROT_*`), the mapping
+//! flags (`MAP_*`, `MAP_FLAGMASK`, with the legacy names that are 0), the advice codes
+//! (`POSIX_MADV_*` and the `MADV_*` names equal to them, with `MADV_SPACEAVAIL` and
+//! `MADV_FREE`), the inheritance codes (`MAP_INHERIT_*`), `MS_*` and `MCL_*`. What is under
+//! `#ifndef _KERNEL` is not kernel material: `MAP_FAILED`, the `size_t`/`off_t`/`mode_t`
+//! typedef guards and the prototypes of the mmap(2) family.
 
 /// No permissions.
 pub const PROT_NONE: i32 = 0x00;
@@ -121,16 +123,30 @@ pub const MS_INVALIDATE: i32 = 0x04;
 
 // Advice to madvise
 
-/// No further special treatment.
-pub const MADV_NORMAL: i32 = 0;
-/// Expect random page references.
-pub const MADV_RANDOM: i32 = 1;
-/// Expect sequential page references.
-pub const MADV_SEQUENTIAL: i32 = 2;
-/// Will need these pages.
-pub const MADV_WILLNEED: i32 = 3;
-/// Don't need these pages.
-pub const MADV_DONTNEED: i32 = 4;
+/// `POSIX_MADV_NORMAL`: no further special treatment.
+pub const POSIX_MADV_NORMAL: i32 = 0;
+/// `POSIX_MADV_RANDOM`: expect random page references.
+pub const POSIX_MADV_RANDOM: i32 = 1;
+/// `POSIX_MADV_SEQUENTIAL`: expect sequential page references.
+pub const POSIX_MADV_SEQUENTIAL: i32 = 2;
+/// `POSIX_MADV_WILLNEED`: will need these pages.
+pub const POSIX_MADV_WILLNEED: i32 = 3;
+/// `POSIX_MADV_DONTNEED`: don't need these pages.
+pub const POSIX_MADV_DONTNEED: i32 = 4;
+
+// Original advice values, equivalent to POSIX definitions, and few implementation-specific
+// ones.
+
+/// `MADV_NORMAL`.
+pub const MADV_NORMAL: i32 = POSIX_MADV_NORMAL;
+/// `MADV_RANDOM`.
+pub const MADV_RANDOM: i32 = POSIX_MADV_RANDOM;
+/// `MADV_SEQUENTIAL`.
+pub const MADV_SEQUENTIAL: i32 = POSIX_MADV_SEQUENTIAL;
+/// `MADV_WILLNEED`.
+pub const MADV_WILLNEED: i32 = POSIX_MADV_WILLNEED;
+/// `MADV_DONTNEED`.
+pub const MADV_DONTNEED: i32 = POSIX_MADV_DONTNEED;
 /// Insure that resources are reserved.
 pub const MADV_SPACEAVAIL: i32 = 5;
 /// Pages are empty, free them.
@@ -183,6 +199,13 @@ mod tests {
             ("MS_INVALIDATE", MS_INVALIDATE as i64),
             ("MCL_CURRENT", MCL_CURRENT as i64),
             ("MCL_FUTURE", MCL_FUTURE as i64),
+            ("POSIX_MADV_NORMAL", POSIX_MADV_NORMAL as i64),
+            ("POSIX_MADV_RANDOM", POSIX_MADV_RANDOM as i64),
+            ("POSIX_MADV_SEQUENTIAL", POSIX_MADV_SEQUENTIAL as i64),
+            ("POSIX_MADV_WILLNEED", POSIX_MADV_WILLNEED as i64),
+            ("POSIX_MADV_DONTNEED", POSIX_MADV_DONTNEED as i64),
+            ("MADV_NORMAL", MADV_NORMAL as i64),
+            ("MADV_DONTNEED", MADV_DONTNEED as i64),
             ("MADV_SPACEAVAIL", MADV_SPACEAVAIL as i64),
             ("MADV_FREE", MADV_FREE as i64),
             ("MAP_INHERIT_SHARE", MAP_INHERIT_SHARE as i64),

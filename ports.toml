@@ -1035,11 +1035,11 @@ notes = "M14 A1, amd64 efiboot (BOOTX64.EFI, crate efiboot-amd64): the C's globa
 [[file]]
 c = "sys/sys/mman.h"
 rust = "sys/sys/mman.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "f76d7e382cdb17886985a8ceea50eef0b7e54b95"
 deps = ["sys/sys/types.h"]
-notes = "PROT_*, MAP_PRIVATE/MAP_ANON, MADV_*, MAP_INHERIT_* and MCL_CURRENT/MCL_FUTURE only; the mmap(2) family prototypes and the remaining MAP_* flags come with uvm_mmap.c (M7a-3); M7a-3b: MAP_SHARED/FIXED/__MAP_NOREPLACE/__MAP_NOFAULT/STACK/CONCEAL, MAP_FLAGMASK, the deprecated MAP_* aliases, MS_*"
+notes = "PROT_*, the MAP_* flags with MAP_FLAGMASK and the legacy names, POSIX_MADV_* (TD1) with the MADV_* names equal to them, MADV_SPACEAVAIL/MADV_FREE, MAP_INHERIT_*, MS_*, MCL_*; MAP_FAILED, the typedef guards and the mmap(2) family prototypes are under #ifndef _KERNEL"
 
 [[file]]
 c = "sys/kern/kern_synch.c"
