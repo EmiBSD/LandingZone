@@ -590,10 +590,10 @@ notes = "M8 (Mach licence): the register and rate/base constants (lower-case uni
 [[file]]
 c = "sys/dev/isa/isareg.h"
 rust = "sys/dev/isa/isareg.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "1a5cd2d5da9e7b5fcff324a7f8b6defaa86384b6"
-notes = "M2: IO_TIMER1, IO_RTC, IO_NMI; M4: IO_ICU1, IO_ICU2, IO_ICUSIZE; M7b: IOM_BEGIN, IOM_END, IOM_SIZE (the ISA hole, bus_space_map); the rest of the port map and the IRQ names come with the ISA bus; M8: IO_DMA1, IO_DMAPG, IO_DMA2 (isa.c); M16d: IO_KBD (pckbc_isa.c)"
+notes = "the whole header (TD1; 14 of its 58 values had come with their users): the I/O port assignments (IO_*), the port sizes (IO_*SIZE) and the I/O memory hole (IOM_BEGIN, IOM_END, IOM_SIZE), with a reference-backed test of every value"
 
 # printf, panic, the message buffer, main()
 
