@@ -4,7 +4,7 @@
 # tree outside the drivers, and `ports check` refuses such a file with no row.
 
 [meta]
-upstream = "https://github.com/EmiBSD/OpenBSD-src"
+upstream = "https://github.com/EmiBSD/ext-openbsd-src"
 pinned = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 
 # ---------------------------------------------------------------------------

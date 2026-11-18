@@ -22,7 +22,7 @@
 ## What is this
 
 - A file-by-file port of the OpenBSD kernel, pinned to commit `3ce1f3f79392` of
-  [EmiBSD/OpenBSD-src](https://github.com/EmiBSD/OpenBSD-src), the organisation's fork of openbsd/src (`reference/PINNED.md`).
+  [EmiBSD/ext-openbsd-src](https://github.com/EmiBSD/ext-openbsd-src), the organisation's fork of openbsd/src (`reference/PINNED.md`).
 - Not a new kernel design, not a Rust-for-Linux style hybrid, not a wrapper around C.
 - The C sources are the specification. Names, structure and semantics stay OpenBSD's.
   Every deviation is written down, in the file and in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -32,7 +32,7 @@
 
 ```mermaid
 flowchart LR
-    obsd["OpenBSD-src (mirror)"] -- "the C under sys/, read-only:<br/>the specification" --> lz["LandingZone"]
+    obsd["ext-openbsd-src (mirror)"] -- "the C under sys/, read-only:<br/>the specification" --> lz["LandingZone"]
     lz -- "the tree at lz-origin,<br/>then every commit, synced" --> k["Kernel"]
     k --> os["OS"]
 ```

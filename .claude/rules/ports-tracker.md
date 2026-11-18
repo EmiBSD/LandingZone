@@ -10,7 +10,7 @@ Source of truth for what is ported. `cargo xtask ports check` validates it; `jus
 
 ```toml
 [meta]
-upstream = "https://github.com/EmiBSD/OpenBSD-src"
+upstream = "https://github.com/EmiBSD/ext-openbsd-src"
 pinned   = "<full commit hash>"          # must equal the Commit: line in reference/PINNED.md
 
 [[file]]
