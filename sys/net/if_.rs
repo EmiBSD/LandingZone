@@ -131,10 +131,10 @@
 //! for transmission (`if_enqueue`); runs the hooks, the interface `ioctl`s and the groups and
 //! cloners; and owns `netlock` and the `netisr` word (`if_netisr`).
 //!
-//! Status: `if.h` `wip` (see the deviations), `if.c` `ported` (M7b).
+//! Status: `if.h` and `if.c` `ported`; the name functions `if.h` declares outside the kernel
+//! (`if_nametoindex`, `if_indextoname`, `if_nameindex`, `if_freenameindex`) are libc's.
 //!
 //! ## Deviations
-//! - `CTL_IFQ_NAMES` (a `struct ctlname` table) comes with `<sys/sysctl.h>`.
 //! - `LINK_STATE_DESCRIPTIONS` is a slice of [`IfStatusDescription`] whose strings are byte
 //!   slices; the C's terminating `{ 0, 0, NULL }` entry is the slice's end.
 //! - `IFG_ALL` and `IFG_EGRESS` are byte strings without the NUL.
@@ -301,6 +301,7 @@ use crate::sys::socket::{
 };
 use crate::sys::socketvar::Socket;
 use crate::sys::sockio::*;
+use crate::sys::sysctl::{CTLTYPE_INT, Ctlname};
 use crate::sys::systm::{
     kernel_assert_locked, kernel_lock, kernel_unlock, net_assert_locked,
     net_assert_locked_exclusive, net_lock, net_lock_shared, net_unlock, net_unlock_shared,
@@ -472,6 +473,15 @@ pub const IFQCTL_DROPS: i32 = 3;
 pub const IFQCTL_CONGESTION: i32 = 4;
 /// `IFQCTL_MAXID`.
 pub const IFQCTL_MAXID: i32 = 5;
+
+/// `CTL_IFQ_NAMES`: the names of this level, for `sysctl(8)`.
+pub const CTL_IFQ_NAMES: [Ctlname; IFQCTL_MAXID as usize] = [
+    Ctlname::NONE,
+    Ctlname::new(b"len", CTLTYPE_INT),
+    Ctlname::new(b"maxlen", CTLTYPE_INT),
+    Ctlname::new(b"drops", CTLTYPE_INT),
+    Ctlname::new(b"congestion", CTLTYPE_INT),
+];
 
 /// Interface arrival.
 pub const IFAN_ARRIVAL: u16 = 0;
@@ -5686,6 +5696,12 @@ pub(crate) mod tests {
         assert!(in6ifa_ifpwithaddr(lo1, &IN6ADDR_LOOPBACK).is_none());
         if_put(lo0);
         if_put(lo1);
+    }
+
+    #[test]
+    #[ignore = "needs OPENBSD_SRC (just test-ref)"]
+    fn the_sysctl_names_match_the_c_header() {
+        crate::reftest::assert_ctlnames("sys/net/if.h", "CTL_IFQ_NAMES", &CTL_IFQ_NAMES);
     }
 }
 /* </TESTS> */

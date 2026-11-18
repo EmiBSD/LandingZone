@@ -53,8 +53,8 @@
 //! Upstream: sys/sys/malloc.h @ 3ce1f3f79392
 //!
 //! Status: `wip`. Milestone M3 ports the flags, the memory types with their names, the
-//! allocator constants and the `kmemstats`/`kmemusage`/`kmembuckets` structures; the
-//! `CTL_KERN_MALLOC_NAMES` sysctl table and `poison_*` (`subr_poison.c`) come later.
+//! allocator constants and the `kmemstats`/`kmemusage`/`kmembuckets` structures, TD1 the
+//! `CTL_KERN_MALLOC_NAMES` sysctl table; `poison_*` (`subr_poison.c`) come later.
 //!
 //! ## Deviations
 //! - `kmemusage`'s union of `freecnt`/`pagecnt` is one `u16` with two accessor pairs.
@@ -66,6 +66,7 @@ use core::cell::Cell;
 use crate::kern::kern_malloc::KfList;
 use crate::sys::param::PAGE_SIZE;
 use crate::sys::queue::XsimpleqHead;
+use crate::sys::sysctl::{CTLTYPE_NODE, CTLTYPE_STRING, Ctlname};
 
 /// `KERN_MALLOC_BUCKETS`.
 pub const KERN_MALLOC_BUCKETS: i32 = 1;
@@ -77,6 +78,15 @@ pub const KERN_MALLOC_KMEMNAMES: i32 = 3;
 pub const KERN_MALLOC_KMEMSTATS: i32 = 4;
 /// `KERN_MALLOC_MAXID`.
 pub const KERN_MALLOC_MAXID: i32 = 5;
+
+/// `CTL_KERN_MALLOC_NAMES`: the names of this level, for `sysctl(8)`.
+pub const CTL_KERN_MALLOC_NAMES: [Ctlname; KERN_MALLOC_MAXID as usize] = [
+    Ctlname::NONE,
+    Ctlname::new(b"buckets", CTLTYPE_STRING),
+    Ctlname::new(b"bucket", CTLTYPE_NODE),
+    Ctlname::new(b"kmemnames", CTLTYPE_STRING),
+    Ctlname::new(b"kmemstat", CTLTYPE_NODE),
+];
 
 // flags to malloc
 
@@ -657,6 +667,16 @@ mod tests {
         for (name, value) in ours {
             assert_eq!(crate::reftest::int(&defs, name), Some(*value), "{name}");
         }
+    }
+
+    #[test]
+    #[ignore = "needs OPENBSD_SRC (just test-ref)"]
+    fn the_sysctl_names_match_the_c_header() {
+        crate::reftest::assert_ctlnames(
+            "sys/sys/malloc.h",
+            "CTL_KERN_MALLOC_NAMES",
+            &CTL_KERN_MALLOC_NAMES,
+        );
     }
 }
 /* </TESTS> */

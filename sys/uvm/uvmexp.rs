@@ -35,7 +35,9 @@
 
 use core::sync::atomic::{AtomicI32, AtomicU64, Ordering};
 
-use crate::sys::sysctl::SysctlPlain;
+use crate::sys::sysctl::{
+    CTLTYPE_INT, CTLTYPE_NODE, CTLTYPE_STRING, CTLTYPE_STRUCT, Ctlname, SysctlPlain,
+};
 
 /// `struct vmmeter`.
 pub const VM_METER: i32 = 1;
@@ -63,6 +65,23 @@ pub const VM_USPACE: i32 = 11;
 pub const VM_MALLOC_CONF: i32 = 12;
 /// Number of valid vm ids.
 pub const VM_MAXID: i32 = 13;
+
+/// `CTL_VM_NAMES`: the names of this level, for `sysctl(8)`.
+pub const CTL_VM_NAMES: [Ctlname; VM_MAXID as usize] = [
+    Ctlname::NONE,
+    Ctlname::new(b"vmmeter", CTLTYPE_STRUCT),
+    Ctlname::new(b"loadavg", CTLTYPE_STRUCT),
+    Ctlname::new(b"psstrings", CTLTYPE_STRUCT),
+    Ctlname::new(b"uvmexp", CTLTYPE_STRUCT),
+    Ctlname::new(b"swapencrypt", CTLTYPE_NODE),
+    Ctlname::new(b"nkmempages", CTLTYPE_INT),
+    Ctlname::new(b"anonmin", CTLTYPE_INT),
+    Ctlname::new(b"vtextmin", CTLTYPE_INT),
+    Ctlname::new(b"vnodemin", CTLTYPE_INT),
+    Ctlname::new(b"maxslp", CTLTYPE_INT),
+    Ctlname::new(b"uspace", CTLTYPE_INT),
+    Ctlname::new(b"malloc_conf", CTLTYPE_STRING),
+];
 
 macro_rules! uvmexp_struct {
     ($( $(#[$doc:meta])* $field:ident ),* $(,)?) => {
@@ -371,3 +390,16 @@ const _: () = {
     assert!(core::mem::size_of::<UvmexpCopy>() == 86 * 4);
 };
 /* </CODE> */
+
+/* <TESTS> */
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "needs OPENBSD_SRC (just test-ref)"]
+    fn the_sysctl_names_match_the_c_header() {
+        crate::reftest::assert_ctlnames("sys/uvm/uvmexp.h", "CTL_VM_NAMES", &CTL_VM_NAMES);
+    }
+}
+/* </TESTS> */

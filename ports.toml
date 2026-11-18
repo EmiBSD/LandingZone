@@ -1162,7 +1162,7 @@ status = "wip"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "df40c25383197e2f0961d54688bd674ade4f63ef"
 deps = ["sys/sys/queue.h", "sys/sys/param.h"]
-notes = "M_* flags and types with INITKMEMNAMES, MINBUCKET/MINALLOCSIZE/MAXALLOCSAVE/MALLOC_MAX, kmemstats/kmemusage/kmembuckets; CTL_KERN_MALLOC_NAMES and the poison_* prototypes (subr_poison.c) later; Kmemstats/Kmembuckets::to_bytes (the C layout kern.malloc copies out); ; Kmemstats is Sync under malloc_mtx (kern_malloc.c, M11a)"
+notes = "M_* flags and types with INITKMEMNAMES, MINBUCKET/MINALLOCSIZE/MAXALLOCSAVE/MALLOC_MAX, kmemstats/kmemusage/kmembuckets; CTL_KERN_MALLOC_NAMES and the poison_* prototypes (subr_poison.c) later; Kmemstats/Kmembuckets::to_bytes (the C layout kern.malloc copies out); ; Kmemstats is Sync under malloc_mtx (kern_malloc.c, M11a); TD1: CTL_KERN_MALLOC_NAMES as a Ctlname table with a reference-backed test; btokmemx/kmemxtob and the poison_* prototypes (subr_poison.c) are what is left"
 
 [[file]]
 c = "sys/sys/pool.h"
@@ -1255,7 +1255,7 @@ status = "wip"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "306d5eebc089484d07dee16d23beaa0c0bed7672"
 deps = ["sys/sys/types.h"]
-notes = "struct uvmexp with every field atomic (one static, no lock), the VM_* sysctl ids, the counters enum; M7a-3: uvmexp_counters as one array for the one CPU with counters_inc/counters_read; kern_sysctl.c: UvmexpCopy (the plain #[repr(C)] struct uvmexp of ints, SysctlPlain) and Uvmexp::snapshot for VM_UVMEXP; M11e: uvmexp_counters stay one array of relaxed atomics bumped by every CPU (correct under MULTIPROCESSOR; the C's per-CPU copies, counters_alloc_ncpus, only spread the cache lines)"
+notes = "struct uvmexp with every field atomic (one static, no lock), the VM_* sysctl ids, the counters enum; M7a-3: uvmexp_counters as one array for the one CPU with counters_inc/counters_read; kern_sysctl.c: UvmexpCopy (the plain #[repr(C)] struct uvmexp of ints, SysctlPlain) and Uvmexp::snapshot for VM_UVMEXP; M11e: uvmexp_counters stay one array of relaxed atomics bumped by every CPU (correct under MULTIPROCESSOR; the C's per-CPU copies, counters_alloc_ncpus, only spread the cache lines); TD1: CTL_VM_NAMES as a Ctlname table with a reference-backed test"
 
 [[file]]
 c = "sys/uvm/uvm_extern.h"
@@ -3132,11 +3132,11 @@ notes = "M7b: IOCPARM_*/IOC_* as u64 (u_long); _IOC/_IO/_IOR/_IOW/_IOWR, IOCPARM
 [[file]]
 c = "sys/sys/socket.h"
 rust = "sys/sys/socket.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "79e9cd186067ecbc1f02c7f07ee4662d40e4de8b"
 deps = ["sys/sys/types.h", "sys/sys/time.h", "sys/sys/param.h"]
-notes = "M7b: every constant (AF_*/PF_* as sa_family_t, the rest i32), linger, splice, sockaddr, sockaddr_storage, sockproto, sockpeercred, msghdr (msg_iov a *mut c_void until sys/uio.h), mmsghdr, cmsghdr, CMSG_ALIGN/LEN/SPACE as const fns, CMSG_DATA/FIRSTHDR (address only) and CMSG_NXTHDR (unsafe, reads cmsg_len) over raw pointers, sstosa a pointer cast; the CTL_NET_*_NAMES sysctl tables wait for sys/sysctl.h"
+notes = "M7b: every constant (AF_*/PF_* as sa_family_t, the rest i32), linger, splice, sockaddr, sockaddr_storage, sockproto, sockpeercred, msghdr (msg_iov a *mut c_void until sys/uio.h), mmsghdr, cmsghdr, CMSG_ALIGN/LEN/SPACE as const fns, CMSG_DATA/FIRSTHDR (address only) and CMSG_NXTHDR (unsafe, reads cmsg_len) over raw pointers, sstosa a pointer cast; the CTL_NET_*_NAMES sysctl tables wait for sys/sysctl.h; TD1: the nine CTL_NET_*_NAMES tables as [Ctlname; N] with a reference-backed test (CTL_NET_NAMES has the header's 36 entries, one short of NET_MAXID: EXT-233); msg_iov is a *mut Iovec (sys/uio.h is ported); the socket functions declared outside the kernel are libc's: the header is whole"
 
 [[file]]
 c = "sys/sys/sockio.h"
@@ -3150,11 +3150,11 @@ notes = "M7b: the 106 socket and interface ioctls whose argument structures are 
 [[file]]
 c = "sys/net/if.h"
 rust = "sys/net/if_.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "929896578ee0f18a975a7b7ef0e38576aa12beb8"
 deps = ["sys/sys/socket.h", "sys/net/if_types.h", "sys/net/if_arp.h"]
-notes = "M7b: module if_ (if is a Rust keyword); every constant, if_nameindex, if_clonereq, if_rxring(_info), if_rxrinfo, if_data, if_status_description with LINK_STATE_DESCRIPTIONS (a slice, no NULL terminator), if_msghdr, ifa_msghdr, if_announcemsghdr, if_ieee80211_data/msghdr, if_nameindex_msg, ifg_req, ifg_attrib, ifgroupreq, ifreq, ifaliasreq, ifmediareq, ifkalivereq, ifconf, if_laddrreq, if_afreq, if_parent, if_sffpage; the unions are #[repr(C)] unions with safe accessors for the ifr_*/ifgr_*/ifc_*/ifra_* shorthands; IF_Kbps/Mbps/Gbps, IFQ_PRIO2TOS/TOS2PRIO, LINK_STATE_IS_UP, LINK_STATE_DESC_MATCH as const fns; CTL_IFQ_NAMES waits for sys/sysctl.h; the prototypes are net/if.c's functions in the same module (M7b)"
+notes = "M7b: module if_ (if is a Rust keyword); every constant, if_nameindex, if_clonereq, if_rxring(_info), if_rxrinfo, if_data, if_status_description with LINK_STATE_DESCRIPTIONS (a slice, no NULL terminator), if_msghdr, ifa_msghdr, if_announcemsghdr, if_ieee80211_data/msghdr, if_nameindex_msg, ifg_req, ifg_attrib, ifgroupreq, ifreq, ifaliasreq, ifmediareq, ifkalivereq, ifconf, if_laddrreq, if_afreq, if_parent, if_sffpage; the unions are #[repr(C)] unions with safe accessors for the ifr_*/ifgr_*/ifc_*/ifra_* shorthands; IF_Kbps/Mbps/Gbps, IFQ_PRIO2TOS/TOS2PRIO, LINK_STATE_IS_UP, LINK_STATE_DESC_MATCH as const fns; CTL_IFQ_NAMES waits for sys/sysctl.h; the prototypes are net/if.c's functions in the same module (M7b); TD1: CTL_IFQ_NAMES as a [Ctlname; IFQCTL_MAXID] with a reference-backed test; the if_nametoindex family is declared outside the kernel only: the header is whole"
 
 [[file]]
 c = "sys/net/if_types.h"
@@ -3273,11 +3273,11 @@ upstream_blob = "0d29b1654199385bcafb175890b5a3ad762afd38"
 [[file]]
 c = "sys/netinet/in.h"
 rust = "sys/netinet/in_.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "ac61d97379129a2d5833f84ab3ca142bffb04022"
 deps = ["sys/sys/socket.h", "sys/sys/endian.h"]
-notes = "M7b: module in_ (in is a Rust keyword), with in.c; every constant, the kernel's __IPADDR as htonl so INADDR_*/IN_CLASS*_NET/HOST are network order; in_addr (s_addr u32), sockaddr_in, ip_opts, ip_mreq, ip_mreqn; IN_CLASSA..D, IN_MULTICAST, IN_RFC3021_SUBNET, IN_EXPERIMENTAL, IN_BADCLASS, IN_LOCAL_GROUP, IN_CLASSFULBROADCAST, in_hosteq, in_nullhost as const fns; satosin/satosin_const/sintosa pointer casts; inetctlerrmap and the ip_* globals are netinet/ip_input.rs; CTL_IPPROTO_NAMES/IPCTL_NAMES wait for sys/sysctl.h (so wip); INADDR_NONE and bindresvport are userland"
+notes = "M7b: module in_ (in is a Rust keyword), with in.c; every constant, the kernel's __IPADDR as htonl so INADDR_*/IN_CLASS*_NET/HOST are network order; in_addr (s_addr u32), sockaddr_in, ip_opts, ip_mreq, ip_mreqn; IN_CLASSA..D, IN_MULTICAST, IN_RFC3021_SUBNET, IN_EXPERIMENTAL, IN_BADCLASS, IN_LOCAL_GROUP, IN_CLASSFULBROADCAST, in_hosteq, in_nullhost as const fns; satosin/satosin_const/sintosa pointer casts; inetctlerrmap and the ip_* globals are netinet/ip_input.rs; CTL_IPPROTO_NAMES/IPCTL_NAMES wait for sys/sysctl.h (so wip); INADDR_NONE and bindresvport are userland; TD1: CTL_IPPROTO_NAMES (259 entries) and IPCTL_NAMES as Ctlname tables with a reference-backed test: the header is whole"
 
 [[file]]
 c = "sys/netinet/in_systm.h"

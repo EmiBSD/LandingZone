@@ -58,14 +58,12 @@
 //! [`SaFamily`] (`sa_family_t`, the type of `sa_family`), which is what the network code
 //! compares them with; the other constants are `i32`, the `int` the system calls take.
 //!
-//! Status: `wip`.
+//! Status: `ported`, the whole header; the socket functions it declares outside the kernel
+//! (`accept`, `bind`, ..., `getpeereid`, `sockatmark`) are libc's.
 //!
 //! ## Deviations
-//! - `msg_iov` is a `*mut c_void` until `<sys/uio.h>` (`struct iovec`) is ported.
-//! - `CTL_NET_NAMES`, `CTL_NET_RT_NAMES`, `CTL_NET_UNIX_NAMES`, `CTL_NET_UNIX_PROTO_NAMES`,
-//!   `CTL_NET_LINK_NAMES`, `CTL_NET_LINK_IFRXQ_NAMES`, `CTL_NET_KEY_NAMES`,
-//!   `CTL_NET_BPF_NAMES` and `CTL_NET_PFLOW_NAMES` (`struct ctlname` tables) come with
-//!   `<sys/sysctl.h>`.
+//! - `CTL_NET_NAMES` has the header's 36 entries, one short of `NET_MAXID`: the C's table
+//!   was not given a name for `AF_FRAME` (`docs/EXTERNAL_BUGS.md`, EXT-233).
 //! - `CMSG_DATA`, `CMSG_FIRSTHDR` and `CMSG_NXTHDR` work on raw pointers, as the C does on
 //!   `msg_control`: the first two only compute addresses and are safe; [`cmsg_nxthdr`] reads
 //!   `cmsg_len` and is `unsafe`. `CMSG_ALIGN`, `CMSG_LEN` and `CMSG_SPACE` are `const fn`s.
@@ -77,8 +75,10 @@ use core::ffi::c_void;
 use core::mem::size_of;
 
 use crate::sys::param::align;
+use crate::sys::sysctl::{CTLTYPE_INT, CTLTYPE_NODE, CTLTYPE_STRUCT, Ctlname};
 use crate::sys::time::Timeval;
 use crate::sys::types::{Gid, Off, Pid, SaFamily, Socklen, Uid};
+use crate::sys::uio::Iovec;
 
 // Types
 
@@ -369,6 +369,47 @@ pub const SHUT_RDWR: i32 = 2;
 /// `NET_MAXID`.
 pub const NET_MAXID: i32 = AF_MAX as i32;
 
+/// `CTL_NET_NAMES`: the names of this level, for `sysctl(8)`. The header's table stops one
+/// short of `NET_MAXID`: `AF_FRAME` (36) has no entry (`docs/EXTERNAL_BUGS.md`, EXT-233).
+pub const CTL_NET_NAMES: [Ctlname; 36] = [
+    Ctlname::NONE,
+    Ctlname::new(b"unix", CTLTYPE_NODE),
+    Ctlname::new(b"inet", CTLTYPE_NODE),
+    Ctlname::new(b"implink", CTLTYPE_NODE),
+    Ctlname::new(b"pup", CTLTYPE_NODE),
+    Ctlname::new(b"chaos", CTLTYPE_NODE),
+    Ctlname::new(b"xerox_ns", CTLTYPE_NODE),
+    Ctlname::new(b"iso", CTLTYPE_NODE),
+    Ctlname::new(b"ecma", CTLTYPE_NODE),
+    Ctlname::new(b"datakit", CTLTYPE_NODE),
+    Ctlname::new(b"ccitt", CTLTYPE_NODE),
+    Ctlname::new(b"ibm_sna", CTLTYPE_NODE),
+    Ctlname::new(b"decnet", CTLTYPE_NODE),
+    Ctlname::new(b"dec_dli", CTLTYPE_NODE),
+    Ctlname::new(b"lat", CTLTYPE_NODE),
+    Ctlname::new(b"hylink", CTLTYPE_NODE),
+    Ctlname::new(b"appletalk", CTLTYPE_NODE),
+    Ctlname::new(b"route", CTLTYPE_NODE),
+    Ctlname::new(b"link", CTLTYPE_NODE),
+    Ctlname::new(b"xtp", CTLTYPE_NODE),
+    Ctlname::new(b"coip", CTLTYPE_NODE),
+    Ctlname::new(b"cnt", CTLTYPE_NODE),
+    Ctlname::new(b"rtip", CTLTYPE_NODE),
+    Ctlname::new(b"ipx", CTLTYPE_NODE),
+    Ctlname::new(b"inet6", CTLTYPE_NODE),
+    Ctlname::new(b"pip", CTLTYPE_NODE),
+    Ctlname::new(b"isdn", CTLTYPE_NODE),
+    Ctlname::new(b"natm", CTLTYPE_NODE),
+    Ctlname::new(b"encap", CTLTYPE_NODE),
+    Ctlname::new(b"sip", CTLTYPE_NODE),
+    Ctlname::new(b"key", CTLTYPE_NODE),
+    Ctlname::new(b"bpf", CTLTYPE_NODE),
+    Ctlname::new(b"bluetooth", CTLTYPE_NODE),
+    Ctlname::new(b"mpls", CTLTYPE_NODE),
+    Ctlname::new(b"pflow", CTLTYPE_NODE),
+    Ctlname::new(b"pipex", CTLTYPE_NODE),
+];
+
 // PF_ROUTE - Routing table. Four additional levels: address family (0 is wildcard), type of
 // info (below), flag(s) to mask with for NET_RT_FLAGS, routing table to use (facultative,
 // defaults to 0; NET_RT_TABLE has the table id as sixth element).
@@ -390,6 +431,18 @@ pub const NET_RT_SOURCE: i32 = 7;
 /// `NET_RT_MAXID`.
 pub const NET_RT_MAXID: i32 = 8;
 
+/// `CTL_NET_RT_NAMES`: the names of this level, for `sysctl(8)`.
+pub const CTL_NET_RT_NAMES: [Ctlname; NET_RT_MAXID as usize] = [
+    Ctlname::NONE,
+    Ctlname::new(b"dump", CTLTYPE_STRUCT),
+    Ctlname::new(b"flags", CTLTYPE_STRUCT),
+    Ctlname::new(b"iflist", CTLTYPE_STRUCT),
+    Ctlname::new(b"stats", CTLTYPE_STRUCT),
+    Ctlname::new(b"table", CTLTYPE_STRUCT),
+    Ctlname::new(b"ifnames", CTLTYPE_STRUCT),
+    Ctlname::new(b"source", CTLTYPE_STRUCT),
+];
+
 // PF_UNIX - unix socket tunables
 
 /// `NET_UNIX_INFLIGHT`.
@@ -399,12 +452,31 @@ pub const NET_UNIX_DEFERRED: i32 = 7;
 /// `NET_UNIX_MAXID`.
 pub const NET_UNIX_MAXID: i32 = 8;
 
+/// `CTL_NET_UNIX_NAMES`: the names of this level, for `sysctl(8)`.
+pub const CTL_NET_UNIX_NAMES: [Ctlname; NET_UNIX_MAXID as usize] = [
+    Ctlname::NONE,
+    Ctlname::new(b"stream", CTLTYPE_NODE),
+    Ctlname::new(b"dgram", CTLTYPE_NODE),
+    Ctlname::NONE,
+    Ctlname::NONE,
+    Ctlname::new(b"seqpacket", CTLTYPE_NODE),
+    Ctlname::new(b"inflight", CTLTYPE_INT),
+    Ctlname::new(b"deferred", CTLTYPE_INT),
+];
+
 /// `UNPCTL_RECVSPACE`.
 pub const UNPCTL_RECVSPACE: i32 = 1;
 /// `UNPCTL_SENDSPACE`.
 pub const UNPCTL_SENDSPACE: i32 = 2;
 /// `NET_UNIX_PROTO_MAXID`.
 pub const NET_UNIX_PROTO_MAXID: i32 = 3;
+
+/// `CTL_NET_UNIX_PROTO_NAMES`: the names of this level, for `sysctl(8)`.
+pub const CTL_NET_UNIX_PROTO_NAMES: [Ctlname; NET_UNIX_PROTO_MAXID as usize] = [
+    Ctlname::NONE,
+    Ctlname::new(b"recvspace", CTLTYPE_INT),
+    Ctlname::new(b"sendspace", CTLTYPE_INT),
+];
 
 // PF_LINK - link layer or device tunables
 
@@ -413,12 +485,23 @@ pub const NET_LINK_IFRXQ: i32 = 1;
 /// `NET_LINK_MAXID`.
 pub const NET_LINK_MAXID: i32 = 2;
 
+/// `CTL_NET_LINK_NAMES`: the names of this level, for `sysctl(8)`.
+pub const CTL_NET_LINK_NAMES: [Ctlname; NET_LINK_MAXID as usize] =
+    [Ctlname::NONE, Ctlname::new(b"ifrxq", CTLTYPE_NODE)];
+
 /// net.link.ifrxq.pressure_return.
 pub const NET_LINK_IFRXQ_PRESSURE_RETURN: i32 = 1;
 /// net.link.ifrxq.pressure_drop.
 pub const NET_LINK_IFRXQ_PRESSURE_DROP: i32 = 2;
 /// `NET_LINK_IFRXQ_MAXID`.
 pub const NET_LINK_IFRXQ_MAXID: i32 = 3;
+
+/// `CTL_NET_LINK_IFRXQ_NAMES`: the names of this level, for `sysctl(8)`.
+pub const CTL_NET_LINK_IFRXQ_NAMES: [Ctlname; NET_LINK_IFRXQ_MAXID as usize] = [
+    Ctlname::NONE,
+    Ctlname::new(b"pressure_return", CTLTYPE_INT),
+    Ctlname::new(b"pressure_drop", CTLTYPE_INT),
+];
 
 // PF_KEY - Key Management
 
@@ -429,6 +512,13 @@ pub const NET_KEY_SPD_DUMP: i32 = 2;
 /// `NET_KEY_MAXID`.
 pub const NET_KEY_MAXID: i32 = 3;
 
+/// `CTL_NET_KEY_NAMES`: the names of this level, for `sysctl(8)`.
+pub const CTL_NET_KEY_NAMES: [Ctlname; NET_KEY_MAXID as usize] = [
+    Ctlname::NONE,
+    Ctlname::new(b"sadb_dump", CTLTYPE_STRUCT),
+    Ctlname::new(b"spd_dump", CTLTYPE_STRUCT),
+];
+
 // PF_BPF not really a family, but connected under CTL_NET
 
 /// Default buffer size.
@@ -438,12 +528,23 @@ pub const NET_BPF_MAXBUFSIZE: i32 = 2;
 /// `NET_BPF_MAXID`.
 pub const NET_BPF_MAXID: i32 = 3;
 
+/// `CTL_NET_BPF_NAMES`: the names of this level, for `sysctl(8)`.
+pub const CTL_NET_BPF_NAMES: [Ctlname; NET_BPF_MAXID as usize] = [
+    Ctlname::NONE,
+    Ctlname::new(b"bufsize", CTLTYPE_INT),
+    Ctlname::new(b"maxbufsize", CTLTYPE_INT),
+];
+
 // PF_PFLOW not really a family, but connected under CTL_NET
 
 /// Statistics.
 pub const NET_PFLOW_STATS: i32 = 1;
 /// `NET_PFLOW_MAXID`.
 pub const NET_PFLOW_MAXID: i32 = 2;
+
+/// `CTL_NET_PFLOW_NAMES`: the names of this level, for `sysctl(8)`.
+pub const CTL_NET_PFLOW_NAMES: [Ctlname; NET_PFLOW_MAXID as usize] =
+    [Ctlname::NONE, Ctlname::new(b"stats", CTLTYPE_STRUCT)];
 
 /// Maximum queue length specifiable by listen(2).
 pub const SOMAXCONN: i32 = 128;
@@ -586,7 +687,7 @@ pub struct Msghdr {
     /// Size of address.
     pub msg_namelen: Socklen,
     /// Scatter/gather array (`struct iovec *`).
-    pub msg_iov: *mut c_void,
+    pub msg_iov: *mut Iovec,
     /// # elements in `msg_iov`.
     pub msg_iovlen: u32,
     /// Ancillary data, see below.
@@ -806,6 +907,48 @@ mod tests {
         assert_complete(&defs, "MSG_", &msg);
         let scm = assert_defines!(defs; SCM_RIGHTS, SCM_TIMESTAMP);
         assert_complete(&defs, "SCM_", &scm);
+    }
+
+    #[test]
+    #[ignore = "needs OPENBSD_SRC (just test-ref)"]
+    fn the_sysctl_names_match_the_c_header() {
+        crate::reftest::assert_ctlnames("sys/sys/socket.h", "CTL_NET_NAMES", &CTL_NET_NAMES);
+        crate::reftest::assert_ctlnames("sys/sys/socket.h", "CTL_NET_RT_NAMES", &CTL_NET_RT_NAMES);
+        crate::reftest::assert_ctlnames(
+            "sys/sys/socket.h",
+            "CTL_NET_UNIX_NAMES",
+            &CTL_NET_UNIX_NAMES,
+        );
+        crate::reftest::assert_ctlnames(
+            "sys/sys/socket.h",
+            "CTL_NET_UNIX_PROTO_NAMES",
+            &CTL_NET_UNIX_PROTO_NAMES,
+        );
+        crate::reftest::assert_ctlnames(
+            "sys/sys/socket.h",
+            "CTL_NET_LINK_NAMES",
+            &CTL_NET_LINK_NAMES,
+        );
+        crate::reftest::assert_ctlnames(
+            "sys/sys/socket.h",
+            "CTL_NET_LINK_IFRXQ_NAMES",
+            &CTL_NET_LINK_IFRXQ_NAMES,
+        );
+        crate::reftest::assert_ctlnames(
+            "sys/sys/socket.h",
+            "CTL_NET_KEY_NAMES",
+            &CTL_NET_KEY_NAMES,
+        );
+        crate::reftest::assert_ctlnames(
+            "sys/sys/socket.h",
+            "CTL_NET_BPF_NAMES",
+            &CTL_NET_BPF_NAMES,
+        );
+        crate::reftest::assert_ctlnames(
+            "sys/sys/socket.h",
+            "CTL_NET_PFLOW_NAMES",
+            &CTL_NET_PFLOW_NAMES,
+        );
     }
 }
 /* </TESTS> */

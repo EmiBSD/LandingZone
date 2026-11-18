@@ -270,6 +270,7 @@ means EmiBSD's code has it too ("Bugs the port reproduces").
 | EXT-229 | `sys/arch/arm64/include/armreg.h:813` | `MAIR_ATTR_MASK(idx)` expands to `(0xff << ((n)* 8))`: `n` is not its parameter | — (the macro has no user) | cosmetic | read | `mair_attr_mask(idx)` shifts by `idx` | open |
 | EXT-231 | `sys/arch/amd64/include/specialreg.h:1540` | `SVM_INTERCEPT_DR3_READ` is `(1UL << 2)`, the bit of `SVM_INTERCEPT_DR2_READ` | — (the constant has no user) | cosmetic | read | `SVM_INTERCEPT_DR3_READ` is `1 << 3` | open |
 | EXT-232 | `sys/arch/amd64/include/segments.h:75` | eight macros cannot be expanded: `IDXDYNSEL` and `GDYNSEL` name an undefined `DYNSEL_START`, the six `IS*DP` read a `d_type` member no descriptor has | — (the macros have no user) | cosmetic | read | the eight are not declared | open |
+| EXT-233 | `sys/sys/socket.h:322` | `CTL_NET_NAMES` has 36 entries while `NET_MAXID` (`AF_MAX`) is 37: `AF_FRAME` (36) was added without a name | — (sysctl(8) only; the kernel does not read the table) | cosmetic | read | the table has the header's 36 entries | open |
 
 ## Entries (EXT-1 to EXT-8, EXT-192 to EXT-197)
 
@@ -831,6 +832,23 @@ Every C line in this and the following sections is at the pin 3ce1f3f79392, unde
   listed in the file).
 - Severity: cosmetic.
 - Fix: remove the eight macros.
+
+### EXT-233: `CTL_NET_NAMES` was not extended for `AF_FRAME`
+
+- Where: `sys/sys/socket.h:322-359` at 3ce1f3f79392, with `AF_FRAME` and `AF_MAX` at 207-208.
+- What: `CTL_NET_NAMES` names the second level of the `net` sysctl tree, one entry per
+  address family, and `NET_MAXID` is `AF_MAX`. `AF_FRAME` (36, frame sockets) raised
+  `AF_MAX` to 37; the table still ends at `{ "pipex", CTLTYPE_NODE }`, entry 35, so it has 36
+  entries and family 36 has none.
+- Reach: none in the kernel, which never reads the table. In userland, a program that sizes
+  its copy by `NET_MAXID` gets a zero-filled last entry, and one that indexes the table by
+  family up to `NET_MAXID` without that reads past a 36-entry array.
+- Verified: read; the port's table is checked against the header by a reference-backed
+  test, and its type (`[Ctlname; 36]`) would not compile with `NET_MAXID` as its length.
+- Port's handling: `sys/sys/socket.rs`, `CTL_NET_NAMES` has the header's 36 entries (a
+  deviation listed in the file).
+- Severity: cosmetic.
+- Fix: add `{ "frame", CTLTYPE_NODE }` (or `{ 0, 0 }`) as entry 36.
 
 ### EXT-227: an address lifetime past INT_MAX seconds rearms the expiry timer every tick
 

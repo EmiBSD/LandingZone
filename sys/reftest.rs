@@ -243,6 +243,54 @@ pub(crate) fn assert_complete(defs: &BTreeMap<String, String>, prefix: &str, our
         assert!(ours.contains(&name.as_str()), "{name} is not ported");
     }
 }
+
+/// Asserts that `ours` is the C's `#define NAME { { "name", CTLTYPE_T }, ... }` of the header
+/// `rel`: the same entries in the same order, `{ 0, 0 }` for an unused slot.
+pub(crate) fn assert_ctlnames(rel: &str, name: &str, ours: &[crate::sys::sysctl::Ctlname]) {
+    let path = openbsd_src().join(rel);
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let types = defines("sys/sys/sysctl.h");
+    let head = std::format!("{name} {{");
+    let at = text
+        .lines()
+        .position(|l| {
+            l.split_whitespace().collect::<std::vec::Vec<_>>().join(" ")
+                == std::format!("#define {head} \\")
+        })
+        .unwrap_or_else(|| panic!("{rel}: no {name}"));
+    let mut n = 0;
+    for line in text.lines().skip(at + 1) {
+        if line.starts_with('}') {
+            break;
+        }
+        // A comment may hold an entry that was taken out (`/* { "mtu", ... }, */ { 0, 0 }`).
+        let mut line = line.to_string();
+        while let (Some(open), Some(close)) = (line.find("/*"), line.find("*/")) {
+            line.replace_range(open..close + 2, "");
+        }
+        let Some(entry) = line.split('{').nth(1).and_then(|e| e.split('}').next()) else {
+            continue;
+        };
+        let (cname, ctype) = entry
+            .split_once(',')
+            .unwrap_or_else(|| panic!("{name}: {line}"));
+        let (cname, ctype) = (cname.trim(), ctype.trim());
+        let want_name =
+            (cname != "0" && cname != "NULL").then(|| cname.trim_matches('"').as_bytes());
+        let want_type = if ctype == "0" {
+            Some(0)
+        } else {
+            int(&types, ctype)
+        };
+        let got = ours
+            .get(n)
+            .unwrap_or_else(|| panic!("{name}: entry {n} is missing"));
+        assert_eq!(got.ctl_name, want_name, "{name}[{n}]");
+        assert_eq!(Some(i64::from(got.ctl_type)), want_type, "{name}[{n}]");
+        n += 1;
+    }
+    assert_eq!(n, ours.len(), "{name}");
+}
 /* </CODE> */
 
 /* <TESTS> */
