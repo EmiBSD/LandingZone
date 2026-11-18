@@ -5,7 +5,7 @@ by DevTools' native cargo, and since 2026-11-16 `ci` run inside it, its second c
 **TD0 met** on 2026-11-16 (the kernel's debt: TD0..TD6; a sub-milestone, closed with
 `just ci`); **TD1 under way**, then TD2..TD6, then TB (the boot debt) and TX (the kernel
 under its own checks), then M17.
-Updated: 2026-11-16.
+Updated: 2026-11-18.
 
 Toolchain: DevTools' Rust 1.99.1+emibsd.6 and LLVM 23.1.4+emibsd.7 (D-0008), run straight
 from `~/devel/emibsd/toolchains` (no rustup; `just cargo`); the userland by DevTools' clang.
@@ -31,10 +31,15 @@ Done:
   timeout wheel (a host test that aborted now and then).
 - TDk (TD1a, 2026-11-15): the kernel built inside the VM; the "EmiBSD" ELF note,
   `__thrsleep`, sysarch, the direct map's UXN (hvf), pins +emibsd.5/+emibsd.6 without rustup.
-- 2026-11-02: DevTools' per-arch pairs and the renamed kernel targets; amd64 back in `ci`.
+- TD1 so far (2026-11-18): 35 of the 138 `wip` rows closed, 103 left (`ports status`: 238
+  `todo`, 103 `wip`, 109 `skipped`, 1210 `ported`). Headers read whole beside their ports
+  and closed or completed (armreg.h, specialreg.h, exec_elf.h, smr.h's lists, the device id
+  tables by `cargo xtask gen-devs`), and profil(2) (subr_prof.c, kern_clock.c, gmon.h).
+  Three slips of the C logged on the way (EXT-229, EXT-231, EXT-232), one boot fault fixed
+  (SVE, EXT-230, `smoke-sve`).
 
 Next:
-- TD1 the `wip` rows; TD2 the `unported!` stubs; TD3 swapctl, SysV IPC, ptrace, ktrace;
+- TD1 the `wip` rows (103 left: the uvm, kern and arch files by cluster); TD2 the `unported!` stubs; TD3 swapctl, SysV IPC, ptrace, ktrace;
   TD4 the other MI files; TD5 networking; TD6 the arch files. Drivers are not in TD.
 - TB, the boot debt (the user's milestone of 2026-11-16, after TD6): the BIOS boot programs
   of amd64, booting from softraid in efiboot, rdboot; 44 rows (docs/ROADMAP.md). Limine is
