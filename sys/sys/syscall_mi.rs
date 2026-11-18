@@ -87,6 +87,7 @@ use crate::sys::errno::Errno;
 use crate::sys::proc::{
     P_OWEUPC, PS_PLEDGE, Pinsyscall, Proc, SINGLE_DEEP, SINGLE_UNWIND, p_hassibling, refreshcreds,
 };
+use crate::sys::resourcevar::adduprof;
 use crate::sys::syscall::*;
 use crate::sys::systm::{SY_NOLOCK, SysArgs, Sysent, kernel_lock, kernel_unlock};
 use crate::sys::types::Register;
@@ -306,8 +307,9 @@ pub fn mi_child_return(p: &Proc) {
 #[inline]
 pub fn mi_ast(p: &Proc, resched: bool) {
     if p.p_flag.load(Ordering::Relaxed) & P_OWEUPC != 0 {
-        // KERNEL_LOCK(); ADDUPROF(p); KERNEL_UNLOCK(): the profiling clock (subr_prof.c).
-        let _ = unported!("mi_ast: ADDUPROF (subr_prof.c)");
+        kernel_lock(); // KERNEL_LOCK()
+        adduprof(p);
+        kernel_unlock(); // KERNEL_UNLOCK()
     }
     if resched {
         preempt();

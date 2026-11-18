@@ -78,8 +78,7 @@
 //! - The set[ug]id stdin/stdout/stderr fix-up opens `/dev/null` with `cdevvp(getnulldev())`:
 //!   the device switch (`<sys/conf.h>`) is not ported, so a set[ug]id exec with one of the
 //!   three descriptors closed reports it and fails (the C would succeed).
-//! - `prof_exec` and `stopprofclock` (profiling, `subr_prof.c`) are reported or no-ops where
-//!   their subsystem is missing (see each call site); `KTRACE` is not configured.
+//! - `KTRACE` is not configured.
 //! - The 4-clause licence (advertising clause) was accepted by the user at M2 for this
 //!   project.
 
@@ -91,6 +90,7 @@ use crate::dev::rnd::{arc4random, arc4random_buf};
 use crate::kern::exec_elf::{exec_elf_fixup, exec_elf_makecmds};
 use crate::kern::exec_script::exec_script_makecmds;
 use crate::kern::exec_subr::exec_process_vmcmds;
+use crate::kern::kern_clock::stopprofclock;
 use crate::kern::kern_descrip::{closef, falloc, fd_getfile, fdprepforexec, fdrelease, fdremove};
 use crate::kern::kern_event::knote;
 use crate::kern::kern_exit::{exit1, pin_free};
@@ -101,6 +101,7 @@ use crate::kern::kern_synch::wakeup;
 use crate::kern::kern_time::cancel_all_itimers;
 use crate::kern::subr_pool::pool_put;
 use crate::kern::subr_prf::panic;
+use crate::kern::subr_prof::prof_exec;
 use crate::kern::vfs_getcwd::vfs_getcwd_common;
 use crate::kern::vfs_init::NAMEI_POOL;
 use crate::kern::vfs_lookup::{namei, ndinit};
@@ -678,8 +679,8 @@ fn execve_common(
     // now.
     let _ = single_thread_set(p, SINGLE_EXIT);
 
-    // Clear profiling state in new image: prof_exec(pr) (subr_prof.c, see the deviations).
-    let _ = unported!("execve: prof_exec (subr_prof.c)");
+    // Clear profiling state in new image
+    prof_exec(pr);
 
     // Prepare vmspace for remapping. Note that uvmspace_exec can replace ps_vmspace!
     uvmspace_exec(
@@ -800,7 +801,7 @@ fn execve_common(
         pr.ps_libcpin.pn_npins.set(0);
     }
 
-    // stopprofclock(pr): stop profiling (subr_prof.c, see the deviations).
+    stopprofclock(pr); // stop profiling
     fdprepforexec(p); // handle close on exec and close on fork
     execsigs(p); // reset caught signals
     tcb_set(p, 0); // reset the TCB address

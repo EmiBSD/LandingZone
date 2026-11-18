@@ -2154,11 +2154,11 @@ notes = "M5: the circq operations, timeout_startup, timeout_proc_init (kthread_c
 [[file]]
 c = "sys/kern/kern_clock.c"
 rust = "sys/kern/kern_clock.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "107e14e2709328e95f35a077f883a2e24cff08ad"
 deps = ["sys/sys/kernel.h", "sys/sys/sched.h", "sys/kern/kern_clockintr.c", "sys/kern/kern_tc.c", "sys/kern/kern_timeout.c"]
-notes = "M5-a: stathz/profhz/profprocs/ticks/jiffies and the period globals, initclocks, hardclock, tvtohz, tstohz, statclock (the per-thread accounting and schedclock wait for struct proc, M5-b: reported); startprofclock/stopprofclock take a struct process (M5-b); sysctl_clockrate came with kern_sysctl.c; M7b: statclock's user/system/interrupt accounting, p_cpticks, the tusage ticks and sizes and schedclock every fourth tick (its unported! prints from the clock interrupt interleaved with user output and made smoke flaky); M11a: statclock's spc_cp_time update is a single-writer atomic store under the pc_lock"
+notes = "M5-a: stathz/profhz/profprocs/ticks/jiffies and the period globals, initclocks, hardclock, tvtohz, tstohz, statclock (the per-thread accounting and schedclock wait for struct proc, M5-b: reported); startprofclock/stopprofclock take a struct process (M5-b); sysctl_clockrate came with kern_sysctl.c; M7b: statclock's user/system/interrupt accounting, p_cpticks, the tusage ticks and sizes and schedclock every fourth tick (its unported! prints from the clock interrupt interleaved with user output and made smoke flaky); M11a: statclock's spc_cp_time update is a single-writer atomic store under the pc_lock; TD1: startprofclock and stopprofclock (PS_PROFIL, profprocs as an atomic, setstatclockrate to profhz or stathz at splstatclock), with subr_prof.c: the file is whole"
 
 [[file]]
 c = "sys/kern/sched_bsd.c"
@@ -2190,11 +2190,11 @@ notes = "M5-a: ratecheck, ppsratecheck; M8: the whole file: settime, clock_getti
 [[file]]
 c = "sys/kern/subr_prof.c"
 rust = "sys/kern/subr_prof.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "5a6e0414362f3343a9bc6ca66ed360dce1d6b5fa"
 deps = ["sys/sys/clockintr.h", "sys/kern/kern_clockintr.c"]
-notes = "M5-a: profclock_period and profclock (addupc_intr reported, struct process M5-b); GPROF/DDBPROF not configured; sys_profil and addupc_* are M6; M8: sys_profil's checks (EPERM without PSI_PROFILE, EINVAL above 1.0, scale 0 stops); struct uprof, prof_fork/exec/write, addupc_intr/task and start/stopprofclock are not ported, so the rest is reported"
+notes = "the whole file but the kernel's own profiling: profclock_period, sys_profil (PSI_PROFILE, the scale, one buffer for good, the output directory from dirfd or the current directory and the credentials of the first call, startprofclock at splstatclock), prof_fork, prof_exec, prof_write (gmon.<name>.<pid>.out through vn_open with BYPASSUNVEIL|KERNELPATH, the regular-file, link-count, mode and owner checks, truncation, vn_rdwr from the user buffer), profclock, PC_TO_INDEX, addupc_intr (P_OWEUPC and need_proftick) and addupc_task (the AST's copyin/copyout of the counter; a fault stops profiling); GPROF/DDBPROF (prof_init, prof_state_toggle, sysctl_doprof, gmonclock) not configured. Deviations: a process with no current directory and no dirfd gets ENOENT (the boot module's process before a root file system); the #if 0 mimmutable block is not carried over. Host tests: the index arithmetic, the tick owed and added, a fault turning profiling off, exec, and profil(2) over a tmpfs root up to an exit that writes nothing (the host's tmpfs takes no file data, and no released program is linked for profiling, so the dump itself runs nowhere yet). M5-a had profclock_period and profclock, M8 sys_profil's checks"
 
 [[file]]
 c = "sys/kern/subr_percpu.c"
@@ -2776,6 +2776,15 @@ deps = ["sys/sys/exec_elf.h", "sys/uvm/uvm_extern.h"]
 notes = "M8: ps_strings (to_bytes), exec_vmcmd (ev_proc an enum of the five vmcmds, ev_vp an ExecFile: a vnode or the boot module image), exec_vmcmd_set as a Vec (NEW_VMCMD2 = push with vref, kill_vmcmds = kill with vrele), exec_package with every member (ep_hdr an owned exec_maxhdrsz buffer, ep_interp a namei_pool NameiBuf, ep_pins, ep_execpath; ep_ndp is check_exec's argument, ep_image the module stand-in), execsw, exec_maxhdrsz as a const fn, EXEC_*, VMCMD_*, ELF_RANDOMIZE_LIMIT; the a.out struct exec and MID_* are not used; M14: exec_makecmds_fcn takes the nameidata (ep_ndp) as its third argument, exec_maxhdrsz is max(EXEC_SCRIPT_HDRSZ, sizeof(Elf_Ehdr)), ep_fa holds exec_script.c's fake args; TD1: the 33 a_mid machine ids (MID_*), with MID_MACHINE in each machine's param.rs, and EXEC_DEFAULT_VMCMD_SETSIZE; every declaration of the kernel half has its definition"
 
 [[file]]
+c = "sys/sys/gmon.h"
+rust = "sys/sys/gmon.rs"
+status = "ported"
+upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
+upstream_blob = "80810c0b53a625cde9cd8a74a2313ed1b7f25de5"
+deps = ["sys/sys/queue.h"]
+notes = "TD1: the whole header, with subr_prof.c: struct gmonhdr (what profil(2)'s buffer starts with; prof_write reads its totarc), GMONVERSION, HISTCOUNTER as the type Histcounter, HISTFRACTION, HASHFRACTION, ARCDENSITY, MINARCS, MAXARCS, struct tostruct, struct rawarc, ROUNDDOWN/ROUNDUP, struct gmonparam, GMON_PROF_*, GPROF_*; gmoninit (the GPROF kernel) is not configured, <machine/profile.h> (mcount) likewise; _gmonparam and the monstartup family are outside the kernel only; a reference-backed test of the values"
+
+[[file]]
 c = "sys/sys/exec_script.h"
 rust = "sys/sys/exec_script.rs"
 status = "ported"
@@ -2868,11 +2877,11 @@ notes = "M7a-3b: sys_obreak (printf for uprintf), uvm_grow (called by both archs
 [[file]]
 c = "sys/sys/resourcevar.h"
 rust = "sys/sys/resourcevar.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "297a4597671378e5e970166eaa0e42d38e925e69"
 deps = ["sys/sys/resource.h", "sys/sys/refcnt.h"]
-notes = "M7a-3b: struct plimit (pl_rlimit as Cells), lim_read_leave, lim_cur; ADDUPROF waits for addupc_task (subr_prof.c)"
+notes = "the whole header: struct plimit (pl_rlimit as Cells), lim_read_leave, lim_cur (M7a-3b); ADDUPROF is adduprof, called by mi_ast under the kernel lock (TD1, with subr_prof.c); the prototypes are kern_resource.rs's and, for profclock_period, profclock, addupc_intr and addupc_task, subr_prof.rs's"
 
 [[file]]
 c = "sys/sys/unistd.h"

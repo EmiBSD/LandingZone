@@ -75,13 +75,14 @@
 //!
 //! Upstream: sys/kern/kern_clock.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M5 ports the globals, `initclocks`, `hardclock`, `tvtohz`,
+//! Status: `ported`, the whole file. Milestone M5 ports the globals, `initclocks`, `hardclock`, `tvtohz`,
 //! `tstohz` and `statclock`; M7b completes `statclock`'s per-thread accounting
-//! (`p_cpticks`, the `tusage` ticks and sizes, `schedclock`). `startprofclock` and
-//! `stopprofclock` (profiling) are not ported; `sysctl_clockrate` came with `kern_sysctl.c`.
+//! (`p_cpticks`, the `tusage` ticks and sizes, `schedclock`); `sysctl_clockrate` came with
+//! `kern_sysctl.c`, `startprofclock` and `stopprofclock` with `profil(2)` (TD1).
 //!
 //! ## Deviations
-//! - None beyond the module's status: the profiling half of the file is missing.
+//! - `profprocs` is an atomic: the C counts it under the kernel lock, which every caller of
+//!   `startprofclock` and `stopprofclock` holds.
 
 use core::ffi::c_void;
 use core::ptr;
@@ -98,11 +99,16 @@ use crate::kern::sched_bsd::ROUNDROBIN_PERIOD;
 use crate::kern::sched_bsd::schedclock;
 use crate::kern::subr_prof::PROFCLOCK_PERIOD;
 use crate::machine::Machine;
-use crate::machine::cpu::{ClockFrame, Cpu, cpu_initclocks, cpu_startclock, curcpu};
+use crate::machine::cpu::{
+    ClockFrame, Cpu, cpu_initclocks, cpu_startclock, curcpu, setstatclockrate,
+};
+use crate::machine::intr::{splstatclock, splx};
 use crate::sys::clockintr::Clockrequest;
 use crate::sys::errno::Errno;
 use crate::sys::param::{NZERO, PAGE_SHIFT};
-use crate::sys::proc::{P_SYSTEM, TU_ITICKS, TU_STICKS, TU_UTICKS, tu_enter, tu_leave};
+use crate::sys::proc::{
+    P_SYSTEM, PS_PROFIL, Process, TU_ITICKS, TU_STICKS, TU_UTICKS, tu_enter, tu_leave,
+};
 use crate::sys::sched::{CP_IDLE, CP_INTR, CP_NICE, CP_SPIN, CP_SYS, CP_USER};
 use crate::sys::sysctl::SysctlPlain;
 use crate::sys::time::{Clockinfo, Timespec, Timeval, timespec_to_timeval};
@@ -240,7 +246,34 @@ pub fn tstohz(ts: &Timespec) -> i32 {
     tvtohz(&tv)
 }
 
-// startprofclock, stopprofclock: struct process (M5-b).
+/// Start profiling on a process.
+///
+/// Kernel profiling passes `process0` which never exits and hence keeps the profile clock
+/// running constantly.
+pub fn startprofclock(pr: &Process) {
+    if pr.ps_flags.load(Ordering::Relaxed) & PS_PROFIL == 0 {
+        pr.ps_flags.fetch_or(PS_PROFIL, Ordering::Relaxed);
+        // ++profprocs == 1
+        if PROFPROCS.fetch_add(1, Ordering::Relaxed) == 0 {
+            let s = splstatclock();
+            setstatclockrate(PROFHZ.load(Ordering::Relaxed));
+            splx(s);
+        }
+    }
+}
+
+/// Stop profiling on a process.
+pub fn stopprofclock(pr: &Process) {
+    if pr.ps_flags.load(Ordering::Relaxed) & PS_PROFIL != 0 {
+        pr.ps_flags.fetch_and(!PS_PROFIL, Ordering::Relaxed);
+        // --profprocs == 0
+        if PROFPROCS.fetch_sub(1, Ordering::Relaxed) == 1 {
+            let s = splstatclock();
+            setstatclockrate(STATHZ.load(Ordering::Relaxed));
+            splx(s);
+        }
+    }
+}
 
 /// `statclock`: statistics clock. Grab profile sample, and if divider reaches 0, do process
 /// and kernel statistics.

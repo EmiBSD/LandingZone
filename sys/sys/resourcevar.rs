@@ -52,8 +52,9 @@
 //!
 //! Upstream: sys/sys/resourcevar.h @ 3ce1f3f79392
 //!
-//! Status: `ported` except `ADDUPROF`, which waits for `addupc_task` (`subr_prof.c`, with
-//! the profiling AST). The prototypes are the functions of `kern/kern_resource.rs`.
+//! Status: `ported`. The prototypes are the functions of `kern/kern_resource.rs`, and of
+//! `kern/subr_prof.rs` for the profiling ones (`profclock_period`, `profclock`,
+//! `addupc_intr`, `addupc_task`); `ADDUPROF` is [`adduprof`].
 //!
 //! ## Deviations
 //! - `pl_rlimit` is an array of `Cell<Rlimit>`: a `plimit` is shared copy-on-write and only
@@ -114,5 +115,15 @@ pub fn lim_cur(which: usize) -> Rlim {
     let val = limit.pl_rlimit[which].get().rlim_cur;
     lim_read_leave(limit);
     val
+}
+
+/// `ADDUPROF(p)`: add user profiling from AST.
+pub fn adduprof(p: &crate::sys::proc::Proc) {
+    use core::sync::atomic::Ordering;
+
+    p.p_flag
+        .fetch_and(!crate::sys::proc::P_OWEUPC, Ordering::Relaxed);
+    crate::kern::subr_prof::addupc_task(p, p.p_prof_addr.get(), p.p_prof_ticks.get() as u32);
+    p.p_prof_ticks.set(0);
 }
 /* </CODE> */

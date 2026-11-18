@@ -69,9 +69,9 @@
 //!   `retval`/`rnewprocp` out-pointers; `thread_new` and `process_new` write a whole
 //!   `Proc::new()`/`Process::new()` into the pool item and then copy the `p_startcopy`/
 //!   `ps_startcopy` fields from the parent, instead of `memset`/`memcpy` by field offset.
-//! - `process_initialize` reports what its process does not have yet: `prof_fork` (M6);
-//!   the `realitexpire` timeout is real since `kern_time.c` (M8) and `klist_init_mutex`
-//!   since `kern_event.c`. `process_new` likewise reports `startprofclock` (M6);
+//! - `process_initialize`: the `realitexpire` timeout is real since `kern_time.c` (M8),
+//!   `klist_init_mutex` since `kern_event.c` and `prof_fork` since `subr_prof.c` (TD1), as
+//!   is `process_new`'s `startprofclock`;
 //!   `sigactsinit` is real since `kern_sig.c`, `fdcopy`/`fdshare` since `kern_descrip.c`
 //!   and `lim_fork` since the `plimit` port. `fork1` skips the `RLIMIT_NPROC` check for
 //!   root as the C does, reports it for other users (the limits); `knote_processfork` is
@@ -90,7 +90,7 @@ use libkern::StaticCell;
 use crate::conf::param::{MAXPROCESS, MAXTHREAD};
 use crate::dev::rnd::{arc4random, arc4random_uniform};
 use crate::kassert;
-use crate::kern::kern_clock::hardclock_period;
+use crate::kern::kern_clock::{hardclock_period, startprofclock};
 use crate::kern::kern_clockintr::clockintr_advance;
 use crate::kern::kern_descrip::{fdcopy, fdshare};
 use crate::kern::kern_event::{klist_init_mutex, knote_processfork};
@@ -114,7 +114,7 @@ use crate::kern::sched_bsd::{
 };
 use crate::kern::subr_pool::pool_get;
 use crate::kern::subr_prf::{panic, tablefull};
-use crate::kern::subr_prof::profclock_period;
+use crate::kern::subr_prof::{prof_fork, profclock_period};
 use crate::kern::subr_xxx::assertwaitok;
 use crate::machine::Machine;
 use crate::machine::copy::{copyin, copyout};
@@ -299,8 +299,7 @@ pub fn process_initialize(pr: &'static Process, p: &'static Proc) {
     // new thread and new process
     kassert!(p.ucred().cr_refcnt.r_refs.load(Ordering::Relaxed) >= 2);
 
-    // prof_fork(pr): subr_prof.c (M6).
-    let _ = unported!("process_initialize: prof_fork (M6)");
+    prof_fork(pr);
 
     pr.ps_children.init();
     pr.ps_orphans.init();
@@ -355,6 +354,15 @@ fn process_new(p: &'static Proc, parent: &'static Process, flags: i32) -> &'stat
     );
     pr.ps_iflags.set(parent.ps_iflags.get());
     pr.ps_nice.set(parent.ps_nice.get());
+    let (prof, pprof) = (&pr.ps_prof, &parent.ps_prof);
+    prof.pr_base.set(pprof.pr_base.get());
+    prof.pr_size.set(pprof.pr_size.get());
+    prof.pr_off.set(pprof.pr_off.get());
+    prof.pr_scale.set(pprof.pr_scale.get());
+    prof.pr_buf.set(pprof.pr_buf.get());
+    prof.pr_buflen.set(pprof.pr_buflen.get());
+    prof.pr_ucred.set(pprof.pr_ucred.get());
+    prof.pr_cdir.set(pprof.pr_cdir.get());
     pr.ps_acflag.set(parent.ps_acflag.get());
     pr.ps_pledge
         .store(parent.ps_pledge.load(Ordering::Relaxed), Ordering::Relaxed);
@@ -412,7 +420,7 @@ fn process_new(p: &'static Proc, parent: &'static Process, flags: i32) -> &'stat
     }
 
     if parent.ps_flags.load(Ordering::Relaxed) & PS_PROFIL != 0 {
-        let _ = unported!("process_new: startprofclock (subr_prof.c, M6)");
+        startprofclock(pr);
     }
     if flags & FORK_PTRACE != 0 {
         pr.ps_flags.fetch_or(

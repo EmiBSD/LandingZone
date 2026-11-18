@@ -2384,7 +2384,7 @@ pub fn filt_tmpfsvnode(kn: &Knote, hint: i64) -> bool {
 
 /* <TESTS> */
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     // Host tests for the tmpfs vnode operations, through the system calls' own paths
     // (`namei`, `vn_open`, `domkdirat`, `dorenameat`, ...) over a tmpfs mounted as the root
     // (the vfs setup is `vfs_subr.rs`'s, the mount `tmpfs_vfsops.rs`'s). The data
@@ -2420,7 +2420,7 @@ mod tests {
 
     /// The test setup plus a tmpfs of 1 MB mounted as "/" (mode 0755, owned by root) and made
     /// the thread's current directory.
-    fn setup_root() -> (MutexGuard<'static, ()>, &'static Proc) {
+    pub(crate) fn setup_root() -> (MutexGuard<'static, ()>, &'static Proc) {
         let (g, p) = setup();
         let mp = vfs_mount_alloc(None, tmpfs_conf());
         let mut data = args(1 << 20, 0, 0, 0o755);
@@ -2457,7 +2457,7 @@ mod tests {
     }
 
     /// `lstat(path)`: the attributes of the node `path` names.
-    fn stat(p: &'static Proc, path: &[u8]) -> Result<Vattr, Errno> {
+    pub(crate) fn stat(p: &'static Proc, path: &[u8]) -> Result<Vattr, Errno> {
         let mut nd = ndinit(LOOKUP, LOCKLEAF, NiDirp::Sys(path), p);
         namei(&mut nd)?;
         let vp = nd.ni_vp.expect("a vnode");

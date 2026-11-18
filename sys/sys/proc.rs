@@ -310,6 +310,48 @@ impl Default for Tusage {
     }
 }
 
+/// `struct uprof` (`ps_prof`): profile arguments, set by `profil(2)`.
+pub struct Uprof {
+    /// `pr_base`: sample buffer base, a user address.
+    pub pr_base: Cell<usize>,
+    /// `pr_size`: sample buffer size.
+    pub pr_size: Cell<usize>,
+    /// `pr_off`: pc offset.
+    pub pr_off: Cell<u64>,
+    /// `pr_scale`: pc scaling.
+    pub pr_scale: Cell<u32>,
+    /// `pr_buf`: total memory buffer, a user address; 0 when the process is not profiling.
+    pub pr_buf: Cell<usize>,
+    /// `pr_buflen`: its length.
+    pub pr_buflen: Cell<usize>,
+    /// `pr_ucred`: cred at first `profil(2)` call; the process holds a reference.
+    pub pr_ucred: Cell<Option<&'static Ucred>>,
+    /// `pr_cdir`: cwd at first `profil(2)` call; the process holds a reference.
+    pub pr_cdir: Cell<Option<&'static Vnode>>,
+}
+
+impl Uprof {
+    /// No profiling (the zero `struct process` starts with).
+    pub const fn new() -> Self {
+        Self {
+            pr_base: Cell::new(0),
+            pr_size: Cell::new(0),
+            pr_off: Cell::new(0),
+            pr_scale: Cell::new(0),
+            pr_buf: Cell::new(0),
+            pr_buflen: Cell::new(0),
+            pr_ucred: Cell::new(None),
+            pr_cdir: Cell::new(None),
+        }
+    }
+}
+
+impl Default for Uprof {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// `struct process`.
 ///
 /// Locks used to protect struct members in this file:
@@ -457,7 +499,8 @@ pub struct Process {
     /// `ps_nice`: process "nice" value.
     pub ps_nice: Cell<u8>,
 
-    // ps_prof: profile arguments (M6).
+    /// `ps_prof`: profile arguments.
+    pub ps_prof: Uprof,
     /// `ps_acflag`: accounting flags.
     pub ps_acflag: Cell<u32>,
 
@@ -551,6 +594,7 @@ impl Process {
             ps_rtableid: AtomicU32::new(0),
             ps_iflags: Cell::new(0),
             ps_nice: Cell::new(0),
+            ps_prof: Uprof::new(),
             ps_acflag: Cell::new(0),
             ps_pledge: AtomicU64::new(0),
             ps_execpledge: Cell::new(0),

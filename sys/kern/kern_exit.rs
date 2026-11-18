@@ -68,7 +68,8 @@
 //!
 //! ## Deviations
 //! - What `exit1` tears down that does not exist yet is reported, each once:
-//!   `stopprofclock`/`prof_write` (`cancel_all_itimers` is real since `kern_time.c`,
+//!   (`stopprofclock` and `prof_write` are real since `subr_prof.c`, TD1,
+//!   `cancel_all_itimers` since `kern_time.c`,
 //!   `unveil_destroy` since `kern_unveil.c`, `kqpoll_exit` and the reaper's
 //!   `knote_processexit` since `kern_event.c`), `process_untrace` (the `SIGKILL` to a
 //!   traced child is sent); `process_zap` likewise `vrele`. `killjobc` and
@@ -89,6 +90,7 @@ use core::sync::atomic::Ordering;
 
 use crate::kassert;
 use crate::kern::init_main::{INITPROCESS, PROCESS0};
+use crate::kern::kern_clock::stopprofclock;
 use crate::kern::kern_descrip::fdfree;
 use crate::kern::kern_event::{knote_processexit, kqpoll_exit};
 use crate::kern::kern_fork::{NPROCESSES, NTHREADS, freepid};
@@ -108,6 +110,7 @@ use crate::kern::kern_timeout::timeout_del;
 use crate::kern::sched_bsd::sched_assert_unlocked;
 use crate::kern::subr_pool::{pool_get, pool_put};
 use crate::kern::subr_prf::panic;
+use crate::kern::subr_prof::prof_write;
 #[cfg(feature = "qemu")]
 use crate::kprintf;
 use crate::machine::Machine;
@@ -142,7 +145,6 @@ use crate::sys::wait::{
     _WCONTINUED, Idtype, P_ALL, P_PGID, P_PID, WAIT_ANY, WAIT_MYPGRP, WCONTINUED, WEXITED, WNOHANG,
     WNOWAIT, WSTOPPED, WTRAPPED, WUNTRACED, w_exitcode, w_stopcode, wcoredump, wstatus,
 };
-use crate::unported;
 use crate::uvm::uvm_glue::{uvm_exit, uvm_purge, uvm_uarea_free};
 
 /// `sys_exit`: death of process.
@@ -295,9 +297,9 @@ pub fn exit1(p: &Proc, xexit: i32, xsig: i32, flags: i32) -> ! {
 
     if p.p_flag.load(Ordering::Relaxed) & P_THREAD == 0 {
         if pr.ps_flags.load(Ordering::Relaxed) & PS_PROFIL != 0 {
-            let _ = unported!("exit1: stopprofclock (M7)");
+            stopprofclock(pr);
         }
-        // prof_write(p): subr_prof.c (M7).
+        prof_write(p);
 
         sigio_freelist(&pr.ps_sigiolst);
 
