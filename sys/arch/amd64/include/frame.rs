@@ -88,11 +88,10 @@
 //!
 //! Upstream: sys/arch/amd64/include/frame.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M2 ports `struct callframe`, M4 `struct trapframe`, `struct intrframe`
-//! and `struct iretq_frame`; `struct switchframe` arrives with `cpu_switchto` (M5). M2's note: `struct callframe`, what the frame-pointer chain is made
-//! of (`push rbp; mov rbp, rsp` leaves the caller's frame and the return address at `rbp`).
-//! `struct trapframe`, `struct intrframe` and `struct switchframe` arrive with the trap and
-//! context-switch code (M4, M5).
+//! Status: `ported`, the whole header: `struct trapframe`, `struct intrframe`, `struct
+//! iretq_frame`, `struct switchframe` (what `cpu_switchto` saves) and `struct callframe`,
+//! what the frame-pointer chain is made of (`push rbp; mov rbp, rsp` leaves the caller's
+//! frame and the return address at `rbp`). The layouts are checked at compile time.
 
 /// `struct callframe`: one link of the frame-pointer chain.
 #[repr(C)]

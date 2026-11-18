@@ -172,9 +172,8 @@
 //! \[r\] the route's `rt_mtx`, \[L\] the ARP/ND lock for updates, net lock for reads, \[T\]
 //! `rttimer_mtx`, \[a\] atomic operations.
 //!
-//! Status: `route.h` `wip` (`struct route`'s IPv6 members, see below), `route.c` `ported`
-//! (M7b). The licence block carries the NRL notice with its advertising clause, accepted as
-//! BSD-4 (`.claude/rules/scope-and-stubs.md`).
+//! Status: `route.h` and `route.c` `ported`. The licence block carries the NRL notice with
+//! its advertising clause, accepted as BSD-4 (`.claude/rules/scope-and-stubs.md`).
 //!
 //! ## Deviations
 //! - `struct rtentry` is shared through `&'static Rtentry`, as `struct rtentry *` is: a route
@@ -273,6 +272,12 @@ use crate::sys::types::{Pid, SaFamily};
 /// Units for rtt, rttvar, as units per sec: `rmx_rtt` and `rmx_rttvar` are stored as
 /// microseconds.
 pub const RTM_RTTUNIT: u32 = 1_000_000;
+
+/// `RTTTOPRHZ(r)`: converts an rtt to a value suitable for use by a protocol slowtimo
+/// counter.
+pub const fn rtttoprhz(r: u32) -> u32 {
+    r / (RTM_RTTUNIT / crate::sys::protosw::PR_SLOWHZ as u32)
+}
 
 // Bitmask values for rtm_flags.
 

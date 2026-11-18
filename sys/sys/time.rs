@@ -52,12 +52,14 @@
 //!
 //! Upstream: sys/sys/time.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M5 ports the three time structures, `timezone`, `itimerval`,
+//! Status: `ported`, the whole header: the three time structures, `timezone`, `itimerval`,
 //! `clockinfo`, the `timer*`/`timespec*`/`bintime*` operations, the conversions between the
 //! representations and the `*_TO_NSEC` helpers. `struct clock_ymdhms` is here; its conversions
 //! are `kern/clock_subr.c`'s (`kern/clock_subr.rs`); the prototypes of the time functions
 //! (`bintime()`, `nanouptime()`, ...) are in `kern/kern_tc.rs`, `clock_gettime` and
-//! `itimer_update` in `kern/kern_time.rs`, `ratecheck`/`ppsratecheck` with it.
+//! `itimer_update` in `kern/kern_time.rs`, `ratecheck`/`ppsratecheck` with it. The functions
+//! declared outside the kernel (`adjtime`, `adjfreq`, `futimes`, `getitimer`,
+//! `gettimeofday`, `setitimer`, `settimeofday`, `utimes`) are libc's.
 //!
 //! ## Deviations
 //! - `timercmp(a, b, <)`, `timespeccmp` and `bintimecmp` are the derived `Ord`: the fields are

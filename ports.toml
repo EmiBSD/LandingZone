@@ -848,10 +848,10 @@ notes = "M8: every NVRAM_* offset and value (MVRAM_EQUIPMENT_NFDS keeps the head
 [[file]]
 c = "sys/arch/amd64/include/frame.h"
 rust = "sys/arch/amd64/include/frame.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "d9b043363ea7fc25368dc3908df3cbc7035033fd"
-notes = "M2: struct callframe; M4: struct trapframe, intrframe, iretq_frame, FRAMESIZE; switchframe is M5; M5-b2: struct switchframe"
+notes = "M2: struct callframe; M4: struct trapframe, intrframe, iretq_frame, FRAMESIZE; switchframe is M5; M5-b2: struct switchframe; TD1: the header is whole (trapframe, intrframe, iretq_frame, switchframe, callframe, layouts checked at compile time)"
 
 [[file]]
 c = "sys/arch/amd64/include/vmparam.h"
@@ -1377,11 +1377,11 @@ notes = "vfs stage 2: the whole file: uvm_vnode_pool, uvn_wlist, uvn_sync_q, uvn
 [[file]]
 c = "sys/uvm/uvm_fault.h"
 rust = "sys/uvm/uvm_fault.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "cbeca0a483b6a2268d0cfe545d4a14878438cd0a"
 deps = ["sys/uvm/uvm_map.h"]
-notes = "M7a-1: VM_FAULT_INVALID/PROTECT/WIRE, struct uvm_faultinfo; M7a-3: the prototypes, with uvm_fault.c in the same file"
+notes = "M7a-1: VM_FAULT_INVALID/PROTECT/WIRE, struct uvm_faultinfo; M7a-3: the prototypes, with uvm_fault.c in the same file; TD1: the header is whole (uvm_fault.c, in the same file, is what stays wip: the swap paths)"
 
 [[file]]
 c = "sys/uvm/uvm_fault.c"
@@ -1984,11 +1984,11 @@ notes = "M4: the registers, ampintc_match/attach (from fdt_attach_args autoconf.
 [[file]]
 c = "sys/sys/time.h"
 rust = "sys/sys/time.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "9c3769e5cd8beeffaa4ce2d170b9d966c3a9e63e"
 deps = ["sys/sys/types.h"]
-notes = "M5: timeval/timespec/bintime/timezone/itimerval/clockinfo, the timer*/timespec*/bintime* operations (cmp is the derived Ord), every conversion and *_TO_NSEC helper, FROMBCD/TOBCD, SECDAY/SECYR; M8: struct clock_ymdhms (ClockYmdhms); its conversions are kern/clock_subr.c; the function prototypes live with kern_tc.c/kern_time.c; kern_sig.c: struct timespec is AbiPod (copyin_obj); M8: struct timeval (TIOCGTSTAMP), struct timezone and struct itimerval are #[repr(C)] AbiPod (copied in and out by tty.c and kern_time.c)"
+notes = "M5: timeval/timespec/bintime/timezone/itimerval/clockinfo, the timer*/timespec*/bintime* operations (cmp is the derived Ord), every conversion and *_TO_NSEC helper, FROMBCD/TOBCD, SECDAY/SECYR; M8: struct clock_ymdhms (ClockYmdhms); its conversions are kern/clock_subr.c; the function prototypes live with kern_tc.c/kern_time.c; kern_sig.c: struct timespec is AbiPod (copyin_obj); M8: struct timeval (TIOCGTSTAMP), struct timezone and struct itimerval are #[repr(C)] AbiPod (copied in and out by tty.c and kern_time.c); TD1: read whole beside the port: nothing is missing (timerclear/timerisset/timercmp and their timespec and bintime kin are methods and the derived Ord; adjtime, adjfreq, futimes, getitimer, gettimeofday, setitimer, settimeofday and utimes are declared outside the kernel only)"
 
 [[file]]
 c = "sys/sys/_time.h"
@@ -3192,11 +3192,11 @@ notes = "M7b: struct arphdr, ARPHRD_*, ARPOP_* (host-order u16; the fields are n
 [[file]]
 c = "sys/net/route.h"
 rust = "sys/net/route.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "4cbfbe94f6db996aeab9c7c90aca5ed884851fb0"
 deps = ["sys/sys/socket.h"]
-notes = "M7b: every constant (RTF_* u32, RTM_* u8, RTA_* i32, RTAX_* usize, RTP_* u8, RTV_* u32), rt_kmetrics (Cells, rmx_mtu atomic, assign for the structure copy), rt_metrics, rtstat, rt_tableinfo, rt_msghdr, sockaddr_rtlabel/rtdns/rtstatic/rtsearch, enum rtstat_counters, ROUTE_FILTER, srtdnstosa; struct rtentry (&'static pool item, Cells and atomics, all-zero valid; rt_use/rt_expire/rt_locks/rt_mtu methods, ifa() panics without an address), rt_addrinfo (rti_flags u32), struct route (Cells; ro_dstsin6/ro_srcin6 are byte arrays until netinet6/in6.h, so wip), rttimer_queue, rttimer (private to route.c in C, here with its queue), rt_label, rtstat_inc (one atomic array: percpu.h not ported); MPLS/BFD/INET6 parts not configured; M9+: ro_dstsin6/ro_srcin6 are SockaddrIn6/In6Addr"
+notes = "M7b: every constant (RTF_* u32, RTM_* u8, RTA_* i32, RTAX_* usize, RTP_* u8, RTV_* u32), rt_kmetrics (Cells, rmx_mtu atomic, assign for the structure copy), rt_metrics, rtstat, rt_tableinfo, rt_msghdr, sockaddr_rtlabel/rtdns/rtstatic/rtsearch, enum rtstat_counters, ROUTE_FILTER, srtdnstosa; struct rtentry (&'static pool item, Cells and atomics, all-zero valid; rt_use/rt_expire/rt_locks/rt_mtu methods, ifa() panics without an address), rt_addrinfo (rti_flags u32), struct route (Cells; ro_dstsin6/ro_srcin6 are byte arrays until netinet6/in6.h, so wip), rttimer_queue, rttimer (private to route.c in C, here with its queue), rt_label, rtstat_inc (one atomic array: percpu.h not ported); MPLS/BFD/INET6 parts not configured; M9+: ro_dstsin6/ro_srcin6 are SockaddrIn6/In6Addr; TD1: RTTTOPRHZ is rtttoprhz; with struct route's IPv6 members (M9+) the header is whole, MPLS and BFD not configured"
 
 [[file]]
 c = "sys/net/netisr.h"
