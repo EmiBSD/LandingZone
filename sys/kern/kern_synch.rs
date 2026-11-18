@@ -65,8 +65,10 @@
 //! `MULTIPROCESSOR` kernel lock steps of `tsleep_nsec` and `msleep_nsec`. TD1: the
 //! `__thrsleep(2)`/`__thrwakeup(2)` system calls (`thrsleep_unlock`, `struct tslpentry`, the
 //! shared bucket and the 64 hashed ones, `tslp_init`, `thrsleep_bucket`, `thrsleep`,
-//! `tslp_wakeups`), which librthread's mutexes, condition variables and `pthread_join`
-//! sleep in.
+//! `tslp_wakeups`). On amd64 and arm64 libc's mutexes, condition variables and `FILE` locks
+//! sleep in futex(2); what calls `__thrsleep` there is librthread's `_rthread_dl_lock`, the
+//! lock of `dlopen`, `dlclose` and the destructors run at exit, so only dynamically linked
+//! threaded programs reach it (in the tree: cargo and rustc in the self-hosting smokes).
 //!
 //! ## Deviations
 //! - `thrsleep` hands `sys___thrsleep`'s copied-in timeout as an argument instead of

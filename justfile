@@ -2277,8 +2277,10 @@ fuse_steps := disk_login + " " + \
 # with libpthread, checks what the calls return (EINVAL for ident 0 and a bad timespec, ESRCH,
 # a time already passed and a real timeout, the abort word, sleepers woken one at a time and
 # the ident -1 broadcast), then runs 300 rounds of four threads that each create and join a
-# thread while they fight over one FILE lock (libc's flockfile(3) sleeps in __thrsleep when
-# contended), the pattern that killed threaded programs with SIGSYS. Both archs. Part of `smoke`.
+# thread while they fight over one FILE lock. Those direct calls are what covers the two system
+# calls here: the stress does not reach them, since thrtest is static and libc's locks sleep in
+# futex(2) on both archs (only librthread's _rthread_dl_lock, in a dynamic program, calls
+# __thrsleep; the self-hosting smokes' cargo and rustc do). Both archs. Part of `smoke`.
 smoke-thrsleep: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor")
     @{{ramdisks}} || \
         { echo "smoke-thrsleep: no ramdisk image; run just userland first"; exit 1; }
