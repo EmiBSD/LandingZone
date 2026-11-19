@@ -12247,6 +12247,36 @@ rust = "sys/kern/kern_ktrace.rs"
 status = "skipped"
 notes = "left out by the user's decision of 2026-11-19: ../Kernel makes its own traces, and ktrace(2)'s records are of no use to it. option KTRACE is in GENERIC.MP; the system call table takes the C's #else (ktrace, fktrace sys_nosys; utrace records nothing) and the ktr* calls of the other files are absent, each site saying so (docs/ARCHITECTURE.md, Deviations)"
 
+[[file]]
+c = "sys/dev/dt/dt_dev.c"
+status = "skipped"
+notes = "left out by the user's decision of 2026-11-19: no tracing (neither KTRACE nor dt(4)); pseudo-device dt is in GENERIC.MP on both machines, and the TRACEPOINT/TRACEINDEX calls of the other files are absent, each site saying so (docs/ARCHITECTURE.md, Deviations); outside TD"
+
+[[file]]
+c = "sys/dev/dt/dt_prov_kprobe.c"
+status = "skipped"
+notes = "left out by the user's decision of 2026-11-19: no tracing (neither KTRACE nor dt(4)); pseudo-device dt is in GENERIC.MP on both machines, and the TRACEPOINT/TRACEINDEX calls of the other files are absent, each site saying so (docs/ARCHITECTURE.md, Deviations); outside TD"
+
+[[file]]
+c = "sys/dev/dt/dt_prov_profile.c"
+status = "skipped"
+notes = "left out by the user's decision of 2026-11-19: no tracing (neither KTRACE nor dt(4)); pseudo-device dt is in GENERIC.MP on both machines, and the TRACEPOINT/TRACEINDEX calls of the other files are absent, each site saying so (docs/ARCHITECTURE.md, Deviations); outside TD"
+
+[[file]]
+c = "sys/dev/dt/dt_prov_static.c"
+status = "skipped"
+notes = "left out by the user's decision of 2026-11-19: no tracing (neither KTRACE nor dt(4)); pseudo-device dt is in GENERIC.MP on both machines, and the TRACEPOINT/TRACEINDEX calls of the other files are absent, each site saying so (docs/ARCHITECTURE.md, Deviations); outside TD"
+
+[[file]]
+c = "sys/dev/dt/dt_prov_syscall.c"
+status = "skipped"
+notes = "left out by the user's decision of 2026-11-19: no tracing (neither KTRACE nor dt(4)); pseudo-device dt is in GENERIC.MP on both machines, and the TRACEPOINT/TRACEINDEX calls of the other files are absent, each site saying so (docs/ARCHITECTURE.md, Deviations); outside TD"
+
+[[file]]
+c = "sys/dev/dt/dtvar.h"
+status = "skipped"
+notes = "left out by the user's decision of 2026-11-19: no tracing (neither KTRACE nor dt(4)); pseudo-device dt is in GENERIC.MP on both machines, and the TRACEPOINT/TRACEINDEX calls of the other files are absent, each site saying so (docs/ARCHITECTURE.md, Deviations); outside TD"
+
 # ---------------------------------------------------------------------------
 # TD0: the inventory. Every .c of the pinned kernel tree outside the drivers (sys/ less the
 # other architectures' arch/ and less the subdirectories of dev/) that had no row gets one:
