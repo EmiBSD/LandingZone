@@ -31,8 +31,18 @@
 //! stored with `write_volatile`, which the optimizer must keep.
 //!
 //! ## Deviations
-//! - No `__explicit_bzero_hook`; volatile stores give the same guarantee.
+//! - The bytes are stored with `write_volatile`, then `__explicit_bzero_hook` runs as in the
+//!   C. The C's hook is a weak empty function, so that another file could replace it; no file
+//!   of the kernel does, and Rust has no weak symbols on stable, so here it is an ordinary
+//!   function that hands the buffer to `core::hint::black_box`.
 //! - Takes a slice; the length is `buf.len()`.
+
+/// `__explicit_bzero_hook`: called after the buffer is zeroed, so that the stores cannot be
+/// proven dead; it does nothing but hide `buf` from the optimizer.
+#[inline(never)]
+pub fn __explicit_bzero_hook(buf: &mut [u8]) {
+    core::hint::black_box(buf);
+}
 
 /// Overwrites `buf` with zeros. The stores are volatile, so they survive even when the buffer is
 /// never read again (the usual case for a secret about to be freed).
@@ -42,6 +52,7 @@ pub fn explicit_bzero(buf: &mut [u8]) {
         // write; a volatile store through it is sound.
         unsafe { core::ptr::write_volatile(b, 0) };
     }
+    __explicit_bzero_hook(buf);
 }
 /* </CODE> */
 

@@ -229,10 +229,10 @@ notes = "returns bool (true = differ); length mismatch counts as a difference"
 [[file]]
 c = "sys/lib/libkern/explicit_bzero.c"
 rust = "sys/lib/libkern/explicit_bzero.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "346c0bac70ec73d76a97abf0c6dc89d42b5cbde2"
-notes = "write_volatile per byte instead of memset + weak hook; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 1 C function(s) not in its Rust file: __explicit_bzero_hook"
+notes = "write_volatile per byte, then __explicit_bzero_hook (an ordinary fn with black_box: no weak symbols on stable, and no kernel file overrides it); TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 1 C function(s) not in its Rust file: __explicit_bzero_hook; ported since, and ports check accepts the row as ported"
 
 [[file]]
 c = "sys/lib/libkern/libkern.h"
