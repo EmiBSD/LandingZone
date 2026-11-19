@@ -78,7 +78,6 @@
 //!   (vnodes); one type serves both, with relaxed plain loads and stores for the latter.
 
 use core::cell::Cell;
-use core::cmp::Ordering;
 use core::ptr;
 use core::sync::atomic::{self, AtomicI32};
 
@@ -95,7 +94,7 @@ use crate::uvm::uvm_aobj::{AOBJ_PAGER, uao_dropswap};
 use crate::uvm::uvm_extern::Voff;
 use crate::uvm::uvm_page::{
     PG_CLEAN, PG_RELEASED, PG_TABLED, PQ_AOBJ, Pglist, VmPage, uvm_page_unbusy, uvm_pageclean,
-    uvm_pagelookup, uvm_pageunwire, uvm_pagewire, uvm_pglistfree,
+    uvm_pagecmp, uvm_pagelookup, uvm_pageunwire, uvm_pagewire, uvm_pglistfree,
 };
 use crate::uvm::uvm_pager::{PGO_ALLPAGES, PGO_SYNCIO, UvmPagerops};
 use crate::uvm::uvm_vnode::{UVM_VNODEOPS, uvn_of};
@@ -118,11 +117,6 @@ pub const UVM_OBJ_KERN: i32 = -2;
 
 /// `FETCH_PAGECOUNT`: page count to fetch per single step.
 const FETCH_PAGECOUNT: usize = 16;
-
-/// `uvm_pagecmp`: orders an object's pages by offset.
-pub fn uvm_pagecmp(a: &VmPage, b: &VmPage) -> Ordering {
-    a.offset.get().cmp(&b.offset.get())
-}
 
 tree_adapter!(
     /// `uvm_objtree`: the pages of an object, by offset.

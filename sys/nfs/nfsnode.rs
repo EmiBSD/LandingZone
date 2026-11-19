@@ -75,20 +75,21 @@
 //! - `n_sillyrename` is a `NonNull` to the `malloc(9)`ed record `nfs_inactive` frees; the
 //!   record holds the credential and directory as `&'static` (held with `crdup`/`vref`).
 //! - `n_rcred`/`n_wcred` are `Cell<*const Ucred>`, the long-lived credential idiom.
-//! - `nfsnode_cmp`, the `RBT_GENERATE` comparator of `nfs_node.c`, is here because the tree
-//!   adapter that `struct nfsmount`'s `nm_ntree` names needs it.
+//! - The `RBT_GENERATE(nfs_nodetree, ...)` adapter `NfsNodetree` is here because `struct
+//!   nfsmount`'s `nm_ntree` names it; its comparator `nfsnode_cmp` is in `nfs_node.rs`, the
+//!   module of its C file.
 //! - `VTONFS` checks the vnode's tag and panics on a vnode that is not NFS's (the C casts).
 //! - `nfs_bufq`, `nfs_bufqlen` and `nfs_bufqmax` are declared here and defined in C in
 //!   `nfs_bio.c`.
 
 use core::cell::Cell;
-use core::cmp::Ordering;
 use core::ops::Deref;
 use core::ptr::NonNull;
 use core::sync::atomic::AtomicU32;
 
 use crate::kern::subr_prf::panic;
 use crate::kern::vfs_lockf::LockfStateSlot;
+use crate::nfs::nfs_node::nfsnode_cmp;
 use crate::nfs::nfsproto::{NFS_MAXFHSIZE, Nfsfh, Nfsuint64};
 use crate::sys::buf::BFreelist;
 use crate::sys::queue::TailqHead;
@@ -305,15 +306,6 @@ impl Default for NfsNode {
     }
 }
 
-/// `nfsnode_cmp`: filehandle to node lookup order: the shorter handle first, then the bytes
-/// (`memcmp`).
-pub fn nfsnode_cmp(a: &NfsNode, b: &NfsNode) -> Ordering {
-    a.n_fhsize
-        .get()
-        .cmp(&b.n_fhsize.get())
-        .then_with(|| (*a.n_fhp()).cmp(&*b.n_fhp()))
-}
-
 tree_adapter!(
     /// `RBT_HEAD(nfs_nodetree, nfsnode)`: a mount's nodes by file handle, through `n_entry`.
     pub NfsNodetree: NfsNode, n_entry => RbtEntry, nfsnode_cmp
@@ -363,6 +355,8 @@ pub fn NFSTOV(np: &NfsNode) -> &'static Vnode {
 /* <TESTS> */
 #[cfg(test)]
 mod tests {
+    use core::cmp::Ordering;
+
     use super::*;
 
     #[test]

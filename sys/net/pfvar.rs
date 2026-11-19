@@ -103,6 +103,7 @@ use crate::kassert;
 use crate::machine::copy::{AbiPod, copyin, copyout};
 use crate::net::if_::IFNAMSIZ;
 use crate::net::if_var::{IfgGroup, Ifnet};
+use crate::net::pf_ruleset::pf_anchor_compare;
 use crate::net::radix::{RadixNode, RadixNodeHead};
 use crate::net::route::RTLABEL_LEN;
 use crate::netinet::in_::{InAddr, SockaddrIn};
@@ -2105,11 +2106,6 @@ impl Default for PfAnchor {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// `pf_anchor_compare`: anchors are ordered by path.
-pub fn pf_anchor_compare(a: &PfAnchor, b: &PfAnchor) -> core::cmp::Ordering {
-    pf_cstr(&a.path).cmp(pf_cstr(&b.path))
 }
 
 crate::tree_adapter!(

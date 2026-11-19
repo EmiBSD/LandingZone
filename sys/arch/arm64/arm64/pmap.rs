@@ -2239,6 +2239,9 @@ pub fn pmap_init_percpu() {
     pool_cache_init(&PMAP_VP_POOL);
 }
 
+/// `pmap_update`: nothing, as the C.
+pub fn pmap_update(_pm: &Pmap) {}
+
 /// `pmap_is_referenced`.
 pub fn pmap_is_referenced(pg: &VmPage) -> bool {
     pg.flags() & PG_PMAP_REF != 0

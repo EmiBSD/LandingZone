@@ -71,9 +71,9 @@
 //! - Only the `_KERNEL` half of the file is here. The `!_KERNEL` half (`rs_malloc` as `calloc`,
 //!   `rs_pool_get_anchor` as `calloc`, no `refcnt(9)`) is the build `pfctl(8)` makes of the
 //!   same C file; userland compiles it from the C source.
-//! - `pf_anchor_compare` and the `RB_GENERATE` of `pf_anchor_global` and `pf_anchor_node` are in
-//!   `net/pfvar.rs` (the comparator and the tree adapters `PfAnchorGlobal`, `PfAnchorNode`),
-//!   beside the trees' types.
+//! - The `RB_GENERATE` of `pf_anchor_global` and `pf_anchor_node` are the tree adapters
+//!   `PfAnchorGlobal` and `PfAnchorNode` in `net/pfvar.rs`, beside the trees' types; their
+//!   comparator `pf_anchor_compare` is here, in its C file's module.
 //! - `pf_main_ruleset` (`#define pf_main_ruleset pf_main_anchor.ruleset`) is the function
 //!   [`pf_main_ruleset`].
 //! - `rs_malloc`/`rs_free` hand out an [`RsBuf`], whose `Drop` is `rs_free`; the C's explicit
@@ -146,6 +146,12 @@ pub static PF_ANCHORS: PfGlobal<RbHead<PfAnchorGlobal>> = PfGlobal(RbHead::new()
 
 /// `pf_main_anchor`: the anchor of the main ruleset; in no tree, never freed.
 pub static PF_MAIN_ANCHOR: PfAnchor = PfAnchor::new();
+
+/// `pf_anchor_compare`: anchors are ordered by path (the comparator of the
+/// `pf_anchor_global` and `pf_anchor_node` trees).
+pub fn pf_anchor_compare(a: &PfAnchor, b: &PfAnchor) -> core::cmp::Ordering {
+    pf_cstr(&a.path).cmp(pf_cstr(&b.path))
+}
 
 /// `pf_main_ruleset`: `pf_main_anchor.ruleset`.
 pub fn pf_main_ruleset() -> &'static PfRuleset {

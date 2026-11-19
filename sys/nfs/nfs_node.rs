@@ -59,9 +59,9 @@
 //! Upstream: sys/nfs/nfs_node.c @ 3ce1f3f79392
 //!
 //! ## Deviations
-//! - `nfsnode_cmp` and the `RBT_GENERATE(nfs_nodetree, ...)` adapter (`NfsNodetree`) live in
-//!   `nfsnode.rs`, beside `struct nfsnode`, because `struct nfsmount`'s tree head names the
-//!   adapter; `nfs_node_pool` (`NFS_NODE_POOL`) is declared in `nfs.rs` and initialised by
+//! - The `RBT_GENERATE(nfs_nodetree, ...)` adapter (`NfsNodetree`) lives in `nfsnode.rs`,
+//!   beside `struct nfsnode`, because `struct nfsmount`'s tree head names it; its comparator
+//!   `nfsnode_cmp` is here. `nfs_node_pool` (`NFS_NODE_POOL`) is declared in `nfs.rs` and initialised by
 //!   `nfs_vfs_init` (`nfs_subs.rs`), as in C.
 //! - `nfs_nget(mnt, fh, fhsize, &np)` is `nfs_nget(mnt, fh) -> Result<&NfsNode, Errno>`:
 //!   the handle is the slice of its `fhsize` bytes, and the node is the return value where
@@ -133,6 +133,15 @@ pub(crate) fn nfs_crfree(cred: *const Ucred) {
     if let Some(cr) = nfs_realcred(cred) {
         crfree(cr);
     }
+}
+
+/// `nfsnode_cmp`: filehandle to node lookup order: the shorter handle first, then the bytes
+/// (`memcmp`).
+pub fn nfsnode_cmp(a: &NfsNode, b: &NfsNode) -> core::cmp::Ordering {
+    a.n_fhsize
+        .get()
+        .cmp(&b.n_fhsize.get())
+        .then_with(|| (*a.n_fhp()).cmp(&*b.n_fhp()))
 }
 
 /// `nfs_ninit(nmp)`: empty the mount's node tree.

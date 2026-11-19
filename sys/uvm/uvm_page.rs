@@ -469,6 +469,11 @@ pub fn uvm_unlock_fpageq() {
     mtx_leave(&UVM.fpageqlock);
 }
 
+/// `uvm_pagecmp`: orders an object's pages by offset (the `uvm_objtree` comparator).
+pub fn uvm_pagecmp(a: &VmPage, b: &VmPage) -> core::cmp::Ordering {
+    a.offset.get().cmp(&b.offset.get())
+}
+
 /// `uvm_pageinsert`: insert a page in the object. Caller must lock object; call should have
 /// already set pg's object and offset pointers and bumped the version counter.
 fn uvm_pageinsert(pg: &VmPage) {

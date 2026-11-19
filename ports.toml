@@ -1282,7 +1282,7 @@ status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "8e18a7725e057df16d8935c8408f9a132570cd55"
 deps = ["sys/uvm/uvm_object.h", "sys/kern/kern_rwlock.c", "sys/uvm/uvm_aobj.c", "sys/uvm/uvm_pager.h"]
-notes = "uvm_pagecmp and the uvm_objtree generation; M7a-1: pmap_pager/bufcache_pager, uvm_obj_init/destroy/setlock/wire/unwire/free (KERNEL_ASSERT_LOCKED not configured); M11e: uvm_obj_free's KERNEL_ASSERT_LOCKED is real"
+notes = "the uvm_objtree generation (its comparator uvm_pagecmp is uvm_page.c's, in uvm_page.rs since 2026-11-19); M7a-1: pmap_pager/bufcache_pager, uvm_obj_init/destroy/setlock/wire/unwire/free (KERNEL_ASSERT_LOCKED not configured); M11e: uvm_obj_free's KERNEL_ASSERT_LOCKED is real"
 
 [[file]]
 c = "sys/uvm/uvm_anon.h"
@@ -6008,11 +6008,11 @@ notes = "M9d: INET6: FILLIN_SIN6 and the ip6 radix head in every lookup, route, 
 [[file]]
 c = "sys/net/pf_ruleset.c"
 rust = "sys/net/pf_ruleset.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "e30fff24059c84d4127e3da1cf353709a6638adc"
 deps = ["sys/net/pfvar.h"]
-notes = "M9d: kernel half only (pfctl compiles the !_KERNEL half from C); pf_anchor_compare/RB_GENERATE in pfvar.rs; pf_main_ruleset is fn pf_main_ruleset(); rs_malloc/rs_free are RsBuf; pf_find_anchor descends the tree without a malloc'd key; pf_get_leaf_ruleset returns the remainder offset; pf_anchor_setup/copyout return bool (true = C's 0); host tests; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 1 C function(s) not in its Rust file: pf_anchor_compare"
+notes = "M9d: kernel half only (pfctl compiles the !_KERNEL half from C); RB_GENERATE (the adapters) in pfvar.rs, pf_anchor_compare in pf_ruleset.rs (moved from pfvar.rs on 2026-11-19, the user's decision); pf_main_ruleset is fn pf_main_ruleset(); rs_malloc/rs_free are RsBuf; pf_find_anchor descends the tree without a malloc'd key; pf_get_leaf_ruleset returns the remainder offset; pf_anchor_setup/copyout return bool (true = C's 0); host tests; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 1 C function(s) not in its Rust file: pf_anchor_compare; moved into pf_ruleset.rs on 2026-11-19, and ports check accepts the row as ported"
 
 [[file]]
 c = "sys/net/pf_if.c"
@@ -7433,7 +7433,7 @@ status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "7977f3e712269a896b9dfff8ba5d96ae9d8927d7"
 deps = ["sys/nfs/nfs.h", "sys/nfs/nfsproto.h", "sys/sys/vnode.h", "sys/sys/rwlock.h", "sys/sys/tree.h", "sys/kern/vfs_lockf.c", "sys/sys/buf.h"]
-notes = "M10e: struct sillyrename (Sillyrename, s_cred/s_dvp &'static); struct nfsnode (NfsNode of Cells, pool item handed as &'static; n_vattr Cell<Vattr>; unions n_un1/n_un2 side by side as n_atim/n_cookieverf and n_mtim/n_direofoffset; n_sillyrename NonNull; n_rcred/n_wcred Cell<*const Ucred>; n_fhp dropped since the C always points it at n_fh: n_fhp() returns NfsFhBytes, set_fh() stores); n_flag helpers isset/set/clr; nfsnode_cmp (nfs_node.c's RBT comparator) and the NfsNodetree adapter here because nfsmount.h's tree head needs them; NFS_INVALIDATE_ATTRCACHE as nfs_invalidate_attrcache; VTONFS (checks VT_NFS) and NFSTOV; nfs_bufq/nfs_bufqlen/nfs_bufqmax of nfs_bio.c declared here; host test"
+notes = "M10e: struct sillyrename (Sillyrename, s_cred/s_dvp &'static); struct nfsnode (NfsNode of Cells, pool item handed as &'static; n_vattr Cell<Vattr>; unions n_un1/n_un2 side by side as n_atim/n_cookieverf and n_mtim/n_direofoffset; n_sillyrename NonNull; n_rcred/n_wcred Cell<*const Ucred>; n_fhp dropped since the C always points it at n_fh: n_fhp() returns NfsFhBytes, set_fh() stores); n_flag helpers isset/set/clr; the NfsNodetree adapter here because nfsmount.h's tree head needs it (its comparator nfsnode_cmp is nfs_node.c's, in nfs_node.rs since 2026-11-19); NFS_INVALIDATE_ATTRCACHE as nfs_invalidate_attrcache; VTONFS (checks VT_NFS) and NFSTOV; nfs_bufq/nfs_bufqlen/nfs_bufqmax of nfs_bio.c declared here; host test"
 
 [[file]]
 c = "sys/nfs/nfsmount.h"
@@ -7546,11 +7546,11 @@ notes = "M10e (nfsclient): every function ported (nfs_bioread with read-ahead, n
 [[file]]
 c = "sys/nfs/nfs_node.c"
 rust = "sys/nfs/nfs_node.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "0b3423a93adbea88dc74f4b4bd0ce7e512e2922b"
 deps = ["sys/nfs/nfs.h", "sys/nfs/nfsnode.h", "sys/nfs/nfsmount.h", "sys/nfs/nfs_var.h", "sys/nfs/nfs_subs.c", "sys/kern/vfs_subr.c", "sys/kern/vfs_cache.c", "sys/kern/vfs_vnops.c", "sys/kern/vfs_vops.c", "sys/kern/kern_rwlock.c", "sys/kern/kern_malloc.c", "sys/kern/kern_prot.c", "sys/kern/subr_pool.c"]
-notes = "M10e (nfsclient): nfs_ninit, nfs_nget(mnt, fh: &[u8]) -> Result<&NfsNode, Errno> (node returned where the C fills *npp; the lookup key is a stack node holding a copy of the handle), nfs_inactive, nfs_reclaim; nfsnode_cmp and the RBT adapter NfsNodetree live in nfsnode.rs (the nfsmount tree head names them), nfs_node_pool is nfs.rs's NFS_NODE_POOL; crate helpers vfstonfs_vp, nfs_crhold, nfs_crfree (NULL/NOCRED/FSCRED skipped); VFSLCKDEBUG not configured; DIAGNOSTIC checks behind feature diagnostic; nfs_removeit and the vops tables come from nfs_vnops.rs; host test of the node tree; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 1 C function(s) not in its Rust file: nfsnode_cmp"
+notes = "M10e (nfsclient): nfs_ninit, nfs_nget(mnt, fh: &[u8]) -> Result<&NfsNode, Errno> (node returned where the C fills *npp; the lookup key is a stack node holding a copy of the handle), nfs_inactive, nfs_reclaim; the RBT adapter NfsNodetree lives in nfsnode.rs (the nfsmount tree head names it), nfsnode_cmp here (moved from nfsnode.rs on 2026-11-19, the user's decision), nfs_node_pool is nfs.rs's NFS_NODE_POOL; crate helpers vfstonfs_vp, nfs_crhold, nfs_crfree (NULL/NOCRED/FSCRED skipped); VFSLCKDEBUG not configured; DIAGNOSTIC checks behind feature diagnostic; nfs_removeit and the vops tables come from nfs_vnops.rs; host test of the node tree; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 1 C function(s) not in its Rust file: nfsnode_cmp; moved into nfs_node.rs on 2026-11-19, and ports check accepts the row as ported"
 
 [[file]]
 c = "sys/nfs/nfs_kq.c"

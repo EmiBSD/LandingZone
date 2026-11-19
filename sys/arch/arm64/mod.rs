@@ -495,7 +495,6 @@ impl Pmap for Machine {
         arm64::pmap::pmap_proc_iflush(pr, va, len)
     }
 
-    /// `pmap_update`: nothing, as the C.
     fn pmap_activate(p: &Proc) {
         arm64::pmap::pmap_activate(p)
     }
@@ -520,7 +519,9 @@ impl Pmap for Machine {
         false
     }
 
-    fn pmap_update(_pmap: &Self::Pmap) {}
+    fn pmap_update(pmap: &Self::Pmap) {
+        arm64::pmap::pmap_update(pmap);
+    }
 
     fn pmap_growkernel(maxkvaddr: Vaddr) -> Vaddr {
         arm64::pmap::pmap_growkernel(maxkvaddr)
