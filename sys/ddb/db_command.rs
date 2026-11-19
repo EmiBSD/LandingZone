@@ -98,11 +98,11 @@
 //!   report the gap once (`unported!`) and flush the line: the `db_examine.c` ones (`print`,
 //!   `examine`, `search`), breakpoints and watchpoints (`db_break.c`, `db_watch.c`),
 //!   `pprint` and `show struct` (`db_ctf.c`), `hangman` (`db_hangman.c`), `kill`, `stop`,
-//!   `ps`/`show all procs` and `proc_printit` (`kern_proc.c`), `callout` (`kern_timeout.c`),
-//!   the `vfs_subr.c` printers (`show buf`, `vnode`, `mount`,
+//!   `ps`/`show all procs` and `proc_printit` (`kern_proc.c`), the `vfs_subr.c` printers
+//!   (`show buf`, `vnode`, `mount`,
 //!   `all mounts`, `all vnodes`, `all bufs`), the `uvm` ones (`map`, `object`, `page`,
 //!   `swap`), `extents`, `bcstats`. `show mbuf`, `socket`, `route`, `all routes`, `tdb`,
-//!   `all tdbs`, `uvmexp`, `malloc`, `pool`, `all pools`, `all clockintr`, `nfsreq`,
+//!   `all tdbs`, `uvmexp`, `malloc`, `pool`, `all pools`, `all clockintr`, `callout`, `nfsreq`,
 //!   `nfsnode`, `all nfsreqs` and `all nfsnodes` call the ported printers. `WITNESS` is not configured: its commands are
 //!   left out, as the C's `#ifdef` does.
 //! - `db_access.c`, `db_sym.c` and `db_examine.c` are not ported: [`db_get_value`],
@@ -136,6 +136,7 @@ use crate::kern::init_main::PROC0;
 use crate::kern::kern_clockintr::db_show_all_clockintr;
 use crate::kern::kern_malloc::malloc_printit;
 use crate::kern::kern_proc::tfind;
+use crate::kern::kern_timeout::db_show_callout;
 use crate::kern::kern_xxx::reboot;
 use crate::kern::subr_log::msgbufp;
 use crate::kern::subr_pool::{PoolWalkPr, db_show_all_pools, pool_printit, pool_walk};
@@ -666,11 +667,6 @@ fn db_bcstats_print_cmd(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8
 /// `db_show_all_procs` (`kern_proc.c`): `ps[/anowt]`, `show all procs`.
 pub fn db_show_all_procs(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
     db_stub!("db_show_all_procs (kern_proc.c)")
-}
-
-/// `db_show_callout` (`kern_timeout.c`): `callout`, `show all callout`.
-fn db_show_callout(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
-    db_stub!("db_show_callout (kern_timeout.c)")
 }
 
 /// `db_listbreak_cmd` (`db_break.c`): `show breaks`.

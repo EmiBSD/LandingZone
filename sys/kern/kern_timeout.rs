@@ -49,15 +49,16 @@
 //!
 //! Upstream: sys/kern/kern_timeout.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M5 ports the circular queue, `timeout_startup`,
+//! Status: `ported`. Milestone M5 ports the circular queue, `timeout_startup`,
 //! `timeout_proc_init` (as far as the soft interrupt), `timeout_set[_flags|_proc]`,
 //! `timeout_add[_sec|_msec|_usec|_nsec]`, `timeout_abs_ts`, `timeout_del`,
 //! `timeout_del_barrier`, `timeout_barrier` (reported), `timeout_bucket`,
 //! `timeout_maskwheel`, `timeout_hardclock_update`, `timeout_run`,
 //! `softclock_process_{kclock,tick}_timeout`, `softclock` and `timeout_adjust_ticks`; part
 //! b2 adds the process-context side (`softclock_create_thread`, `softclock_thread[_run]`)
-//! and the real `timeout_barrier`; `timeout_sysctl` came with `kern_sysctl.c`; the `ddb`
-//! `show callout` printers come with the real ddb (M7).
+//! and the real `timeout_barrier`; `timeout_sysctl` came with `kern_sysctl.c`; TD1 ddb's
+//! `callout` printers (`db_show_callout`, `db_show_callout_bucket`, `db_show_timeout`,
+//! `db_timespec`, `db_kclock`), and the file is whole.
 //!
 //! `MULTIPROCESSOR` (M11e): as in the C, a `TIMEOUT_PROC | TIMEOUT_MPSAFE` timeout goes to
 //! `timeout_proc_mp` and runs in the `softclockmp` thread (`softclock_thread_mp`), which drops
@@ -70,6 +71,9 @@
 //! - `WITNESS` and `kcov` are not configured: `timeout_sync_*` are no-ops and `to_process`
 //!   is only recorded.
 //! - `timeout_level_width` is a `const` (the C fills it once at startup).
+//! - `db_show_timeout` prints the function through `db_printsym` where the C looks its name
+//!   up with `db_find_sym_and_offset` and prints `?` for none: `db_sym.c` is not ported.
+//!   `db_timespec` formats into a buffer of its caller, not a static one.
 
 use core::ffi::c_void;
 use core::ptr::{self, NonNull};
@@ -78,6 +82,7 @@ use core::sync::atomic::{AtomicPtr, Ordering};
 use libkern::StaticCell;
 
 use crate::conf::param::{HZ, TICK, TICK_NSEC};
+use crate::ddb::db_command::{DbResult, db_printsym};
 use crate::kassert;
 use crate::kern::kern_clock::ticks;
 use crate::kern::kern_kthread::{kthread_create, kthread_create_deferred};
@@ -89,9 +94,10 @@ use crate::kern::kern_synch::{
 };
 use crate::kern::kern_sysctl::sysctl_rdstruct;
 use crate::kern::kern_tc::nanouptime;
-use crate::kern::subr_prf::panic;
+use crate::kern::subr_prf::{db_printf, panic, snprintf};
 use crate::machine::Machine;
 use crate::machine::cpu::{Cpu, CpuInfo, cpu_info_foreach, curproc};
+use crate::machine::db_machdep::{DbAddr, DbExpr};
 use crate::machine::intr::{IPL_HIGH, IPL_SOFTCLOCK, splsoftclock, splx};
 use crate::sys::errno::Errno;
 use crate::sys::mutex::{Mutex, mutex_assert_locked};
@@ -1025,6 +1031,163 @@ pub fn timeout_sysctl(
 
 // db_kclock, db_timespec, db_show_callout_bucket, db_show_timeout, db_show_callout: the real
 // ddb (M7).
+/// `db_kclock`: the name of a clock.
+fn db_kclock(kclock: i32) -> &'static str {
+    match kclock {
+        KCLOCK_UPTIME => "uptime",
+        _ => "invalid",
+    }
+}
+
+/// `db_timespec`: `ts` as seconds and nanoseconds, with a sign, in `buf` (the C returns a
+/// static buffer).
+fn db_timespec<'a>(ts: &Timespec, buf: &'a mut [u8; 32]) -> &'a str {
+    let l = if ts.tv_sec >= 0 {
+        snprintf(buf, format_args!("{}.{:09}", ts.tv_sec, ts.tv_nsec))
+    } else {
+        let tmp = timespecsub(&Timespec::new(0, 0), ts);
+        snprintf(buf, format_args!("-{}.{:09}", tmp.tv_sec, tmp.tv_nsec))
+    };
+    core::str::from_utf8(&buf[..l.min(31)]).unwrap_or("?")
+}
+
+/// `db_show_callout_bucket`: every timeout of one queue.
+fn db_show_callout_bucket(bucket: &Circq) {
+    // CIRCQ_FOREACH(p, bucket)
+    let mut p = bucket.next.get();
+    while !p.is_null() && !ptr::eq(p, bucket) {
+        // SAFETY: the elements of the timeout queues are the `to_list` of timeouts, which
+        // stay where they are while the debugger has the machine.
+        let (to, next) = unsafe { (timeout_from_circq(p), (*p).next.get()) };
+        db_show_timeout(to, bucket);
+        p = next;
+    }
+}
+
+/// `db_show_timeout`: one timeout: what is left until it fires, its clock, the queue or
+/// wheel bucket it is in, its argument and its function.
+fn db_show_timeout(to: &Timeout, bucket: &Circq) {
+    let width = size_of::<usize>() * 2;
+    let mut buf = [0u8; 8];
+    let kclock = to.to_kclock.get();
+
+    let invalid = || {
+        db_printf(format_args!(
+            "db_show_timeout: timeout {:p}: invalid to_kclock: {}",
+            to, kclock
+        ));
+    };
+
+    let where_ = if ptr::eq(bucket, &TIMEOUT_NEW) {
+        "new"
+    } else if ptr::eq(bucket, &TIMEOUT_TODO) {
+        "softint"
+    } else if ptr::eq(bucket, &TIMEOUT_PROC_Q) {
+        "thread"
+    } else if db_is_proc_mp(bucket) {
+        "thread-mp"
+    } else {
+        let wheel = match kclock {
+            KCLOCK_UPTIME => &TIMEOUT_WHEEL_KC,
+            KCLOCK_NONE => &TIMEOUT_WHEEL,
+            _ => {
+                invalid();
+                return;
+            }
+        };
+        let index = (ptr::from_ref(bucket) as usize).wrapping_sub(wheel.as_ptr() as usize)
+            / size_of::<Circq>();
+        let l = snprintf(
+            &mut buf,
+            format_args!("{:>3}/{:1}", index % WHEELSIZE, index / WHEELSIZE),
+        );
+        core::str::from_utf8(&buf[..l.min(7)]).unwrap_or("?")
+    };
+    match kclock {
+        KCLOCK_UPTIME => {
+            let kc = &TIMEOUT_KCLOCK[KCLOCK_UPTIME as usize];
+            let remaining = timespecsub(&to.to_abstime.get(), &kc.kc_lastscan.get());
+            let mut tsbuf = [0u8; 32];
+            db_printf(format_args!(
+                "{:>20}  {:>8}  {:>9}  0x{:0width$x}  ",
+                db_timespec(&remaining, &mut tsbuf),
+                db_kclock(kclock),
+                where_,
+                to.to_arg.get() as usize
+            ));
+        }
+        KCLOCK_NONE => {
+            db_printf(format_args!(
+                "{:>20}  {:>8}  {:>9}  0x{:0width$x}  ",
+                to.to_time.get().wrapping_sub(ticks()),
+                "ticks",
+                where_,
+                to.to_arg.get() as usize
+            ));
+        }
+        _ => {
+            invalid();
+            return;
+        }
+    }
+    // db_find_sym_and_offset and the name: ddb's symbol printer (see the module's
+    // deviations).
+    db_printsym(to.to_func.get().map_or(0, |f| f as usize) as DbAddr, db_pr);
+    db_printf(format_args!("\n"));
+}
+
+/// Whether `bucket` is `timeout_proc_mp` (`MULTIPROCESSOR`).
+fn db_is_proc_mp(bucket: &Circq) -> bool {
+    #[cfg(feature = "multiprocessor")]
+    {
+        ptr::eq(bucket, &TIMEOUT_PROC_MP)
+    }
+    #[cfg(not(feature = "multiprocessor"))]
+    {
+        let _ = bucket;
+        false
+    }
+}
+
+/// `db_printf` as the printer `db_printsym` takes.
+fn db_pr(args: core::fmt::Arguments<'_>) {
+    db_printf(args);
+}
+
+/// `db_show_callout` (`DDB`): `callout`, `show all callout`: when each clock was last
+/// scanned, then every timeout: the new ones, those due, those for the threads, and the
+/// wheels.
+pub fn db_show_callout(_addr: DbExpr, _haddr: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
+    let width = size_of::<usize>() * 2 + 2;
+
+    db_printf(format_args!("{:>20}  {:>8}\n", "lastscan", "clock"));
+    db_printf(format_args!("{:>20}  {:>8}\n", ticks(), "ticks"));
+    for (i, kc) in TIMEOUT_KCLOCK.iter().enumerate() {
+        let mut tsbuf = [0u8; 32];
+        db_printf(format_args!(
+            "{:>20}  {:>8}\n",
+            db_timespec(&kc.kc_lastscan.get(), &mut tsbuf),
+            db_kclock(i as i32)
+        ));
+    }
+    db_printf(format_args!("\n"));
+    db_printf(format_args!(
+        "{:>20}  {:>8}  {:>9}  {:>width$}  {}\n",
+        "remaining", "clock", "wheel", "arg", "func"
+    ));
+    db_show_callout_bucket(&TIMEOUT_NEW);
+    db_show_callout_bucket(&TIMEOUT_TODO);
+    db_show_callout_bucket(&TIMEOUT_PROC_Q);
+    #[cfg(feature = "multiprocessor")]
+    db_show_callout_bucket(&TIMEOUT_PROC_MP);
+    for bucket in &TIMEOUT_WHEEL {
+        db_show_callout_bucket(bucket);
+    }
+    for bucket in &TIMEOUT_WHEEL_KC {
+        db_show_callout_bucket(bucket);
+    }
+    Ok(())
+}
 /* </CODE> */
 
 /* <TESTS> */
