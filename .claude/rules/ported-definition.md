@@ -45,3 +45,33 @@ older habit wherever they differ.
   `ports-tracker.md` describes the file.
 - The checks do not see a check or a branch missing inside a function that exists; that is
   measured by reading the C and the Rust whole.
+
+## The user's decisions of 2026-11-19
+
+Given while TD1 was under way; they hold with the order above.
+
+1. **Reference configuration: `GENERIC.MP` of amd64 and of arm64, and nothing else.**
+   ../Kernel does not work with plain `GENERIC`. What `GENERIC.MP` includes counts as
+   configured (`KTRACE`, `dt` on amd64, ...). Code that exists only under
+   `#ifndef MULTIPROCESSOR` does not count.
+2. **`DEBUG` is not configured** (../Kernel will use its own debugging). The cargo feature
+   `debug` is outside the definition of `ported`. A function that exists only under
+   `#ifdef DEBUG` still enters `ports-exceptions.toml` only by the user's approval of its
+   name (`pgrpdump` first).
+3. **dt(4) is in TD's scope.** A `ported` row whose C has `TRACEPOINT`s (or other dt probes)
+   that `GENERIC.MP` compiles and its Rust lacks is not complete: it goes to `wip` with the
+   reason in its notes.
+4. **C slips** found by a sample are logged in `docs/EXTERNAL_BUGS.md` only after each was
+   checked against the C at the pin; one that is not confirmed is not logged, and the user is
+   told.
+5. **A `#if` true on one architecture and false on the other** is not decided by the session:
+   how `completeness.rs` treats it is reported and the rule is the user's.
+6. **`KTRACE` is in `GENERIC.MP`.** A "KTRACE is not configured" line is false and is
+   corrected. Moving the rows that omit `ktr*` calls (to `wip`, or kept as depending on TD3)
+   waits for the user's answer.
+7. **The exceptions are not approved in bulk.** The candidates the tool calls `missing` are
+   split into those a program can reach (system call table, ioctl, sysctl, devices) and
+   internal ones; those it calls `not configured` and `in another file` are presented by name.
+
+After every task: the status in the format of point 6 above. Separate commits; Mac `just ci`
+and the VM's ci at rc 0 before publishing.

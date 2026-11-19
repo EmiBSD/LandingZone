@@ -52,13 +52,16 @@
 //!
 //! Upstream: sys/kern/kern_proc.c @ 3ce1f3f79392
 //!
-//! Status: `wip` (`pgrpdump` is missing). Milestone M5 ports the lists, the hash tables and the pools (`procinit`),
+//! Status: `wip` until the user decides on `pgrpdump`. Milestone M5 ports the lists, the
+//! hash tables and the pools (`procinit`),
 //! `uid_find`/`uid_release`/`chgproccnt`, `inferior`, `tfind`, `tfind_user`, `prfind`,
 //! `pgfind` and `zombiefind`; the tty layer (M8) brings the process group management
 //! (`enternewpgrp`, `enterthispgrp`, `leavepgrp`, `pgdelete`, `zapverauth`, `fixjobc`,
 //! `killjobc`, `orphanpg`); TD1 `proc_printit` and the ddb commands (`db_kill_cmd`,
-//! `db_stop_cmd`, `db_show_all_procs`). `pgrpdump` (`#ifdef DEBUG`, which this kernel can
-//! configure: feature `debug`) is not ported; it waits for the user's decision.
+//! `db_stop_cmd`, `db_show_all_procs`). `pgrpdump` is `#ifdef DEBUG`, which is not
+//! configured (`GENERIC.MP` has no `DEBUG`, and the feature `debug` is outside the definition
+//! of `ported`: the user's decision of 2026-11-19). It is not ported, and it enters
+//! `ports-exceptions.toml` only when the user approves it by name.
 //!
 //! ## Deviations
 //! - `enternewpgrp` takes the raw `pgrp_pool`/`session_pool` items its callers got (the C
