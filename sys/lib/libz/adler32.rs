@@ -65,21 +65,21 @@
 //!
 //! ## Deviations
 //! - `buf` is `Option<&[u8]>`: `None` is the C's `Z_NULL`, which returns the initial value 1
-//!   (`adler32(0, None)`); a slice carries its length, so `adler32` and `adler32_z` are one
-//!   function.
+//!   (`adler32(0, None)`); a slice carries its length, so `adler32` and `adler32_z` take the
+//!   same arguments, and `adler32` calls `adler32_z` as in the C.
 //! - `NO_DIVIDE` (the shift-and-subtract `MOD`) is not defined in the kernel build; `MOD`,
 //!   `MOD28` and `MOD63` are the `%` the C uses then.
-//! - `adler32_combine` and `adler32_combine64` are one function over an `i64` length
-//!   (`z_off_t` and `z_off64_t` are both 64 bits on LP64); `adler32_combine_` is its body.
+//! - `adler32_combine` and `adler32_combine64` take an `i64` length (`z_off_t` and
+//!   `z_off64_t` are both 64 bits on LP64); both call `adler32_combine_`, as in the C.
 
 /// `BASE`: largest prime smaller than 65536.
 const BASE: u32 = 65521;
 /// `NMAX`: the largest n such that `255n(n+1)/2 + (n+1)(BASE-1) <= 2^32-1`.
 const NMAX: usize = 5552;
 
-/// `adler32` (and `adler32_z`): update the running Adler-32 `adler` with `buf` and return it.
+/// `adler32_z`: update the running Adler-32 `adler` with `buf` and return it.
 /// `buf == None` returns the required initial value, 1.
-pub fn adler32(adler: u32, buf: Option<&[u8]>) -> u32 {
+pub fn adler32_z(adler: u32, buf: Option<&[u8]>) -> u32 {
     // split Adler-32 into component sums
     let mut sum2 = (adler >> 16) & 0xffff;
     let mut adler = adler & 0xffff;
@@ -130,10 +130,15 @@ pub fn adler32(adler: u32, buf: Option<&[u8]>) -> u32 {
     adler | (sum2 << 16)
 }
 
-/// `adler32_combine` (and `adler32_combine64`, `adler32_combine_`): the Adler-32 of two
-/// sequences concatenated, from the Adler-32 of each and the length of the second. A negative
-/// `len2` returns `0xffffffff`, an invalid Adler-32, as a clue for debugging.
-pub fn adler32_combine(adler1: u32, adler2: u32, len2: i64) -> u32 {
+/// `adler32`: [`adler32_z`].
+pub fn adler32(adler: u32, buf: Option<&[u8]>) -> u32 {
+    adler32_z(adler, buf)
+}
+
+/// `adler32_combine_`: the Adler-32 of two sequences concatenated, from the Adler-32 of each
+/// and the length of the second. A negative `len2` returns `0xffffffff`, an invalid Adler-32,
+/// as a clue for debugging.
+fn adler32_combine_(adler1: u32, adler2: u32, len2: i64) -> u32 {
     // for negative len, return invalid adler32 as a clue for debugging
     if len2 < 0 {
         return 0xffff_ffff;
@@ -159,6 +164,16 @@ pub fn adler32_combine(adler1: u32, adler2: u32, len2: i64) -> u32 {
         sum2 -= BASE;
     }
     sum1 | (sum2 << 16)
+}
+
+/// `adler32_combine`: [`adler32_combine_`] over a `z_off_t` length.
+pub fn adler32_combine(adler1: u32, adler2: u32, len2: i64) -> u32 {
+    adler32_combine_(adler1, adler2, len2)
+}
+
+/// `adler32_combine64`: [`adler32_combine_`] over a `z_off64_t` length.
+pub fn adler32_combine64(adler1: u32, adler2: u32, len2: i64) -> u32 {
+    adler32_combine_(adler1, adler2, len2)
 }
 /* </CODE> */
 

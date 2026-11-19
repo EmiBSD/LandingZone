@@ -285,10 +285,10 @@ notes = "license: zlib; an altered source version. z_errmsg, zlibVersion, zlibCo
 [[file]]
 c = "sys/lib/libz/adler32.c"
 rust = "sys/lib/libz/adler32.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "6e4cbb32d94c507b782c43f3965a8b3b6fab20e9"
-notes = "license: zlib; an altered source version. adler32 (= adler32_z) over Option<&[u8]>, None is Z_NULL and returns 1; NMAX blocks with one modulo each, the len 1 and len < 16 short paths; NO_DIVIDE is not defined (MOD is %); adler32_combine (= adler32_combine64 and adler32_combine_) over an i64 length; tests against the RFC 1950 definition and Python's zlib vectors; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 3 C function(s) not in its Rust file: adler32_z, adler32_combine_, adler32_combine64"
+notes = "license: zlib; an altered source version. adler32 (= adler32_z) over Option<&[u8]>, None is Z_NULL and returns 1; NMAX blocks with one modulo each, the len 1 and len < 16 short paths; NO_DIVIDE is not defined (MOD is %); adler32_combine (= adler32_combine64 and adler32_combine_) over an i64 length; tests against the RFC 1950 definition and Python's zlib vectors; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 3 C function(s) not in its Rust file: adler32_z, adler32_combine_, adler32_combine64; each now has its own fn with its C name (adler32 calls adler32_z, adler32_combine and adler32_combine64 call adler32_combine_, as in the C), and ports check accepts the row as ported"
 
 [[file]]
 c = "sys/lib/libz/zopenbsd.c"
