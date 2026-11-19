@@ -86,12 +86,13 @@
 //! Upstream: sys/uvm/uvm_pager.h @ 3ce1f3f79392
 //! Upstream: sys/uvm/uvm_pager.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M7a ports `struct uvm_pagerops`, the `PGO_*` flags, the
-//! `VM_PAGER_*` results, `PGO_DONTCARE` and `uvm_pager_init`'s call of the pagers' init
-//! functions; the vnode pager (VFS stage 2) the pager map (`uvm_pseg_*`,
-//! `uvm_pagermapin`/`out`) and the cluster building (`uvm_mk_pcluster`, `uvm_pager_put`,
-//! `uvm_pager_dropcluster`). The async pageout (`uvm_aio_biodone`, `uvm_swap_dropcluster`,
-//! `uvm_aio_aiodone`, `uvm.aio_done`) is the swap pager's (M7) and not here.
+//! Status: the header is whole (`ported`): `struct uvm_pagerops`, the `PGO_*` flags,
+//! `PGO_DONTCARE`, the `UVMPAGER_MAPIN_*` flags, the `VM_PAGER_*` results, `PAGER_MAP_SIZE`
+//! and its seven prototypes, which are functions of this file. `uvm_pager.c` is `wip`: it has
+//! `uvm_pager_init`, the pager map (`uvm_pseg_*`, `uvm_pagermapin`/`out`) and the cluster
+//! building (`uvm_mk_pcluster`, `uvm_pager_put`, `uvm_pager_dropcluster`); its async pageout
+//! (`uvm_aio_biodone`, `uvm_swap_dropcluster`, `uvm_aio_aiodone`, `uvm.aio_done`) is the swap
+//! pager's and not here.
 //!
 //! ## Deviations
 //! - `pgo_get`'s page array is `&mut [*const VmPage]`: the C passes `vm_page_t *` with the
@@ -829,3 +830,40 @@ pub fn uvm_pager_dropcluster(
 // uvm_aio_biodone, uvm_swap_dropcluster, uvm_aio_aiodone: the async (swap) pageout, which
 // needs uvm_swap.c (M7): not here yet.
 /* </CODE> */
+
+/* <TESTS> */
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pgo_dontcare_is_the_all_ones_pointer() {
+        assert!(pgo_dontcare(PGO_DONTCARE));
+        assert!(pgo_dontcare(usize::MAX as *const VmPage));
+        assert!(!pgo_dontcare(core::ptr::null()));
+    }
+
+    #[test]
+    #[ignore = "needs OPENBSD_SRC (just test-ref)"]
+    fn values_match_the_c_header() {
+        use crate::reftest::assert_complete;
+        let defs = crate::reftest::defines("sys/uvm/uvm_pager.h");
+        let pgo = crate::reftest::assert_defines!(defs;
+            PGO_CLEANIT, PGO_SYNCIO, PGO_DEACTIVATE, PGO_FREE, PGO_ALLPAGES, PGO_DOACTCLUST,
+            PGO_LOCKED, PGO_PDFREECLUST, PGO_NOWAIT,
+        );
+        // PGO_DONTCARE is a pointer cast, not a number.
+        assert_complete(&defs, "PGO_", &[&pgo[..], &["PGO_DONTCARE"]].concat());
+        let mapin = crate::reftest::assert_defines!(defs;
+            UVMPAGER_MAPIN_WAITOK, UVMPAGER_MAPIN_READ, UVMPAGER_MAPIN_WRITE,
+        );
+        assert_complete(&defs, "UVMPAGER_", &mapin);
+        let results = crate::reftest::assert_defines!(defs;
+            VM_PAGER_OK, VM_PAGER_BAD, VM_PAGER_FAIL, VM_PAGER_PEND, VM_PAGER_ERROR,
+            VM_PAGER_AGAIN, VM_PAGER_UNLOCK, VM_PAGER_REFAULT,
+        );
+        assert_complete(&defs, "VM_PAGER_", &results);
+        crate::reftest::assert_defines!(defs; PAGER_MAP_SIZE);
+    }
+}
+/* </TESTS> */

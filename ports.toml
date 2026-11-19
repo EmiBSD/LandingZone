@@ -1341,11 +1341,11 @@ notes = "M7a-1: struct uao_swhash_elt, struct uvm_aobj (#[repr(C)], u_obj first;
 [[file]]
 c = "sys/uvm/uvm_pager.h"
 rust = "sys/uvm/uvm_pager.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "90f5246917aa83f47e7f929741427db176600dfe"
 deps = ["sys/uvm/uvm_object.h", "sys/uvm/uvm_fault.h"]
-notes = "M7a-1: struct uvm_pagerops (every op an Option<fn> with the Pgo* aliases), PGO_*, PGO_DONTCARE (a raw-pointer sentinel in &mut [*const VmPage] arrays), UVMPAGER_MAPIN_*, VM_PAGER_*, PAGER_MAP_SIZE; pgo_put's last argument is the PGO_* flags as i32 (the C prototype says boolean_t but uvn_put reads flags); pgo_mk_pcluster returns the cluster's start index; the uvm_pagermapin/out, uvm_mk_pcluster, uvm_pager_put/dropcluster prototypes are uvm_pager.c's functions, the uvm_aio_* ones come with the swap pager (M7)"
+notes = "struct uvm_pagerops (every op an Option<fn> with the Pgo* aliases), PGO_*, PGO_DONTCARE (a raw-pointer sentinel in &mut [*const VmPage] arrays, pgo_dontcare tests for it), UVMPAGER_MAPIN_*, VM_PAGER_*, PAGER_MAP_SIZE; pgo_put's last argument is the PGO_* flags as i32 (the C prototype says boolean_t but uvn_put reads flags); pgo_mk_pcluster returns the cluster's start index; the seven prototypes (uvm_pager_dropcluster, uvm_pager_init, uvm_pager_put, uvm_pagermapin, uvm_pagermapout, uvm_mk_pcluster, uvm_pseg_reserve_available) are uvm_pager.c's functions in the same file; test-ref of every constant with completeness (TD1: read again whole, nothing missing)"
 
 [[file]]
 c = "sys/uvm/uvm_pager.c"
