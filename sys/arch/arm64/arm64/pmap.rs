@@ -111,7 +111,9 @@
 //!   `smoke-thrsleep` lost that race about every other run under QEMU (EXTERNAL_BUGS
 //!   EXT-236). The ASID bitmap
 //!   is 8-bit (`pmap_nasid` 256 and a bitmap that size; the 16-bit probe of
-//!   `id_aa64mmfr0_el1` is not done). `pmap_setpauthkeys` (pointer authentication) is M7.
+//!   `id_aa64mmfr0_el1` is not done).
+//! - `pmap_setpauthkeys` names the key registers by their encodings (`S3_0_C2_C1_0`, ...)
+//!   where the C is compiled with `__attribute__((target("+pauth")))`.
 //! - M11a (`MULTIPROCESSOR`): the ASID allocator is the C's, under `pmap_asid_mtx`
 //!   (`pmap_find_asid` with the old/random/linear search, `pmap_rollover_asid` carrying the
 //!   ASIDs active on every CPU into the new generation); `pm_asid` is an atomic because the
@@ -129,9 +131,16 @@ use core::cell::{Cell, UnsafeCell};
 use core::ptr::{self, NonNull};
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
+use crate::arch::arm64::arm64::cpu::{CPU_ID_AA64ISAR1, CPU_ID_AA64ISAR2};
 use crate::arch::arm64::arm64::cpufunc::{
     cpu_icache_sync_range, cpu_idcache_wbinv_range, cpu_setttb, cpu_tlb_flush,
     cpu_tlb_flush_all_asid, cpu_tlb_flush_asid, cpu_tlb_flush_asid_all,
+};
+use crate::arch::arm64::include::armreg::{
+    ID_AA64ISAR1_APA_MASK, ID_AA64ISAR1_APA_PAC, ID_AA64ISAR1_API_MASK, ID_AA64ISAR1_API_PAC,
+    ID_AA64ISAR1_GPA_IMPL, ID_AA64ISAR1_GPA_MASK, ID_AA64ISAR1_GPI_IMPL, ID_AA64ISAR1_GPI_MASK,
+    ID_AA64ISAR2_APA3_MASK, ID_AA64ISAR2_APA3_PAC, ID_AA64ISAR2_GPA3_IMPL, ID_AA64ISAR2_GPA3_MASK,
+    write_specialreg,
 };
 use crate::arch::arm64::include::cpu::curcpu;
 use crate::arch::arm64::include::param::{PAGE_MASK, PAGE_SHIFT, PAGE_SIZE};
@@ -415,10 +424,50 @@ pub fn pmap_deactivate(p: &Proc) {
     pm.pm_active.fetch_sub(1, Ordering::Relaxed);
 }
 
+/// `pmap_setpauthkeys`: loads the pointer authentication keys of `pm` into the key registers
+/// the CPU has: the four address keys with `FEAT_PAuth`, the generic key with its own
+/// feature.
+pub fn pmap_setpauthkeys(pm: &Pmap) {
+    let isar1 = CPU_ID_AA64ISAR1.load(Ordering::Relaxed);
+    let isar2 = CPU_ID_AA64ISAR2.load(Ordering::Relaxed);
+
+    if isar1 & ID_AA64ISAR1_APA_MASK >= ID_AA64ISAR1_APA_PAC
+        || isar1 & ID_AA64ISAR1_API_MASK >= ID_AA64ISAR1_API_PAC
+        || isar2 & ID_AA64ISAR2_APA3_MASK >= ID_AA64ISAR2_APA3_PAC
+    {
+        let (ia, da) = (pm.pm_apiakey.get(), pm.pm_apdakey.get());
+        let (ib, db) = (pm.pm_apibkey.get(), pm.pm_apdbkey.get());
+        // SAFETY: the CPU has the key registers (the ID registers say so). The kernel is
+        // built without pointer authentication, so the keys only matter to userland. The
+        // registers are named by their encodings (APIAKeyLo_EL1 is S3_0_C2_C1_0, and so on):
+        // the assembler takes those without the `pauth` extension.
+        unsafe {
+            write_specialreg!("s3_0_c2_c1_0", ia[0]); // apiakeylo_el1
+            write_specialreg!("s3_0_c2_c1_1", ia[1]); // apiakeyhi_el1
+            write_specialreg!("s3_0_c2_c2_0", da[0]); // apdakeylo_el1
+            write_specialreg!("s3_0_c2_c2_1", da[1]); // apdakeyhi_el1
+            write_specialreg!("s3_0_c2_c1_2", ib[0]); // apibkeylo_el1
+            write_specialreg!("s3_0_c2_c1_3", ib[1]); // apibkeyhi_el1
+            write_specialreg!("s3_0_c2_c2_2", db[0]); // apdbkeylo_el1
+            write_specialreg!("s3_0_c2_c2_3", db[1]); // apdbkeyhi_el1
+        }
+    }
+
+    if isar1 & ID_AA64ISAR1_GPA_MASK >= ID_AA64ISAR1_GPA_IMPL
+        || isar1 & ID_AA64ISAR1_GPI_MASK >= ID_AA64ISAR1_GPI_IMPL
+        || isar2 & ID_AA64ISAR2_GPA3_MASK >= ID_AA64ISAR2_GPA3_IMPL
+    {
+        let ga = pm.pm_apgakey.get();
+        // SAFETY: as above, for the generic key (APGAKeyLo_EL1 is S3_0_C2_C3_0).
+        unsafe {
+            write_specialreg!("s3_0_c2_c3_0", ga[0]); // apgakeylo_el1
+            write_specialreg!("s3_0_c2_c3_1", ga[1]); // apgakeyhi_el1
+        }
+    }
+}
+
 /// `pmap_setttb`: loads `p`'s address space into `TTBR0_EL1`: called by `cpu_switchto_asm`
 /// for every switch (hence `extern "C"` by its C name) and by `pmap_activate`.
-///
-/// `pmap_setpauthkeys` (pointer authentication) is M7.
 #[unsafe(no_mangle)]
 pub extern "C" fn pmap_setttb(p: *const core::ffi::c_void) {
     let ci = curcpu();
@@ -434,6 +483,10 @@ pub extern "C" fn pmap_setttb(p: *const core::ffi::c_void) {
             != PMAP_ASID_GEN.load(Ordering::Relaxed)
     {
         pmap_allocate_asid(pm);
+    }
+
+    if !ptr::eq(pm, pmap_kernel()) {
+        pmap_setpauthkeys(pm);
     }
 
     // SAFETY: the kernel's empty lower-half table first, so no translation of the old

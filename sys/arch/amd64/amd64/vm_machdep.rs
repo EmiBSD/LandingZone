@@ -62,14 +62,11 @@
 //!
 //! Upstream: sys/arch/amd64/amd64/vm_machdep.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M5 (part b2) ports `cpu_fork` and `cpu_exit`; `tcb_get` and
-//! `tcb_set` (`<machine/tcb.h>`'s `TCB_GET`/`TCB_SET`) come with `kern_prot.c`; M10a adds
-//! physio's `kv_physwait`, `vmapbuf` and `vunmapbuf`.
+//! Status: `ported`: `cpu_fork`, `cpu_exit`, physio's `kv_physwait`, `vmapbuf` and
+//! `vunmapbuf`, and `tcb_get`/`tcb_set` (`<machine/tcb.h>`'s `TCB_GET`/`TCB_SET`).
 //!
 //! ## Deviations
 //! - The TCB is a `usize` (a user address the kernel never dereferences), not a `void *`.
-//! - `cpu_fork` cannot `fpusave` a parent that ran in user mode (`CPUPF_USERXSTATE`) before
-//!   user mode exists (M6): the case is reported.
 //! - The switch frame's `sf_r12` holds the thread function as a pointer, which
 //!   `proc_trampoline_run` (`locore.rs`) turns back into a Rust `fn`: Rust function
 //!   pointers have no C calling convention to `call` from assembly.

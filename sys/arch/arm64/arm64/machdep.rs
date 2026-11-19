@@ -130,7 +130,7 @@ use crate::arch::arm64::arm64::intr::delay;
 use crate::arch::arm64::arm64::locore0::DIRECT_BASE;
 use crate::arch::arm64::arm64::pmap::{
     PMAP_DIRECT_BASE, PMAP_DIRECT_END, PMAP_KERNEL_IMAGE_END, PMAP_KERNEL_IMAGE_PHYS_OFF,
-    PMAP_KERNEL_IMAGE_START, pmap_bootstrap, pmap_growkernel,
+    PMAP_KERNEL_IMAGE_START, pmap_bootstrap, pmap_growkernel, pmap_setpauthkeys,
 };
 #[cfg(feature = "multiprocessor")]
 use crate::arch::arm64::include::armreg::{MPIDR_AFF, read_specialreg};
@@ -170,6 +170,7 @@ use crate::dev::ofw::fdt::{
     fdt_is_compatible, fdt_next_node, fdt_node_property,
 };
 use crate::dev::ofw::openfirm::{OF_finddevice, OF_getprop, OF_getproplen};
+use crate::dev::rnd::arc4random_buf;
 use crate::dev::softraid::{SR_BOOTKEY, SR_BOOTUUID};
 use crate::dev::softraidvar::{SR_CRYPTO_MAXKEYBYTES, SR_UUID_MAX, SrUuid};
 use crate::kern::init_main::{BOOTHOWTO, PROC0};
@@ -1209,8 +1210,19 @@ pub fn setregs(p: &Proc, pack: &ExecPackage<'_>, stack: Vaddr, _arginfo: &PsStri
         ATTR_GP
     });
 
-    // pm_apiakey/apdakey/apibkey/apdbkey/apgakey and pmap_setpauthkeys: pointer
-    // authentication (M7; QEMU's default virt CPU has none).
+    // Fresh pointer authentication keys for the new image.
+    let key = || {
+        let mut k = [0u8; 16];
+        arc4random_buf(&mut k);
+        let k = u128::from_ne_bytes(k);
+        [k as u64, (k >> 64) as u64]
+    };
+    pm.pm_apiakey.set(key());
+    pm.pm_apdakey.set(key());
+    pm.pm_apibkey.set(key());
+    pm.pm_apdbkey.set(key());
+    pm.pm_apgakey.set(key());
+    pmap_setpauthkeys(pm);
 
     // If we were using the FPU, forget about it.
     // SAFETY: the thread's own pcb, with no reference to the FP state alive.

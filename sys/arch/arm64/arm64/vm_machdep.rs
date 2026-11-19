@@ -62,12 +62,10 @@
 //!
 //! Upstream: sys/arch/arm64/arm64/vm_machdep.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M5 (part b2) ports `cpu_fork` and `cpu_exit`; M10a adds physio's
-//! `kv_physwait`, `vmapbuf` and `vunmapbuf`.
+//! Status: `ported`: `cpu_fork` (with the parent's pointer authentication keys), `cpu_exit`,
+//! physio's `kv_physwait`, `vmapbuf` and `vunmapbuf`.
 //!
 //! ## Deviations
-//! - The pointer authentication keys (`pm_ap*key`) the C copies from the parent's pmap wait
-//!   for user pmaps (M6): kernel threads share the kernel pmap.
 //! - The switch frame's `sf_x19` holds the thread function as a pointer, which
 //!   `proc_trampoline_run` (`cpuswitch.rs`) turns back into a Rust `fn`: Rust function
 //!   pointers have no C calling convention to `blr` from assembly.
@@ -105,10 +103,16 @@ pub fn cpu_fork(
     func: fn(*mut c_void),
     arg: *mut c_void,
 ) {
+    let pm = p2.vmspace().vm_map.pmap();
+    let pm1 = p1.vmspace().vm_map.pmap();
     let pcb = p2.pcb();
     let pcb1 = p1.pcb();
 
-    // pm->pm_ap{ia,da,ib,db,ga}key = pm1's: user pmaps (M6).
+    pm.pm_apiakey.set(pm1.pm_apiakey.get());
+    pm.pm_apdakey.set(pm1.pm_apdakey.get());
+    pm.pm_apibkey.set(pm1.pm_apibkey.get());
+    pm.pm_apdbkey.set(pm1.pm_apdbkey.get());
+    pm.pm_apgakey.set(pm1.pm_apgakey.get());
 
     // Save FPU state to PCB if necessary.
     if pcb1.pcb_flags.get() & PCB_FPU != 0 {

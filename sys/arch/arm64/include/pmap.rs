@@ -155,7 +155,18 @@ pub struct Pmap {
     pub pm_refs: AtomicI32,
     /// pmap statistics.
     pub pm_stats: PmapStatistics,
-    // pm_apiakey, pm_apdakey, pm_apibkey, pm_apdbkey, pm_apgakey (pointer authentication): M6.
+    /// The pointer authentication keys of the address space: instruction key A. Like the
+    /// four below, written by `setregs` at exec and by `cpu_fork` for a child that has not
+    /// run yet, and read by `pmap_setpauthkeys` at every switch to the pmap.
+    pub pm_apiakey: Cell<[u64; 2]>,
+    /// Data key A.
+    pub pm_apdakey: Cell<[u64; 2]>,
+    /// Instruction key B.
+    pub pm_apibkey: Cell<[u64; 2]>,
+    /// Data key B.
+    pub pm_apdbkey: Cell<[u64; 2]>,
+    /// The generic key.
+    pub pm_apgakey: Cell<[u64; 2]>,
 }
 
 // SAFETY: a user pmap's tables, pteds and statistics are guarded by `pm_mtx`, the kernel
@@ -179,6 +190,11 @@ impl Pmap {
             pm_active: AtomicI32::new(0),
             pm_refs: AtomicI32::new(0),
             pm_stats: PmapStatistics::new(),
+            pm_apiakey: Cell::new([0; 2]),
+            pm_apdakey: Cell::new([0; 2]),
+            pm_apibkey: Cell::new([0; 2]),
+            pm_apdbkey: Cell::new([0; 2]),
+            pm_apgakey: Cell::new([0; 2]),
         }
     }
 }
