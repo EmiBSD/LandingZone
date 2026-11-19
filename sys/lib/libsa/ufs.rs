@@ -122,7 +122,8 @@
 //!
 //! ## Deviations
 //! - `struct file` is [`UfsFile`], owned by `f_fsdata`; its buffers are `Vec`s (the C
-//!   `alloc()`s them; libsa's allocator is the global one). `ufs_close_internal` is the drop.
+//!   `alloc()`s them; libsa's allocator is the global one). `ufs_close_internal` drops them in
+//!   the C's order.
 //! - The path is copied into one `MAXPATHLEN + 1` buffer that the walk and the symbolic-link
 //!   splice work in (the C walks the caller's string, writing NULs it then restores, and
 //!   splices links into `namebuf`). A path longer than that is `ENOENT`.
@@ -186,6 +187,8 @@ pub trait Dinode: Copy + Default + Send + 'static {
     fn block_map(io: DevIo, fp: &mut UfsFile<Self>, file_block: Daddr) -> Result<Daddr, Errno>;
     /// This flavour's `buf_read_file`.
     fn buf_read_file(io: DevIo, fp: &mut UfsFile<Self>) -> Result<(usize, usize), Errno>;
+    /// This flavour's `ufs_close_internal` or `ufs2_close_internal`.
+    fn close_internal(fp: Box<UfsFile<Self>>) -> Result<(), Errno>;
     /// This flavour's `search_directory`.
     fn search_directory(name: &[u8], io: DevIo, fp: &mut UfsFile<Self>) -> Result<Ufsino, Errno>;
 }
@@ -269,6 +272,10 @@ impl Dinode for Ufs1Dinode {
     /// `ufs.c`'s `search_directory`: [`Ufs::search_directory`] for this inode.
     fn search_directory(name: &[u8], io: DevIo, fp: &mut UfsFile<Self>) -> Result<Ufsino, Errno> {
         Ufs::<Self>::search_directory(name, io, fp)
+    }
+
+    fn close_internal(fp: Box<UfsFile<Self>>) -> Result<(), Errno> {
+        ufs_close_internal(fp)
     }
 }
 
@@ -551,8 +558,24 @@ impl<D: Dinode> Ufs<D> {
             f_buf_blkno: -1,
         });
 
+        match Self::open_lookup(path, io, &mut fp) {
+            Ok(()) => {
+                f.f_fsdata = Some(fp);
+                Ok(())
+            }
+            // out: if (rc) (void)ufs_close_internal(fp);
+            Err(e) => {
+                let _ = D::close_internal(fp);
+                Err(e)
+            }
+        }
+    }
+
+    /// `ufs_open`'s walk of `path` from the root, into `fp`; on an error the caller closes
+    /// `fp`, as the C's `out:` label does.
+    fn open_lookup(path: &[u8], io: DevIo, fp: &mut UfsFile<D>) -> Result<(), Errno> {
         let mut inumber = ROOTINO;
-        D::read_inode(inumber, io, &mut fp)?;
+        D::read_inode(inumber, io, fp)?;
 
         // The path, NUL-terminated, in the buffer symbolic links are spliced into.
         let plen = path.iter().position(|&c| c == 0).unwrap_or(path.len());
@@ -591,10 +614,10 @@ impl<D: Dinode> Ufs<D> {
             // find a symbolic link.
             let parent_inumber = inumber;
             let component = namebuf[ncp..cp].to_vec();
-            inumber = D::search_directory(&component, io, &mut fp)?;
+            inumber = D::search_directory(&component, io, fp)?;
 
             // Open next component.
-            D::read_inode(inumber, io, &mut fp)?;
+            D::read_inode(inumber, io, fp)?;
 
             // Check for symbolic link.
             if (fp.f_di.mode() & IFMT) == IFLNK {
@@ -614,7 +637,7 @@ impl<D: Dinode> Ufs<D> {
                     namebuf[..link_len].copy_from_slice(&short[..link_len]);
                 } else {
                     // Read file for symbolic link
-                    let disk_block = D::block_map(io, &mut fp, 0)?;
+                    let disk_block = D::block_map(io, fp, 0)?;
                     let bsize = fp.f_fs.fs_bsize as usize;
                     let mut buf = vec![0u8; bsize];
                     let mut rsize = 0;
@@ -638,19 +661,39 @@ impl<D: Dinode> Ufs<D> {
                 } else {
                     ROOTINO
                 };
-                D::read_inode(inumber, io, &mut fp)?;
+                D::read_inode(inumber, io, fp)?;
             }
         }
 
         // Found terminal component.
         fp.f_ino = inumber;
-        f.f_fsdata = Some(fp);
         Ok(())
     }
 
     /// `ufs_close(f)`.
     pub fn close(f: &mut OpenFile) -> Result<(), Errno> {
-        f.f_fsdata = None;
+        let Some(fp) = f.f_fsdata.take() else {
+            return Ok(());
+        };
+        match fp.downcast::<UfsFile<D>>() {
+            Ok(fp) => D::close_internal(fp),
+            Err(_) => Ok(()),
+        }
+    }
+
+    /// The body of `ufs_close_internal` and `ufs2_close_internal`: free the indirect block
+    /// buffers, the file buffer, the super-block and the file.
+    pub(crate) fn free_file(mut fp: Box<UfsFile<D>>) -> Result<(), Errno> {
+        for level in 0..NIADDR {
+            if fp.f_blk[level].is_some() {
+                fp.f_blk[level] = None;
+            }
+        }
+        if fp.f_buf.is_some() {
+            fp.f_buf = None;
+        }
+        // free(fp->f_fs, SBSIZE); free(fp, sizeof(struct file));
+        drop(fp);
         Ok(())
     }
 
@@ -801,6 +844,11 @@ fn put_dinode<D: Dinode>(buf: &mut [u8], off: usize, dp: &D) {
 /// `ufs_open`.
 pub fn ufs_open(path: &[u8], f: &mut OpenFile) -> Result<(), Errno> {
     Ufs::<Ufs1Dinode>::open(path, f)
+}
+
+/// `ufs_close_internal`: [`Ufs::free_file`] for an FFS1 file.
+fn ufs_close_internal(fp: Box<UfsFile<Ufs1Dinode>>) -> Result<(), Errno> {
+    Ufs::<Ufs1Dinode>::free_file(fp)
 }
 
 /// `ufs_close`.

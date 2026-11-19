@@ -9423,10 +9423,10 @@ notes = "M14 A1, libsa as efiboot builds it (__INTERNAL_LIBSA_CREAD): declaratio
 [[file]]
 c = "sys/lib/libsa/ufs.c"
 rust = "sys/lib/libsa/ufs.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "9ba26a490483cc0041898eeebf8ef99e890f9e30"
-notes = "M14 A1, libsa as efiboot builds it (__INTERNAL_LIBSA_CREAD): FFS1 and (with ufs2.rs) FFS2 as one generic reader Ufs<D: Dinode>; buffers are Vecs; the path walk and symlink splice in one MAXPATHLEN buffer; d_reclen 0 ends a block's scan; COMPAT_UFS not defined; tested on makefs FFS1/FFS2 images (testdata/); TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 2 C function(s) not in its Rust file: ufs_close_internal, ffs_oldfscompat"
+notes = "M14 A1, libsa as efiboot builds it (__INTERNAL_LIBSA_CREAD): FFS1 and (with ufs2.rs) FFS2 as one generic reader Ufs<D: Dinode>; buffers are Vecs; the path walk and symlink splice in one MAXPATHLEN buffer; d_reclen 0 ends a block's scan; COMPAT_UFS not defined; tested on makefs FFS1/FFS2 images (testdata/); TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 2 C function(s) not in its Rust file: ufs_close_internal, ffs_oldfscompat; all by name in its Rust file since 2026-11-19 (ufs_close_internal/ufs2_close_internal on close and on a failed open, as the C), and ports check accepts the row as ported"
 
 [[file]]
 c = "sys/lib/libsa/ufs.h"
@@ -9439,10 +9439,10 @@ notes = "M14 A1, libsa as efiboot builds it (__INTERNAL_LIBSA_CREAD): declaratio
 [[file]]
 c = "sys/lib/libsa/ufs2.c"
 rust = "sys/lib/libsa/ufs2.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "f36d2d155d2070500bd92c8f6fcd2c1097f3e745"
-notes = "M14 A1, libsa as efiboot builds it (__INTERNAL_LIBSA_CREAD): the Ufs2Dinode instance of ufs.rs's reader; tested on a makefs FFS2 image (its super-block copied to SBLOCK_UFS2: makefs writes it at SBLOCK_UFS1); TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 7 C function(s) not in its Rust file: read_inode, chmod_inode, block_map, buf_read_file, search_directory, ufs2_close_internal, ffs_oldfscompat 2026-11-19 (the user's decision): read_inode, chmod_inode, block_map, buf_read_file and search_directory are here by name, in impl Dinode for Ufs2Dinode, which the reader calls for FFS2; each calls ufs.rs's body (the C copies differ only in types)."
+notes = "M14 A1, libsa as efiboot builds it (__INTERNAL_LIBSA_CREAD): the Ufs2Dinode instance of ufs.rs's reader; tested on a makefs FFS2 image (its super-block copied to SBLOCK_UFS2: makefs writes it at SBLOCK_UFS1); TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 7 C function(s) not in its Rust file: read_inode, chmod_inode, block_map, buf_read_file, search_directory, ufs2_close_internal, ffs_oldfscompat 2026-11-19 (the user's decision): read_inode, chmod_inode, block_map, buf_read_file and search_directory are here by name, in impl Dinode for Ufs2Dinode, which the reader calls for FFS2; all by name in its Rust file since 2026-11-19 (ufs_close_internal/ufs2_close_internal on close and on a failed open, as the C), and ports check accepts the row as ported; each calls ufs.rs's body (the C copies differ only in types)."
 
 [[file]]
 c = "sys/lib/libsa/ufs2.h"

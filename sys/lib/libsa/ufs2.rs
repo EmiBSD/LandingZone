@@ -128,6 +128,8 @@
 //! ## Deviations
 //! - As `ufs.rs`'s.
 
+use alloc::boxed::Box;
+
 use crate::hdr::dinode::{NDADDR, NIADDR, Ufs2Dinode};
 use crate::hdr::fs::{FS_UFS2_MAGIC, Fs, SBLOCK_UFS2};
 use crate::hdr::param::DEV_BSIZE;
@@ -216,6 +218,15 @@ impl Dinode for Ufs2Dinode {
     fn search_directory(name: &[u8], io: DevIo, fp: &mut UfsFile<Self>) -> Result<Ufsino, Errno> {
         Ufs::<Self>::search_directory(name, io, fp)
     }
+
+    fn close_internal(fp: Box<UfsFile<Self>>) -> Result<(), Errno> {
+        ufs2_close_internal(fp)
+    }
+}
+
+/// `ufs2_close_internal`: [`Ufs::free_file`] for an FFS2 file.
+fn ufs2_close_internal(fp: Box<UfsFile<Ufs2Dinode>>) -> Result<(), Errno> {
+    Ufs::<Ufs2Dinode>::free_file(fp)
 }
 
 /// `ufs2_open`.
