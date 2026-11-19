@@ -70,8 +70,148 @@ pub fn blank_c(src: &[u8]) -> String {
 
 /// The Rust source with its comments and the contents of its string literals blanked
 /// (newlines kept). Character literals are left alone: a lifetime looks like one.
-fn blank_rust(src: &[u8]) -> String {
-    blank(src, false)
+/// A Rust file with its comments (block comments nest), string literals (raw ones too,
+/// `r"..."`, `r#"..."#`, `br"..."`) and char and byte literals (`'x'`, `b'"'`, `'\''`,
+/// `'\u{e9}'`) blanked, keeping the line breaks. A `'` that opens no char literal is a
+/// lifetime or a label and stays. Before 2026-11-19 the Rust files went through the C
+/// blanker, which knows no char literals: a `b'"'` opened a string that ran to the next
+/// `"`, and the `fn`s and `unported!` sites between were not seen.
+fn blank_rust(b: &[u8]) -> String {
+    let blank_byte = |c: u8| if c == b'\n' { b'\n' } else { b' ' };
+    let ident_at = |k: usize| b.get(k).is_some_and(|&c| is_ident(c));
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        let c = b[i];
+        let next = b.get(i + 1).copied();
+        if c == b'/' && next == Some(b'*') {
+            let mut depth = 0usize;
+            while i < b.len() {
+                if b[i] == b'/' && b.get(i + 1) == Some(&b'*') {
+                    depth += 1;
+                    out.extend_from_slice(b"  ");
+                    i += 2;
+                } else if b[i] == b'*' && b.get(i + 1) == Some(&b'/') {
+                    depth -= 1;
+                    out.extend_from_slice(b"  ");
+                    i += 2;
+                    if depth == 0 {
+                        break;
+                    }
+                } else {
+                    out.push(blank_byte(b[i]));
+                    i += 1;
+                }
+            }
+        } else if c == b'/' && next == Some(b'/') {
+            while i < b.len() && b[i] != b'\n' {
+                out.push(b' ');
+                i += 1;
+            }
+        } else if let Some((hashes, open)) = raw_string_at(b, i) {
+            // r"..." / r#"..."# / br"...": no escapes; ends at `"` and as many `#`.
+            out.extend_from_slice(&b[i..open + 1]);
+            i = open + 1;
+            loop {
+                if i >= b.len() {
+                    break;
+                }
+                if b[i] == b'"'
+                    && b.get(i + 1..i + 1 + hashes)
+                        .is_some_and(|h| h.iter().all(|&x| x == b'#'))
+                {
+                    out.push(b'"');
+                    out.extend(std::iter::repeat_n(b'#', hashes));
+                    i += 1 + hashes;
+                    break;
+                }
+                out.push(blank_byte(b[i]));
+                i += 1;
+            }
+        } else if c == b'"' {
+            out.push(c);
+            i += 1;
+            while i < b.len() && b[i] != b'"' {
+                if b[i] == b'\\' && i + 1 < b.len() {
+                    out.push(b' ');
+                    out.push(blank_byte(b[i + 1]));
+                    i += 2;
+                    continue;
+                }
+                out.push(blank_byte(b[i]));
+                i += 1;
+            }
+            if i < b.len() {
+                out.push(b'"');
+                i += 1;
+            }
+        } else if c == b'\''
+            && (i == 0 || !ident_at(i - 1) || (b[i - 1] == b'b' && (i < 2 || !ident_at(i - 2))))
+        {
+            match char_literal_end(b, i) {
+                Some(end) => {
+                    out.push(b'\'');
+                    out.extend(std::iter::repeat_n(b' ', end - i - 1));
+                    out.push(b'\'');
+                    i = end + 1;
+                }
+                None => {
+                    out.push(c);
+                    i += 1;
+                }
+            }
+        } else {
+            out.push(c);
+            i += 1;
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// When a raw string starts at `i` (`r`, `br`, then `#`s, then `"`, with no identifier
+/// character before the `r` or the `b`): its number of `#`s and the index of its `"`.
+fn raw_string_at(b: &[u8], i: usize) -> Option<(usize, usize)> {
+    let start_ok = |k: usize| k == 0 || !is_ident(b[k - 1]);
+    let r = if b[i] == b'r' && start_ok(i) {
+        i
+    } else if b[i] == b'b' && b.get(i + 1) == Some(&b'r') && start_ok(i) {
+        i + 1
+    } else {
+        return None;
+    };
+    let mut k = r + 1;
+    while b.get(k) == Some(&b'#') {
+        k += 1;
+    }
+    (b.get(k) == Some(&b'"')).then_some((k - r - 1, k))
+}
+
+/// The index of the `'` that closes a char or byte literal opened at `i`, or `None` when the
+/// `'` is a lifetime or a label.
+fn char_literal_end(b: &[u8], i: usize) -> Option<usize> {
+    let first = *b.get(i + 1)?;
+    if first == b'\\' {
+        // An escape: `\n`, `\'`, `\x7f`, `\u{10ffff}`: the closing quote is within 12 bytes.
+        let mut k = i + 3;
+        while k < b.len() && k <= i + 12 {
+            if b[k] == b'\'' {
+                return Some(k);
+            }
+            k += 1;
+        }
+        return None;
+    }
+    if first == b'\'' || first == b'\n' {
+        return None;
+    }
+    // One character, ASCII or a UTF-8 sequence of up to four bytes.
+    let len = match first {
+        0x00..=0x7f => 1,
+        0xc0..=0xdf => 2,
+        0xe0..=0xef => 3,
+        _ => 4,
+    };
+    (b.get(i + 1 + len) == Some(&b'\'')).then_some(i + 1 + len)
 }
 
 fn blank(b: &[u8], char_literals: bool) -> String {
@@ -1320,6 +1460,10 @@ f(void)
             "fn r#type() {}".into(),
             "macro_rules! mac { ($w:literal) => { unported!($w) } }".into(),
             "fn g() { let _ = \"fn in_a_string\"; let _ = unported!(\"thing\"); }".into(),
+            "fn after_quote_char<'a>(x: &'a u8) -> bool { *x == b'\"' || 'q' == '\\'' }".into(),
+            "fn after_raw() { let _ = r#\"fn not_a_fn() \" \"#; let _ = unported!(\"raw\"); }"
+                .into(),
+            "/* outer /* fn nested_comment() */ fn still_comment() */ fn after_nested() {}".into(),
             "// let _ = unported!(\"commented\");".into(),
             zone(false, "CODE"),
             String::new(),
@@ -1332,8 +1476,19 @@ f(void)
         let fns = rust_fns(src);
         let mut v: Vec<_> = fns.iter().map(String::as_str).collect();
         v.sort_unstable();
-        assert_eq!(v, ["g", "mac", "real", "type"]);
-        assert_eq!(stub_sites(src), [9]);
+        assert_eq!(
+            v,
+            [
+                "after_nested",
+                "after_quote_char",
+                "after_raw",
+                "g",
+                "mac",
+                "real",
+                "type"
+            ]
+        );
+        assert_eq!(stub_sites(src), [9, 11]);
     }
 
     fn env(defs: &[(&str, i64)]) -> Env {

@@ -474,12 +474,6 @@ reason = "not configured: `defined(HIDKBD_DEBUG)` is false on amd64 and arm64 GE
 approved = "2026-11-19"
 
 [[exception]]
-c = "sys/dev/wscons/wsemul_vt100.c"
-function = "wsemul_vt100_jump_scroll"
-reason = "not configured: `defined(HAVE_JUMP_SCROLL)` is false on amd64 and arm64 GENERIC.MP"
-approved = "2026-11-19"
-
-[[exception]]
 c = "sys/dev/usb/xhci.c"
 function = "xhci_dump_trb"
 reason = "not configured: `defined(XHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
