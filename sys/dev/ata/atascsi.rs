@@ -67,8 +67,8 @@
 //!   `atascsi_lookup_port` and `atascsi_free` also return when a host port is missing (the
 //!   C would dereference NULL); the other functions find their port through it and do nothing
 //!   more when it is not there.
-//! - `dma_alloc(9)` (`kern/dma_alloc.c`) is not ported: the IDENTIFY buffer is a
-//!   `scsiconf.rs` `DmaBuf`, the TRIM range list of UNMAP a `dma_alloc(9)` block.
+//! - The IDENTIFY buffer is a `scsiconf.rs` `DmaBuf` (`dma_alloc(9)`, freed when dropped);
+//!   the TRIM range list of UNMAP a `dma_alloc(9)` block, as the C.
 //! - The functions that return an errno (`atascsi_probe`, `atascsi_detach`,
 //!   `atascsi_port_identify`, `atascsi_port_set_features`, `ata_polled`) return
 //!   `Result<(), Errno>`; `atascsi_passthru_map`'s 0/1 is a `Result<(), ()>`-like `bool`

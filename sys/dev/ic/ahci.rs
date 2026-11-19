@@ -71,7 +71,6 @@
 //!   through `err_slotp`.
 //! - `ahci_poll`'s `timeout_fn` is an `Option<TimeoutFn>` called with the ccb as its
 //!   argument, as the C. `ccb_done` is a `Cell` of a function pointer.
-//! - `dma_alloc(9)` is not ported: `ap_err_scratch` is `malloc(9)`ed (`M_DEVBUF`).
 //! - `ahci_port_intr`'s `goto failall` and `goto fatal`, which jump into the body of an `if`,
 //!   are a labelled block that yields how the error path ends, followed by that body.
 //! - The `KASSERT`s are `kassert!` (feature `diagnostic`); the C's `ffs(x) - 1` is
@@ -128,6 +127,7 @@ use crate::dev::ic::ahcivar::{
     ahci_dma_dva, ahci_dma_kva, ahci_dma_map, ahci_port_start,
 };
 use crate::kassert;
+use crate::kern::dma_alloc::{dma_alloc, dma_free};
 use crate::kern::kern_lock::{mtx_enter, mtx_init, mtx_leave};
 use crate::kern::kern_malloc::{free, malloc, mallocarray};
 use crate::kern::kern_timeout::{timeout_add_msec, timeout_del, timeout_set};
@@ -147,6 +147,7 @@ use crate::sys::device::{Cfdriver, DV_DULL, DVACT_POWERDOWN, DVACT_RESUME, Devic
 use crate::sys::errno::Errno;
 use crate::sys::malloc::{M_DEVBUF, M_NOWAIT, M_ZERO};
 use crate::sys::param::{DEV_BSIZE, MAXPHYS, PAGE_SIZE};
+use crate::sys::pool::{PR_NOWAIT, PR_ZERO};
 use crate::sys::queue::TailqEntry;
 use crate::sys::timeout::TimeoutFn;
 
@@ -459,7 +460,7 @@ pub fn ahci_port_alloc(sc: &'static AhciSoftc, port: usize) -> Result<(), Errno>
         &*app.as_ptr()
     };
 
-    let Some(scratch) = malloc(DEV_BSIZE, M_DEVBUF, M_NOWAIT | M_ZERO) else {
+    let Some(scratch) = dma_alloc(DEV_BSIZE, PR_NOWAIT | PR_ZERO) else {
         printf(format_args!(
             "{}: unable to allocate DMA scratch buf for port {}\n",
             sc.sc_dev.xname(),
@@ -827,7 +828,7 @@ pub fn ahci_port_free(sc: &AhciSoftc, port: usize) {
         unsafe { ahci_dmamem_free(sc, adm) };
     }
     if let Some(scratch) = NonNull::new(ap.ap_err_scratch.get()) {
-        free(scratch, M_DEVBUF, DEV_BSIZE);
+        dma_free(scratch, DEV_BSIZE);
     }
 
     // bus_space(9) says we dont free the subregions handle
