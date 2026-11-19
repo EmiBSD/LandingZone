@@ -14,7 +14,7 @@ Columns: what OpenBSD C does | what we write | why.
 | `mtx_enter(&m); ... mtx_leave(&m);` | `let g = m.lock();` on the ported `Mutex<T>` (`kern_lock.c`, IPL-aware) | data lives inside the lock; the guard proves it is held |
 | `KASSERT(x)` / `KDASSERT(x)` | `kassert!(x)` / `kdassert!(x)` behind features `diagnostic` / `debug` | same text: `kernel diagnostic assertion "x" failed: file "f", line n` |
 | `panic("fmt", ...)` | `panic!("fmt", ...)` routed to `kern::subr_prf::panic` | identical message; `#[allow(clippy::panic)]` with a reason at each site |
-| `printf(9)`, `log(9)`, `%b` | `kprintf!`, `kprintln!`, `log!(LOG_x, ...)`; a `Bitmask(value, "\20\1FLAG...")` `Display` helper for `%b` | Rust format strings; `%b` has no counterpart so it is a wrapper |
+| `printf(9)`, `log(9)`, `%b` | `kprintf!`, `kprintln!`, `log!(LOG_x, ...)`; a `Bitmask(value, b"\x10\x01FLAG...")` `Display` helper for `%b` (the C's octal `"\20\1FLAG..."`: the base byte is `\x10`, never `\x20`) | Rust format strings; `%b` has no counterpart so it is a wrapper |
 | `#ifdef OPTION` | `#[cfg(feature = "option")]` | one knob per `option(4)`, visible in `Cargo.toml` |
 | `struct proc *p` passed down (borrowed) | `&Proc` | no ownership transfer |
 | `struct proc *` in lists or long-lived | `Cell<*const Proc>` inside the list entries, `&Proc` at the API; `Arc<Process>` after M3 for `refcnt(9)` | the link is a raw pointer under the list's lock; every borrow is explicit |
