@@ -965,6 +965,10 @@ impl Env {
             ("BIG_ENDIAN", 4321),
             ("PDP_ENDIAN", 3412),
             ("BYTE_ORDER", 1234),
+            // OpenBSD's clang turns retguard on by default on x86_64 and aarch64 and then
+            // defines _RET_PROTECTOR (gnu/llvm/clang/lib/Driver/ToolChains/Clang.cpp:6935),
+            // unless -fno-stack-protector or -pg, which the kernel's Makefiles do not pass.
+            ("_RET_PROTECTOR", 1),
         ] {
             defs.insert(k.to_string(), Some(v));
         }
