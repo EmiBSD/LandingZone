@@ -952,6 +952,23 @@ impl Missing<'_> {
     }
 }
 
+/// What a function's conditions come to on amd64 (`[0]`) and arm64 (`[1]`), `eval(i)` being
+/// the value under that machine's `GENERIC.MP`. The user's rule of 2026-11-19: a function is
+/// required when its `#if` is true on at least one of the two (no other architecture
+/// counts), and a file under `sys/arch/amd64/` or `sys/arch/arm64/` is evaluated on its own
+/// machine only, its value standing for both.
+fn configured_on(c: &str, eval: impl Fn(usize) -> Option<bool>) -> [Option<bool>; 2] {
+    if c.starts_with("sys/arch/amd64/") {
+        let v = eval(0);
+        [v, v]
+    } else if c.starts_with("sys/arch/arm64/") {
+        let v = eval(1);
+        [v, v]
+    } else {
+        [eval(0), eval(1)]
+    }
+}
+
 /// The completeness of every `ported` row, into `errors`; with the reference present, the
 /// functions of every `ported` and `wip` `.c` row that its Rust file lacks are returned for
 /// `ports missing`.
@@ -1094,10 +1111,7 @@ pub fn check<'a>(
                 used_exceptions.insert((x.c.as_str(), x.function.as_str()));
                 continue;
             }
-            let configured = [
-                envs[0].eval_all(&func.conds, &local),
-                envs[1].eval_all(&func.conds, &local),
-            ];
+            let configured = configured_on(&e.c, |i| envs[i].eval_all(&func.conds, &local));
             let elsewhere = fns_by_file
                 .iter()
                 .filter(|(f, set)| **f != e.rust && set.contains(&func.name))
@@ -1329,6 +1343,24 @@ f(void)
                 .map(|(k, v)| ((*k).to_string(), Some(*v)))
                 .collect(),
         }
+    }
+
+    #[test]
+    fn an_arch_file_is_evaluated_on_its_own_machine() {
+        // amd64 true, arm64 false.
+        let split = |i: usize| Some(i == 0);
+        assert_eq!(
+            configured_on("sys/arch/amd64/amd64/pmap.c", split),
+            [Some(true), Some(true)]
+        );
+        assert_eq!(
+            configured_on("sys/arch/arm64/arm64/pmap.c", split),
+            [Some(false), Some(false)]
+        );
+        assert_eq!(
+            configured_on("sys/uvm/uvm_km.c", split),
+            [Some(true), Some(false)]
+        );
     }
 
     #[test]

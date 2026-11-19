@@ -64,8 +64,12 @@ Given while TD1 was under way; they hold with the order above.
 4. **C slips** found by a sample are logged in `docs/EXTERNAL_BUGS.md` only after each was
    checked against the C at the pin; one that is not confirmed is not logged, and the user is
    told.
-5. **A `#if` true on one architecture and false on the other** is not decided by the session:
-   how `completeness.rs` treats it is reported and the rule is the user's.
+5. **A `#if` true on one architecture and false on the other** (the user's rule of the same
+   day): a function is required when its `#if` is true on at least one `GENERIC.MP` of amd64
+   or arm64, those two and no other, and the Rust must compile it on that machine. A file
+   under `sys/arch/amd64/` or `sys/arch/arm64/` is evaluated on its own machine only
+   (`completeness.rs`, `configured_on`). The tool checks the name, not the `cfg` it is
+   compiled under; that part is read by hand.
 6. **`KTRACE` is in `GENERIC.MP`, but it is left out** (the user's answer of the same day:
    ../Kernel's redesign makes its own traces; ktrace(2)'s are of no use to it). A "KTRACE is
    not configured" line is false; each site says KTRACE is left out by the user's decision.
