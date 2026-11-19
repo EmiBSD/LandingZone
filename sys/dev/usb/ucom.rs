@@ -1244,7 +1244,10 @@ pub fn ucomstart(tp: &Tty) {
         let err = usbd_transfer(oxfer);
         #[cfg(feature = "diagnostic")]
         if err != USBD_IN_PROGRESS {
-            printf(format_args!("ucomstart: err={}\n", usbd_errstr(err)));
+            printf(format_args!(
+                "ucomstart: err={}\n",
+                crate::dev::usb::usb_subr::usbd_errstr(err)
+            ));
         }
         let _ = err;
     }
