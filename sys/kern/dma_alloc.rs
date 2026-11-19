@@ -112,6 +112,32 @@ pub fn dma_free(m: NonNull<u8>, size: usize) {
     };
     pool_put(&DMAPOOLS[pi], m);
 }
+
+/// Test only: one physically contiguous segment anywhere. The host's test memory lies above
+/// the DMA constraint (4 GB), which `kp_dma_contig` keeps to, so the tests that need
+/// `dma_alloc(9)` items take them with this mode instead.
+#[cfg(test)]
+static KP_TEST_CONTIG: crate::uvm::uvm_extern::KmemPaMode = crate::uvm::uvm_extern::KmemPaMode {
+    kp_constraint: &crate::uvm::uvm_km::NO_CONSTRAINT,
+    kp_object: false,
+    kp_align: crate::sys::types::Paddr::new(0),
+    kp_boundary: crate::sys::types::Paddr::new(0),
+    kp_maxseg: 1,
+    kp_nomem: false,
+    kp_zero: false,
+    kp_pageable: false,
+};
+
+/// Test only: the pools set up again over the memory `setup_real_memory` just loaded (on the
+/// list of all pools it has just emptied, `pool_test_reset`), and given [`KP_TEST_CONTIG`] so
+/// that the host can hand out their items.
+#[cfg(test)]
+pub(crate) fn dma_alloc_test_reset() {
+    dma_alloc_init();
+    for pp in &DMAPOOLS {
+        pool_set_constraints(pp, &KP_TEST_CONTIG);
+    }
+}
 /* </CODE> */
 
 /* <TESTS> */
@@ -145,6 +171,11 @@ mod tests {
         // The host's test memory lies above the DMA constraint (4 GB), so no item can be
         // taken here; the pools' set-up is what is checked.
         let _g = setup_real_memory();
+        // setup_real_memory set the pools up for the host (dma_alloc_test_reset): back to the
+        // kernel's set-up, taken off the pool list first.
+        for pp in &DMAPOOLS {
+            crate::kern::subr_pool::pool_test_unlist(pp);
+        }
         dma_alloc_init();
         for (i, pp) in DMAPOOLS.iter().enumerate() {
             assert_eq!(pp.pr_size.get() as usize, 1 << (i + DMA_BUCKET_OFFSET));

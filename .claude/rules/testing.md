@@ -18,7 +18,8 @@ Four tiers. Every change lands with the tier it belongs to.
    `config_attach` or under a kernel lock then hangs the rest of the run (rule of
    2026-10-08, after the M16e close found it). Known resets: `rn_test_reset` (radix),
    `wsmux_test_reset` (the mux table), `autoconf_test_reset` (`autoconf_attdet`),
-   `pf_osfp_test_reset` (the fingerprint list), `kmemstats_test_reset`; in `setup_net`,
+   `pf_osfp_test_reset` (the fingerprint list), `kmemstats_test_reset`, `pool_test_reset`
+   (the list of all pools, emptied first), `dma_alloc_test_reset` (dma_alloc(9)'s pools, set up again); in `setup_net`,
    `pfi_test_reset`, `bpf_test_reset`, `enc_reset` and the interface lists; the server cache
    by `nfsrv_initcache` in the nfs tests' setup.
 2. **Reference-backed tests**: `just test-ref`. Marked `#[ignore]`; they read `$OPENBSD_SRC`

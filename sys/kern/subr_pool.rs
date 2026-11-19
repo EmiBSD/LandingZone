@@ -2846,6 +2846,45 @@ fn pool_lock_rw_sleep(
 ) -> Result<(), Errno> {
     rwsleep_nsec(ident, &lock.prl_rwlock, priority, wmesg, INFSLP)
 }
+
+/// Test only: forgets the list of all pools, as `setup_real_memory` forgets the memory. The
+/// host tests set their subsystems up again on every run (`procinit`, `vfsinit`, the mbuf
+/// pools), so the same pool would be put on the list once more and close it into a loop; a
+/// fresh list per test keeps it a list. The pools themselves are not touched.
+#[cfg(test)]
+pub(crate) fn pool_test_reset() {
+    rw_enter_write(&POOL_LOCK);
+    POOL_HEAD.0.init();
+    POOL_COUNT.store(0, Ordering::Relaxed);
+    rw_exit_write(&POOL_LOCK);
+}
+
+/// Test only: takes `pp` off the list of all pools if it is there, without touching its pages
+/// (they are an earlier test's memory, which `setup_real_memory` leaks), so that `pool_init`
+/// can set it up again over fresh memory without linking it twice.
+#[cfg(test)]
+pub(crate) fn pool_test_unlist(pp: &'static Pool) {
+    rw_enter_write(&POOL_LOCK);
+    if POOL_HEAD.0.first().is_some_and(|first| ptr::eq(first, pp)) {
+        // SAFETY: `pp` is the head of the list.
+        unsafe { POOL_HEAD.0.remove_head() };
+        POOL_COUNT.fetch_sub(1, Ordering::Relaxed);
+    } else {
+        let mut prev = POOL_HEAD.0.first();
+        for iter in POOL_HEAD.0.iter() {
+            if ptr::eq(iter, pp) {
+                if let Some(prev) = prev {
+                    // SAFETY: `prev` is on the list and `pp` follows it.
+                    unsafe { POOL_HEAD.0.remove_after(prev) };
+                    POOL_COUNT.fetch_sub(1, Ordering::Relaxed);
+                }
+                break;
+            }
+            prev = Some(iter);
+        }
+    }
+    rw_exit_write(&POOL_LOCK);
+}
 /* </CODE> */
 
 /* <TESTS> */
@@ -2880,6 +2919,8 @@ pub(crate) mod tests {
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         uvm_page_test_reset();
+        // The list of all pools, before any pool is set up over the fresh memory.
+        crate::kern::subr_pool::pool_test_reset();
         UVMEXP.pagesize.store(PAGE_SIZE as i32, Ordering::Relaxed);
         uvm_setpagesize();
 
@@ -2899,6 +2940,8 @@ pub(crate) mod tests {
         kmeminit();
         #[cfg(feature = "kmemstats")]
         crate::kern::kern_malloc::kmemstats_test_reset();
+        // dma_alloc(9)'s pools, set up again over the fresh memory (uvm_init's dma_alloc_init).
+        crate::kern::dma_alloc::dma_alloc_test_reset();
         // The radix trees' globals (`rn_zeros`, the mask tree) point into the memory just replaced:
         // the next `rn_init` (`vfsinit`'s, `pfr_initialize`'s) starts over.
         crate::net::radix::rn_test_reset();
