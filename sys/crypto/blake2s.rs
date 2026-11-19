@@ -150,6 +150,11 @@ fn blake2s_init_param(state: &mut Blake2sState, param: u32) {
     state.h[0] ^= param;
 }
 
+/// `ror32`: `word` rotated right by `shift` bits.
+fn ror32(word: u32, shift: u32) -> u32 {
+    word.rotate_right(shift)
+}
+
 /// `blake2s_init`: an unkeyed hash with a digest of `outlen` bytes.
 pub fn blake2s_init(state: &mut Blake2sState, outlen: usize) {
     kassert!(!(outlen == 0 || outlen > BLAKE2S_HASH_SIZE));
@@ -205,15 +210,15 @@ fn blake2s_compress(state: &mut Blake2sState, block: &[u8], nblocks: usize, inc:
         let g = |v: &mut [u32; 16], r: usize, i: usize, a: usize, b: usize, c: usize, d: usize| {
             let s = &BLAKE2S_SIGMA[r];
             v[a] = v[a].wrapping_add(v[b]).wrapping_add(m[s[2 * i] as usize]);
-            v[d] = (v[d] ^ v[a]).rotate_right(16);
+            v[d] = ror32(v[d] ^ v[a], 16);
             v[c] = v[c].wrapping_add(v[d]);
-            v[b] = (v[b] ^ v[c]).rotate_right(12);
+            v[b] = ror32(v[b] ^ v[c], 12);
             v[a] = v[a]
                 .wrapping_add(v[b])
                 .wrapping_add(m[s[2 * i + 1] as usize]);
-            v[d] = (v[d] ^ v[a]).rotate_right(8);
+            v[d] = ror32(v[d] ^ v[a], 8);
             v[c] = v[c].wrapping_add(v[d]);
-            v[b] = (v[b] ^ v[c]).rotate_right(7);
+            v[b] = ror32(v[b] ^ v[c], 7);
         };
 
         for r in 0..10 {

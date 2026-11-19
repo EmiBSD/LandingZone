@@ -67,27 +67,34 @@ pub struct Poly1305State {
 }
 
 /// `U8TO32`: the little-endian 32-bit word at the start of `p`.
-fn u8to32(p: &[u8]) -> u64 {
+#[allow(non_snake_case)] // the C name
+fn U8TO32(p: &[u8]) -> u64 {
     u64::from(u32::from_le_bytes([p[0], p[1], p[2], p[3]]))
+}
+
+/// `U32TO8`: stores the low 32 bits of `v` at the start of `p`, little-endian.
+#[allow(non_snake_case)] // the C name
+fn U32TO8(p: &mut [u8], v: u64) {
+    p[..4].copy_from_slice(&(v as u32).to_le_bytes());
 }
 
 /// `poly1305_init`: starts a MAC under `key` (`r` clamped, the pad saved).
 pub fn poly1305_init(st: &mut Poly1305State, key: &[u8; 32]) {
     // r &= 0xffffffc0ffffffc0ffffffc0fffffff
-    st.r[0] = u8to32(&key[0..]) & 0x3ffffff;
-    st.r[1] = (u8to32(&key[3..]) >> 2) & 0x3ffff03;
-    st.r[2] = (u8to32(&key[6..]) >> 4) & 0x3ffc0ff;
-    st.r[3] = (u8to32(&key[9..]) >> 6) & 0x3f03fff;
-    st.r[4] = (u8to32(&key[12..]) >> 8) & 0x00fffff;
+    st.r[0] = U8TO32(&key[0..]) & 0x3ffffff;
+    st.r[1] = (U8TO32(&key[3..]) >> 2) & 0x3ffff03;
+    st.r[2] = (U8TO32(&key[6..]) >> 4) & 0x3ffc0ff;
+    st.r[3] = (U8TO32(&key[9..]) >> 6) & 0x3f03fff;
+    st.r[4] = (U8TO32(&key[12..]) >> 8) & 0x00fffff;
 
     // h = 0
     st.h = [0; 5];
 
     // save pad for later
-    st.pad[0] = u8to32(&key[16..]);
-    st.pad[1] = u8to32(&key[20..]);
-    st.pad[2] = u8to32(&key[24..]);
-    st.pad[3] = u8to32(&key[28..]);
+    st.pad[0] = U8TO32(&key[16..]);
+    st.pad[1] = U8TO32(&key[20..]);
+    st.pad[2] = U8TO32(&key[24..]);
+    st.pad[3] = U8TO32(&key[28..]);
 
     st.leftover = 0;
     st.final_ = 0;
@@ -106,11 +113,11 @@ fn poly1305_blocks(st: &mut Poly1305State, m: &[u8]) {
 
     for blk in m.as_chunks::<poly1305_block_size>().0 {
         // h += m[i]
-        h0 += u8to32(&blk[0..]) & 0x3ffffff;
-        h1 += (u8to32(&blk[3..]) >> 2) & 0x3ffffff;
-        h2 += (u8to32(&blk[6..]) >> 4) & 0x3ffffff;
-        h3 += (u8to32(&blk[9..]) >> 6) & 0x3ffffff;
-        h4 += (u8to32(&blk[12..]) >> 8) | hibit;
+        h0 += U8TO32(&blk[0..]) & 0x3ffffff;
+        h1 += (U8TO32(&blk[3..]) >> 2) & 0x3ffffff;
+        h2 += (U8TO32(&blk[6..]) >> 4) & 0x3ffffff;
+        h3 += (U8TO32(&blk[9..]) >> 6) & 0x3ffffff;
+        h4 += (U8TO32(&blk[12..]) >> 8) | hibit;
 
         // h *= r
         let d0 = h0 * r0 + h1 * s4 + h2 * s3 + h3 * s2 + h4 * s1;
@@ -253,10 +260,10 @@ pub fn poly1305_finish(st: &mut Poly1305State, mac: &mut [u8; 16]) {
     f = h3 + st.pad[3] + (f >> 32);
     h3 = f & 0xffffffff;
 
-    mac[0..4].copy_from_slice(&(h0 as u32).to_le_bytes());
-    mac[4..8].copy_from_slice(&(h1 as u32).to_le_bytes());
-    mac[8..12].copy_from_slice(&(h2 as u32).to_le_bytes());
-    mac[12..16].copy_from_slice(&(h3 as u32).to_le_bytes());
+    U32TO8(&mut mac[0..], h0);
+    U32TO8(&mut mac[4..], h1);
+    U32TO8(&mut mac[8..], h2);
+    U32TO8(&mut mac[12..], h3);
 
     // zero out the state
     st.h = [0; 5];

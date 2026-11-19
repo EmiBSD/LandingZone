@@ -4098,11 +4098,11 @@ notes = "Poly1305State (limbs are u64: the C's unsigned long on LP64); shares th
 [[file]]
 c = "sys/crypto/poly1305.c"
 rust = "sys/crypto/poly1305.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "3f7aec44426416442a1c9e3bb828b024ad24abbf"
 deps = ["sys/crypto/poly1305.h"]
-notes = "poly1305_init/update/finish over the donna 26-bit limbs; RFC 8439 2.5.2 and A.3 vectors and a split-input property tested; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 2 C function(s) not in its Rust file: U8TO32, U32TO8"
+notes = "poly1305_init/update/finish over the donna 26-bit limbs; RFC 8439 2.5.2 and A.3 vectors and a split-input property tested; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 2 C function(s) not in its Rust file: U8TO32, U32TO8; each now has its fn with its C name, and ports check accepts the row as ported"
 
 [[file]]
 c = "sys/crypto/chachapoly.h"
@@ -4132,11 +4132,11 @@ notes = "Blake2sState, BLAKE2S_*_SIZE; the inline blake2s() is a function; share
 [[file]]
 c = "sys/crypto/blake2s.c"
 rust = "sys/crypto/blake2s.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "82d53ed4a51f0298e6ec4fe78412e9b65f95e8ba"
 deps = ["sys/crypto/blake2s.h", "sys/lib/libkern/explicit_bzero.c"]
-notes = "blake2s_init/init_key/update/final, blake2s_hmac (and blake2s_hmac_inplace for wg_noise's out, out calls); RFC 7693 B and hashlib/hmac vectors around the block size, plain, keyed, split inputs tested; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 1 C function(s) not in its Rust file: ror32"
+notes = "blake2s_init/init_key/update/final, blake2s_hmac (and blake2s_hmac_inplace for wg_noise's out, out calls); RFC 7693 B and hashlib/hmac vectors around the block size, plain, keyed, split inputs tested; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 1 C function(s) not in its Rust file: ror32; each now has its fn with its C name, and ports check accepts the row as ported"
 
 [[file]]
 c = "sys/crypto/curve25519.h"
