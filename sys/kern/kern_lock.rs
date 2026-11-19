@@ -49,8 +49,8 @@
 //! parking lots (`mtx_init_parking`, `mtx_park`, `mtx_enter_park`, `mtx_leave_park`,
 //! `mtx_cas`, `mtx_enter`, `mtx_enter_try`, `mtx_leave`); the interlocking `pc_mprod_enter`
 //! and `pc_mprod_leave`. M11c adds the debugger's mutex, `db_mtx_enter`/`db_mtx_leave` (`DDB`;
-//! uniprocessor too, as in the C). `mtx_print_parks` (a debugging printer of the parking lots
-//! that nothing calls) is not here; `WITNESS` and `MP_LOCKDEBUG` are not configured.
+//! uniprocessor too, as in the C). `mtx_print_parks` prints the parking lots for ddb's `call`;
+//! `WITNESS` and `MP_LOCKDEBUG` are not configured.
 //!
 //! ## Deviations
 //! - `membar_producer`/`membar_consumer`/`membar_exit` are `fence`s of the matching
@@ -310,6 +310,29 @@ fn mtx_init_parking() {
     for p in &MTX_PARKING {
         p.lock.store(ptr::null_mut(), Ordering::Relaxed);
         p.waiters.init();
+    }
+}
+
+/// `mtx_print_parks` (`DDB`): every parking lot and its waiters; nothing calls it, ddb's
+/// `call` does.
+#[cfg(feature = "multiprocessor")]
+pub fn mtx_print_parks() {
+    use crate::kern::subr_prf::db_printf;
+
+    for (i, p) in MTX_PARKING.iter().enumerate() {
+        db_printf(format_args!(
+            "park {} @ {:p} lock {:p}\n",
+            i,
+            p,
+            p.lock.load(Ordering::Relaxed)
+        ));
+        for w in p.waiters.iter() {
+            db_printf(format_args!(
+                "\twaiter mtx {:p} wait {}\n",
+                w.mtx,
+                w.wait.load(Ordering::Relaxed)
+            ));
+        }
     }
 }
 

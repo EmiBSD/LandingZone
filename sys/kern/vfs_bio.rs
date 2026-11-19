@@ -98,9 +98,9 @@
 //!   `splbio`.
 //! - `getblk` and `buf_get` return `Option` (the C's NULL); `incore` likewise.
 //! - The cleaner's `TRACEPOINT`s (dt(4)) are left out (the user's decision of 2026-11-19);
-//!   `HIBERNATE` is not configured
-//!   (`hibernate_suspend_bufcache`); the DDB printer `bcstats_print` waits for the ddb
-//!   command loop (`db_command.c`).
+//!   `HIBERNATE` (in amd64's and arm64's GENERIC) gives `hibernate_suspend_bufcache` and
+//!   `hibernate_resume_bufcache`, whose caller (`subr_hibernate.c`) is TD4's; the DDB printer
+//!   `bcstats_print` takes ddb's `PrFn`.
 //! - `curproc->p_ru.ru_inblock++`/`ru_oublock++` are skipped when there is no `curproc`
 //!   (the C always has one).
 //! - `pool_get(PR_WAITOK)` and `uvm_pagealloc_multi(UVM_PLA_WAITOK)` cannot sleep yet
@@ -1349,7 +1349,27 @@ pub fn biodone(bp: &'static Buf) {
     }
 }
 
-// DDB: bcstats_print waits for the ddb command loop (db_command.c).
+/// `bcstats_print(pr)` (`DDB`): ddb hook to print interesting buffer cache counters.
+pub fn bcstats_print(pr: crate::machine::db_machdep::PrFn) {
+    let bc = BCSTATS.snapshot();
+    pr(format_args!("Current Buffer Cache status:\n"));
+    pr(format_args!(
+        "numbufs {} busymapped {}, delwri {}\n",
+        bc.numbufs, bc.busymapped, bc.delwribufs
+    ));
+    pr(format_args!(
+        "kvaslots {} avail kva slots {}\n",
+        bc.kvaslots, bc.kvaslots_avail
+    ));
+    pr(format_args!(
+        "bufpages {}, dirtypages {}\n",
+        bc.numbufpages, bc.numdirtypages
+    ));
+    pr(format_args!(
+        "pendingreads {}, pendingwrites {}\n",
+        bc.pendingreads, bc.pendingwrites
+    ));
+}
 
 /// `buf_adjcnt(bp, ncount)`: shortens the valid part of a buffer.
 pub fn buf_adjcnt(bp: &Buf, ncount: i64) {
@@ -1636,7 +1656,26 @@ pub fn bufcache_release(bp: &'static Buf) {
     unsafe { freelist_insert_tail(queue, bp) };
 }
 
-// HIBERNATE (hibernate_suspend_bufcache, hibernate_resume_bufcache): not configured.
+/// `hibernate_suspend_bufcache` (`HIBERNATE`): nuke the buffer cache from orbit when
+/// hibernating. We do not want to save any clean cache pages to swap and read them back; the
+/// original disk files are just as good.
+pub fn hibernate_suspend_bufcache() {
+    let s = splbio();
+    // Chuck away all the cache pages.. discard bufs, do not promote
+    while let Some(bp) = bufcache_getcleanbuf(true) {
+        bufcache_take(bp);
+        if let Some(vp) = bp.b_vp.get() {
+            // SAFETY: a buffer with a vnode is in that vnode's tree (`buf_get`).
+            unsafe { vp.v_bufs_tree.remove(bp) };
+            brelvp(bp);
+        }
+        buf_put(bp);
+    }
+    splx(s);
+}
+
+/// `hibernate_resume_bufcache` (`HIBERNATE`): XXX Nothing needed here for now.
+pub fn hibernate_resume_bufcache() {}
 
 /// `dma_constraint`, the range `buf_alloc_pages` backs off for.
 pub fn dma_constraint() -> &'static UvmConstraintRange {

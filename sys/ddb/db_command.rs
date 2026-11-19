@@ -144,7 +144,7 @@ use crate::kern::subr_pool::{PoolWalkPr, db_show_all_pools, pool_printit, pool_w
 use crate::kern::subr_prf::{Str, db_printf, panicstr_message};
 use crate::kern::uipc_mbuf::{m_print, m_print_chain, m_print_packet};
 use crate::kern::uipc_socket::so_print;
-use crate::kern::vfs_bio::BUFPOOL;
+use crate::kern::vfs_bio::{BUFPOOL, bcstats_print};
 use crate::kern::vfs_subr::{
     MOUNTLIST, VNODE_POOL, vfs_buf_print, vfs_mount_print, vfs_vnode_print,
 };
@@ -719,7 +719,8 @@ fn db_uvmexp_print_cmd(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]
 
 /// `db_bcstats_print_cmd`: `show bcstats`.
 fn db_bcstats_print_cmd(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
-    db_stub!("bcstats_print (vfs_bio.c)")
+    bcstats_print(db_pr);
+    Ok(())
 }
 
 /// `db_listbreak_cmd` (`db_break.c`): `show breaks`.
