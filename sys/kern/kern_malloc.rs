@@ -52,25 +52,30 @@
 //!
 //! Upstream: sys/kern/kern_malloc.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M3 ports `malloc`, `free`, `mallocarray`, `kmeminit_nkmempages`
-//! and `kmeminit`; the diagnostic tools (stage 2) `sysctl_malloc` with `buckstring` and
-//! `memall`; `malloc_printit` (ddb) is not here. The `KMEMSTATS` option is feature
-//! `kmemstats`.
+//! Status: `ported`: `malloc`, `free`, `mallocarray`, `kmeminit_nkmempages`, `kmeminit`,
+//! `sysctl_malloc` with `buckstring` and `memall`, and `malloc_printit` (ddb's `show malloc`).
+//! The `KMEMSTATS` option is feature `kmemstats`, `DIAGNOSTIC` feature `diagnostic`.
 //!
 //! ## Deviations
 //! - On a machine without an MMU (`PMAP_NOMMU`: the host test double) `kmem_map` is not
 //!   made: `kmembase`/`kmemlimit` are the direct-map addresses of the lowest and the highest
-//!   loaded page frame and `kmemusage` has one entry per frame in between.
+//!   loaded page frame and `kmemusage` has one entry per frame in between; the `DIAGNOSTIC`
+//!   check of a freelist link compares it with those bounds there.
 //! - `btokup` always checks that the address is inside `[kmembase, kmemlimit)` (the C only
 //!   under `DIAGNOSTIC`): it indexes an array.
 //! - M11a: `malloc_mtx` is the C's mutex (`IPL_VM`) around the buckets, `kmemusage` and
 //!   `kmemstats`, with or without `MULTIPROCESSOR`; a `M_WAITOK` request over a type's
 //!   `ks_limit` sleeps on it as in C. `km_alloc`/`km_free` run at `splvm` with the mutex
 //!   released, as in C.
-//! - `poison_mem`/`poison_check`/`poison_value` (`subr_poison.c`) and the `uvm_map_checkprot`
-//!   freelist check under `DIAGNOSTIC` are reported where the C calls them.
-//! - `malloc_lasterr`/`ratecheck` (time) are not here: the "allocation too large" message is
-//!   printed every time.
+//! - `DIAGNOSTIC` is feature `diagnostic`: the poisoning of free blocks (`subr_poison.rs`),
+//!   the `uvm_map_checkprot` check of the freelist and the multiple-free search are the C's.
+//!   The "invalid addr" message prints the word of the block that holds the freelist link
+//!   where the C prints `(int32_t *)&addr - (int32_t *)kbp`, the distance from the bucket to
+//!   a local variable (EXTERNAL_BUGS EXT-234).
+//! - `malloc_lasterr`, which limits the "allocation too large" message to one in five
+//!   seconds, is read and written under `malloc_mtx`: the C's `ratecheck` on it takes no
+//!   lock, and two CPUs writing a `struct timeval` at once is a data race Rust cannot have.
+//!   `SMALL_KERNEL` is not configured.
 //! - `sysctl_malloc` copies `kmembuckets`/`kmemstats` out through their `to_bytes` (the C
 //!   layout, freelist head zeroed) under `malloc_mtx`. `BUCKETINDX` of a negative bucket
 //!   number is the smallest bucket, as the C's `int` comparisons make it.
@@ -84,8 +89,12 @@ use libkern::StaticCell;
 use crate::dev::rnd::arc4random_buf;
 use crate::kern::kern_lock::{mtx_enter, mtx_leave};
 use crate::kern::kern_sysctl::{sysctl_rdstring, sysctl_rdstruct};
+use crate::kern::kern_time::ratecheck;
+#[cfg(feature = "diagnostic")]
+use crate::kern::subr_poison::{poison_check, poison_mem, poison_value};
 #[cfg(any(feature = "kmemstats", feature = "diagnostic"))]
 use crate::kern::subr_prf::snprintf;
+use crate::machine::db_machdep::PrFn;
 use crate::machine::intr::{IPL_VM, splvm, splx};
 use crate::machine::pmap::pmap_map_direct;
 use crate::machine::{Machine, Pmap};
@@ -105,14 +114,15 @@ use crate::sys::mutex::Mutex;
 use crate::sys::param::{PAGE_SHIFT, PAGE_SIZE};
 use crate::sys::queue::XsimpleqEntry;
 use crate::sys::systm::PHYSMEM;
-#[cfg(feature = "diagnostic")]
-use crate::unported;
+use crate::sys::time::Timeval;
 use crate::uvm::uvm_init::UVMEXP;
 use crate::uvm::uvm_km::{
     KD_NOWAIT, KD_WAITOK, KP_DIRTY, KP_ZERO, KV_ANY, KV_INTRSAFE, kernel_map, km_alloc, km_free,
     uvm_km_suballoc,
 };
 use crate::uvm::uvm_map::{VM_MAP_INTRSAFE, VmMap};
+#[cfg(feature = "diagnostic")]
+use crate::uvm::uvm_map::{uvm_map_checkprot, vm_map_lock, vm_map_unlock};
 use crate::uvm::uvm_page::vm_physmem;
 use crate::uvm::uvm_param::{VM_KERNEL_SPACE_SIZE, atop, ptoa, round_page};
 use crate::{kassert, kprintf, queue_adapter};
@@ -125,6 +135,8 @@ use crate::sys::malloc::Kmemstats;
 use crate::sys::malloc::M_LAST;
 #[cfg(feature = "diagnostic")]
 use crate::sys::malloc::{M_FREE, MINALLOCSIZE};
+#[cfg(feature = "diagnostic")]
+use crate::sys::mman::PROT_WRITE;
 
 /// `BUCKETINDX(sz)`: the bucket of a size. Note that this relies upon `MINALLOCSIZE` being
 /// `1 << MINBUCKET`.
@@ -163,6 +175,8 @@ pub fn kmem_map() -> &'static VmMap {
 /// `NKMEMPAGES`: the configured number of pages in `kmem_map`; -1 asks for the run-time
 /// calculation.
 const NKMEMPAGES_OPTION: i64 = -1;
+/// `malloc_errintvl`: the least time between two "allocation too large" messages.
+const MALLOC_ERRINTVL: Timeval = Timeval::new(5, 0);
 
 /// `struct kmem_freelist`: normally the freelist structure is used only to hold the list
 /// pointer for free objects. However, when running with diagnostics, the first 8 bytes of the
@@ -191,6 +205,9 @@ queue_adapter!(
 static NKMEMPAGES: AtomicI64 = AtomicI64::new(NKMEMPAGES_OPTION);
 /// `malloc_mtx`: guards `bucket[]`, `kmemstats[]` and `kmemusage`.
 static MALLOC_MTX: Mutex = Mutex::new(IPL_VM);
+/// `malloc_lasterr`: when "allocation too large" was last printed; under `malloc_mtx` (see
+/// the module's deviations).
+static MALLOC_LASTERR: StaticCell<Timeval> = StaticCell::new(Timeval::new(0, 0));
 /// `bucket[]`.
 static BUCKET: [Kmembuckets; (MINBUCKET + 16) as usize] =
     [const { Kmembuckets::new() }; (MINBUCKET + 16) as usize];
@@ -258,6 +275,16 @@ fn kmemstats_wmesg(type_: i32) -> &'static str {
         .unwrap_or("???")
 }
 
+/// `kmemxtob(alloc)`: the address of page `alloc` of the malloc arena.
+pub fn kmemxtob(alloc: usize) -> usize {
+    KMEMBASE.load(Ordering::Relaxed) + alloc * PAGE_SIZE
+}
+
+/// `btokmemx(addr)`: the page of the malloc arena that holds `addr`.
+pub fn btokmemx(addr: usize) -> usize {
+    (addr - KMEMBASE.load(Ordering::Relaxed)) / PAGE_SIZE
+}
+
 /// `btokup(addr)`: the usage descriptor of the page holding `addr`.
 fn btokup(addr: usize) -> &'static Kmemusage {
     let base = KMEMBASE.load(Ordering::Relaxed);
@@ -307,12 +334,17 @@ pub fn malloc(size: usize, type_: i32, flags: i32) -> Option<NonNull<u8>> {
 
     if size > MALLOC_MAX {
         if flags & M_CANFAIL != 0 {
-            // ratecheck(&malloc_lasterr, &malloc_errintvl): see the module's deviations.
-            kprintf!(
-                "malloc(): allocation too large, type = {}, size = {}\n",
-                type_,
-                size
-            );
+            mtx_enter(&MALLOC_MTX);
+            // SAFETY: `malloc_lasterr` is touched only here, under malloc_mtx.
+            let say = ratecheck(unsafe { MALLOC_LASTERR.get_mut() }, &MALLOC_ERRINTVL);
+            mtx_leave(&MALLOC_MTX);
+            if say {
+                kprintf!(
+                    "malloc(): allocation too large, type = {}, size = {}\n",
+                    type_,
+                    size
+                );
+            }
             return None;
         }
         #[allow(clippy::panic)] // the C panics here too
@@ -432,15 +464,18 @@ pub fn malloc(size: usize, type_: i32, flags: i32) -> Option<NonNull<u8>> {
         }
         let mut cp = va + (npg * PAGE_SIZE) - allocsize;
         loop {
+            #[cfg(feature = "diagnostic")]
+            {
+                // Copy in known text to detect modification after freeing.
+                // SAFETY: `cp` is the start of a block of `allocsize` bytes inside the pages
+                // just allocated, which nothing holds yet.
+                unsafe { poison_mem(cp as *mut u8, allocsize) };
+            }
             // SAFETY: `cp` is the start of a block inside the pages just allocated; any bit
             // pattern is a valid kmem_freelist (three integers and a link).
             let freep = unsafe { &*(cp as *const KmemFreelist) };
             #[cfg(feature = "diagnostic")]
-            {
-                // Copy in known text to detect modification after freeing.
-                let _ = unported!("poison_mem (subr_poison.c) in malloc");
-                freep.kf_type.set(M_FREE as i16);
-            }
+            freep.kf_type.set(M_FREE as i16);
             // SAFETY: a block of a fresh allocation is on no list.
             unsafe { kbp.kb_freelist.insert_head(freep) };
             if cp <= va {
@@ -463,16 +498,58 @@ pub fn malloc(size: usize, type_: i32, flags: i32) -> Option<NonNull<u8>> {
         // SAFETY: `freep` was a linked block; it is the caller's now.
         let freep = unsafe { &*freep };
         let savedtype = memname(i32::from(freep.kf_type.get()));
-        if !freshalloc && kbp.kb_freelist.first().is_some() {
-            // vm_map_lock(kmem_map); uvm_map_checkprot(kmem_map, addr, addr + sizeof(struct
-            // kmem_freelist), PROT_WRITE): uvm_map.c.
-            let _ = unported!("uvm_map_checkprot (malloc freelist check)");
+        if !freshalloc && let Some(next) = kbp.kb_freelist.first() {
+            // Only the address is used: a link somebody wrote over may point anywhere.
+            let addr = ptr::from_ref(next) as usize;
+
+            let rv = if <Machine as Pmap>::PMAP_NOMMU {
+                // No kmem_map (see the module's deviations): the arena's bounds stand in.
+                addr >= KMEMBASE.load(Ordering::Relaxed)
+                    && addr + size_of::<KmemFreelist>() <= KMEMLIMIT.load(Ordering::Relaxed)
+            } else {
+                vm_map_lock(kmem_map());
+                let rv = uvm_map_checkprot(
+                    kmem_map(),
+                    addr,
+                    addr + size_of::<KmemFreelist>(),
+                    PROT_WRITE,
+                );
+                vm_map_unlock(kmem_map());
+                rv
+            };
+
+            if !rv {
+                kprintf!(
+                    "Data modified on freelist: word {} of object {:#x} size {:#x} previous type {} (invalid addr {:#x})\n",
+                    core::mem::offset_of!(KmemFreelist, kf_flist) / size_of::<i32>(),
+                    va,
+                    size,
+                    savedtype,
+                    addr
+                );
+            }
         }
 
-        // Fill the fields that we've used with poison and check that the data hasn't been
-        // modified.
-        let _ = unported!("poison_mem/poison_check (subr_poison.c) in malloc");
-        let _ = savedtype;
+        // Fill the fields that we've used with poison
+        // SAFETY: the block is off the list and the caller's; it starts with the
+        // kmem_freelist it was linked by, whose fields are cells.
+        unsafe { poison_mem(va as *mut u8, size_of::<KmemFreelist>()) };
+
+        // and check that the data hasn't been modified.
+        if !freshalloc {
+            // SAFETY: `allocsize` bytes of the block, which nothing else holds.
+            if let Some((pidx, pval)) = unsafe { poison_check(va as *const u8, allocsize) } {
+                // SAFETY: `poison_check` read this word of the block.
+                let found = unsafe { (va as *const i32).add(pidx).read() };
+                #[allow(clippy::panic)] // the C panics here too
+                {
+                    panic!(
+                        "Data modified on freelist: word {} of object {:#x} size {:#x} previous type {} ({:#x} != {:#x})\n",
+                        pidx, va, size, savedtype, found, pval
+                    );
+                }
+            }
+        }
 
         freep.kf_spare0.set(0);
     }
@@ -633,17 +710,24 @@ pub fn free(addr: NonNull<u8>, type_: i32, freedsize: usize) {
     #[cfg(feature = "diagnostic")]
     {
         // Check for multiple frees. Use a quick check to see if it looks free before
-        // laboriously searching the freelist: poison_value, subr_poison.c.
-        let _ = unported!("poison_value/poison_mem (subr_poison.c) in free");
-        for fp in kbp.kb_freelist.iter() {
-            if ptr::eq(fp, freep) {
-                kprintf!("multiply freed item {:#x}\n", addr);
-                #[allow(clippy::panic)] // the C panics here too
-                {
-                    panic!("free: duplicated free");
+        // laboriously searching the freelist.
+        if freep.kf_spare0.get() as u32 == poison_value(addr) {
+            for fp in kbp.kb_freelist.iter() {
+                if ptr::eq(fp, freep) {
+                    kprintf!("multiply freed item {:#x}\n", addr);
+                    #[allow(clippy::panic)] // the C panics here too
+                    {
+                        panic!("free: duplicated free");
+                    }
                 }
             }
         }
+        // Copy in known text to detect modification after freeing and to make it look free.
+        // SAFETY: the block is `size` bytes the caller returns; nothing else holds it, and
+        // the kmem_freelist view of its start is made of cells.
+        unsafe { poison_mem(addr as *mut u8, size) };
+        freep.kf_spare0.set(poison_value(addr) as i32);
+
         // Save the type being freed so we can list likely culprit if modification is
         // detected when the object is reallocated.
         freep.kf_type.set(type_ as i16);
@@ -909,6 +993,38 @@ pub fn sysctl_malloc(
 /// `MUL_NO_OVERFLOW`: products of two factors below it cannot overflow.
 const MUL_NO_OVERFLOW: usize = 1 << (size_of::<usize>() * 4);
 
+/// `malloc_printit` (`DDB`): `show malloc`, a line for every type that was ever asked for.
+pub fn malloc_printit(pr: PrFn) {
+    #[cfg(feature = "kmemstats")]
+    {
+        pr(format_args!(
+            "{:>15} {:>5}  {:>6}  {:>7}  {:>6} {:>9} {:>8}\n",
+            "Type", "InUse", "MemUse", "HighUse", "Limit", "Requests", "Type Lim"
+        ));
+        for (km, name) in KMEMSTATS.iter().zip(INITKMEMNAMES.iter()) {
+            let Some(name) = name else {
+                continue;
+            };
+            if km.ks_calls.get() == 0 {
+                continue;
+            }
+
+            pr(format_args!(
+                "{:>15} {:>5} {:>6}K {:>7}K {:>6}K {:>9} {:>8}\n",
+                name,
+                km.ks_inuse.get(),
+                km.ks_memuse.get() / 1024,
+                km.ks_maxused.get() / 1024,
+                km.ks_limit.get() / 1024,
+                km.ks_calls.get(),
+                km.ks_limblocks.get()
+            ));
+        }
+    }
+    #[cfg(not(feature = "kmemstats"))]
+    pr(format_args!("No KMEMSTATS compiled in\n"));
+}
+
 /// `mallocarray`: `malloc` of `nmemb * size` bytes, refusing an overflow.
 pub fn mallocarray(nmemb: usize, size: usize, type_: i32, flags: i32) -> Option<NonNull<u8>> {
     if (nmemb >= MUL_NO_OVERFLOW || size >= MUL_NO_OVERFLOW)
@@ -950,6 +1066,49 @@ mod tests {
     use super::*;
     use crate::kern::subr_pool::tests::setup_real_memory;
     use crate::sys::malloc::{M_DEVBUF, M_TEMP};
+
+    /// What `malloc_printit` printed in the test below.
+    static PRINTED: std::sync::Mutex<std::string::String> =
+        std::sync::Mutex::new(std::string::String::new());
+
+    fn capture(args: core::fmt::Arguments<'_>) {
+        use std::fmt::Write;
+        let _ = PRINTED
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .write_fmt(args);
+    }
+
+    #[test]
+    fn malloc_printit_lists_the_types_in_use() {
+        let _g = setup_real_memory();
+        let p = malloc(3000, M_DEVBUF, M_NOWAIT).expect("a block");
+
+        PRINTED.lock().unwrap_or_else(|e| e.into_inner()).clear();
+        malloc_printit(capture);
+        let out = PRINTED.lock().unwrap_or_else(|e| e.into_inner()).clone();
+
+        let mut lines = out.lines();
+        assert_eq!(
+            lines.next(),
+            Some("           Type InUse  MemUse  HighUse   Limit  Requests Type Lim")
+        );
+        // devbuf has one 4096-byte block: 4K in use.
+        let devbuf = lines
+            .find(|l| l.trim_start().starts_with("devbuf "))
+            .expect("a line for devbuf");
+        let cols: Vec<&str> = devbuf.split_whitespace().collect();
+        assert_eq!(cols[..3], ["devbuf", "1", "4K"]);
+        assert_eq!(cols.len(), 7);
+        // A type nobody asked for has no line; neither has an unused number.
+        assert!(!out.contains("???"));
+
+        free(p, M_DEVBUF, 3000);
+        assert_eq!(
+            kmemxtob(btokmemx(p.as_ptr() as usize)),
+            p.as_ptr() as usize & !(PAGE_SIZE - 1)
+        );
+    }
 
     #[test]
     fn bucketindx_follows_the_c_formula() {

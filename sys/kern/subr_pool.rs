@@ -78,9 +78,8 @@
 //!   (or a thread-less host test) fails, where the C panics under `DIAGNOSTIC` ("cannot sleep
 //!   for memory during boot") and spins in `msleep`'s cold path otherwise; after boot it
 //!   queues a request and sleeps for `pool_runqueue` as in C.
-//! - `poison_mem`/`poison_check` (`subr_poison.c`) are reported where `POOL_DEBUG` would
-//!   call them, in the page lists and in the per-CPU caches; the double-put check under
-//!   `DIAGNOSTIC` is ported.
+//! - `DIAGNOSTIC` is feature `diagnostic`: the double-put check and the poisoning of free
+//!   items (`subr_poison.rs`), in the page lists and in the per-CPU caches, are the C's.
 //! - `splassert(pp->pr_ipl)` in `pool_do_get`/`pool_do_put` is not checked.
 //! - `arc4random` (page magics, freelist order, the `XSIMPLEQ` cookies, the cache magics) is
 //!   `dev/rnd.rs`'s stream.
@@ -111,6 +110,8 @@ use crate::kern::kern_sysctl::{sysctl_rdint, sysctl_rdstring, sysctl_rdstruct};
 use crate::kern::kern_task::{SYSTQMP, task_add};
 use crate::kern::kern_tc::getnsecuptime;
 use crate::kern::kern_timeout::timeout_add_sec;
+#[cfg(feature = "diagnostic")]
+use crate::kern::subr_poison::{poison_check, poison_mem};
 use crate::kern::subr_xxx::assertwaitok;
 use crate::machine::intr::{IPL_HIGH, splvm, splx};
 use crate::sys::errno::Errno;
@@ -128,8 +129,6 @@ use crate::sys::systm::{INFSLP, kernel_lock, kernel_unlock};
 use crate::sys::task::Task;
 use crate::sys::timeout::Timeout;
 use crate::sys::tree::RbtEntry;
-#[cfg(feature = "diagnostic")]
-use crate::unported;
 use crate::uvm::uvm_extern::{KMEM_DYN_INITIALIZER, KmemPaMode, KmemVaMode};
 use crate::uvm::uvm_km::{KP_DIRTY, KV_ANY, KV_INTRSAFE, KV_PAGE, km_alloc, km_free};
 use crate::{kassert, queue_adapter, tree_adapter};
@@ -212,6 +211,18 @@ const POOL_MAGICBIT: usize = 1 << 3;
 #[cfg(feature = "diagnostic")]
 fn pool_phpoison(ph: &PoolPageHeader) -> bool {
     ph.ph_magic.get() & POOL_MAGICBIT != 0
+}
+
+/// `pi + 1` and `pp->pr_size - sizeof(*pi)`: the bytes of a free item past its `struct
+/// pool_item`, which `poison_mem` fills and `poison_check` reads.
+#[cfg(feature = "diagnostic")]
+fn pool_item_body(pp: &Pool, pi: *const PoolItem) -> (*mut u8, usize) {
+    (
+        pi.cast_mut()
+            .cast::<u8>()
+            .wrapping_add(size_of::<PoolItem>()),
+        pp.pr_size.get() as usize - size_of::<PoolItem>(),
+    )
 }
 
 queue_adapter!(
@@ -1018,7 +1029,24 @@ pub fn pool_do_get(pp: &Pool, flags: i32, slowdown: &mut i32) -> Option<NonNull<
 
     #[cfg(feature = "diagnostic")]
     if POOL_DEBUG.load(Ordering::Relaxed) != 0 && pool_phpoison(ph) {
-        let _ = unported!("poison_check (subr_poison.c) in pool_do_get");
+        let (body, len) = pool_item_body(pp, pi);
+        // SAFETY: a free item just taken off its page's list: `pr_size` bytes of the pool's
+        // memory, word aligned, that nothing else holds.
+        if let Some((pidx, _pval)) = unsafe { poison_check(body, len) } {
+            // SAFETY: `poison_check` read this word of the item.
+            let found = unsafe { body.cast::<i32>().add(pidx).read() };
+            #[allow(clippy::panic)] // the C panics here too
+            {
+                panic!(
+                    "pool_do_get: {} free list modified: page {:p}; item addr {:p}; offset {:#x}={:#x}",
+                    pp.pr_wchan.get(),
+                    ph.ph_page.get(),
+                    pi,
+                    pidx * size_of::<i32>() + size_of::<PoolItem>(),
+                    found
+                );
+            }
+        }
     }
 
     let nmissing = ph.ph_nmissing.get();
@@ -1130,7 +1158,10 @@ pub fn pool_do_put(pp: &Pool, v: NonNull<u8>) {
     unsafe { ph.ph_items.insert_head(pi_ref) };
     #[cfg(feature = "diagnostic")]
     if pool_phpoison(ph) {
-        let _ = unported!("poison_mem (subr_poison.c) in pool_do_put");
+        let (body, len) = pool_item_body(pp, pi);
+        // SAFETY: the item the caller gives back: `pr_size` bytes of the pool's memory, word
+        // aligned, free from here on.
+        unsafe { poison_mem(body, len) };
     }
 
     let nmissing = ph.ph_nmissing.get();
@@ -1267,7 +1298,10 @@ pub fn pool_p_alloc(pp: &Pool, flags: i32, slowdown: &mut i32) -> Option<&'stati
 
         #[cfg(feature = "diagnostic")]
         if pool_phpoison(ph) {
-            let _ = unported!("poison_mem (subr_poison.c) in pool_p_alloc");
+            let (body, len) = pool_item_body(pp, pi);
+            // SAFETY: an item of the page just allocated: `pr_size` bytes inside it, word
+            // aligned, that nothing holds yet.
+            unsafe { poison_mem(body, len) };
         }
 
         addr = addr.wrapping_add(pp.pr_size.get() as usize);
@@ -1297,7 +1331,24 @@ pub fn pool_p_free(pp: &Pool, ph: &PoolPageHeader) {
 
         #[cfg(feature = "diagnostic")]
         if pool_phpoison(ph) {
-            let _ = unported!("poison_check (subr_poison.c) in pool_p_free");
+            let (body, len) = pool_item_body(pp, pi);
+            // SAFETY: a free item of a page the pool is giving back: `pr_size` bytes of its
+            // memory, word aligned, that nothing else holds.
+            if let Some((pidx, _pval)) = unsafe { poison_check(body, len) } {
+                // SAFETY: `poison_check` read this word of the item.
+                let found = unsafe { body.cast::<i32>().add(pidx).read() };
+                #[allow(clippy::panic)] // the C panics here too
+                {
+                    panic!(
+                        "pool_p_free: {} free list modified: page {:p}; item addr {:p}; offset {:#x}={:#x}",
+                        pp.pr_wchan.get(),
+                        ph.ph_page.get(),
+                        pi,
+                        pidx * size_of::<i32>(),
+                        found
+                    );
+                }
+            }
         }
     }
 
@@ -2027,7 +2078,27 @@ pub fn pool_cache_get(pp: &Pool) -> Option<NonNull<u8>> {
     pool_cache_item_magic_check(pp, ci);
     #[cfg(feature = "diagnostic")]
     if POOL_DEBUG.load(Ordering::Relaxed) != 0 && pool_cache_item_poisoned(ci) {
-        let _ = unported!("poison_check (subr_poison.c) in pool_cache_get");
+        let body = ptr::from_ref(ci)
+            .cast::<u8>()
+            .wrapping_add(size_of::<PoolCacheItem>());
+        let len = pp.pr_size.get() as usize - size_of::<PoolCacheItem>();
+        // SAFETY: a free item on this CPU's list: `pr_size` bytes of the pool's memory, word
+        // aligned, that nothing else holds.
+        if let Some((pidx, pval)) = unsafe { poison_check(body, len) } {
+            // SAFETY: `poison_check` read this word of the item.
+            let found = unsafe { body.cast::<i32>().add(pidx).read() };
+            #[allow(clippy::panic)] // the C panics here too
+            {
+                panic!(
+                    "pool_cache_get: {} cpu free list modified: item addr {:p}+{} {:#x}!={:#x}",
+                    pp.pr_wchan.get(),
+                    ci,
+                    size_of::<PoolCacheItem>() + pidx * size_of::<i32>(),
+                    found,
+                    pval
+                );
+            }
+        }
     }
 
     pc.pc_actv.set(ci.ci_next.get());
@@ -2056,7 +2127,14 @@ pub fn pool_cache_put(pp: &Pool, v: NonNull<u8>) {
         && pp.pr_size.get() as usize > size_of::<PoolCacheItem>();
     #[cfg(feature = "diagnostic")]
     if poison {
-        let _ = unported!("poison_mem (subr_poison.c) in pool_cache_put");
+        // SAFETY: the item the caller gives back: `pr_size` bytes of the pool's memory, word
+        // aligned, free from here on.
+        unsafe {
+            poison_mem(
+                v.as_ptr().wrapping_add(size_of::<PoolCacheItem>()),
+                pp.pr_size.get() as usize - size_of::<PoolCacheItem>(),
+            );
+        }
     }
 
     let (pc, s) = pool_cache_enter(pp, cm);

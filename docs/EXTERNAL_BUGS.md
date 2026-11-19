@@ -271,6 +271,7 @@ means EmiBSD's code has it too ("Bugs the port reproduces").
 | EXT-231 | `sys/arch/amd64/include/specialreg.h:1540` | `SVM_INTERCEPT_DR3_READ` is `(1UL << 2)`, the bit of `SVM_INTERCEPT_DR2_READ` | — (the constant has no user) | cosmetic | read | `SVM_INTERCEPT_DR3_READ` is `1 << 3` | open |
 | EXT-232 | `sys/arch/amd64/include/segments.h:75` | eight macros cannot be expanded: `IDXDYNSEL` and `GDYNSEL` name an undefined `DYNSEL_START`, the six `IS*DP` read a `d_type` member no descriptor has | — (the macros have no user) | cosmetic | read | the eight are not declared | open |
 | EXT-233 | `sys/sys/socket.h:322` | `CTL_NET_NAMES` has 36 entries while `NET_MAXID` (`AF_MAX`) is 37: `AF_FRAME` (36) was added without a name | — (sysctl(8) only; the kernel does not read the table) | cosmetic | read | the table has the header's 36 entries | open |
+| EXT-234 | `sys/kern/kern_malloc.c:312` | the "Data modified on freelist" message of a bad freelist link prints `(int32_t *)&addr - (int32_t *)kbp`: the distance from the bucket to a local variable, not a word of the object | — (a `DIAGNOSTIC` kernel whose freelist was already overwritten) | cosmetic | read | prints the word of the block that holds the link | open |
 
 ## Entries (EXT-1 to EXT-8, EXT-192 to EXT-197)
 
@@ -849,6 +850,24 @@ Every C line in this and the following sections is at the pin 3ce1f3f79392, unde
   deviation listed in the file).
 - Severity: cosmetic.
 - Fix: add `{ "frame", CTLTYPE_NODE }` (or `{ 0, 0 }`) as entry 36.
+
+### EXT-234: malloc's "invalid addr" message prints the address of a local variable
+
+- Where: `sys/kern/kern_malloc.c:299-315` at 3ce1f3f79392 (`malloc`, under `DIAGNOSTIC`).
+- What: before it hands out a block, `malloc` checks that the next link of the bucket's
+  freelist points at writable kernel memory (`uvm_map_checkprot` on `kmem_map`). When it
+  does not, the message says "Data modified on freelist: word %zd of object %p", and the
+  word is computed as `(int32_t *)&addr - (int32_t *)kbp`. `addr` is the local `vaddr_t`
+  declared at 301 that holds the link, so `&addr` is a stack address, and the number
+  printed is the distance in words from the bucket to the stack. The older code subtracted
+  the object's address from the address of its link field.
+- Reach: a `DIAGNOSTIC` kernel whose freelist was already overwritten; only the number in
+  the message is wrong, the check itself is right.
+- Verified: read.
+- Port's handling: `sys/kern/kern_malloc.rs` prints the word of the block that holds the
+  link (`offset_of!(KmemFreelist, kf_flist) / 4`), a deviation listed in the file.
+- Severity: cosmetic.
+- Fix: print the index of the link's word in the object, or drop the word from this message.
 
 ### EXT-227: an address lifetime past INT_MAX seconds rearms the expiry timer every tick
 

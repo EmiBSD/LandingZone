@@ -52,9 +52,10 @@
 //!
 //! Upstream: sys/sys/malloc.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M3 ports the flags, the memory types with their names, the
-//! allocator constants and the `kmemstats`/`kmemusage`/`kmembuckets` structures, TD1 the
-//! `CTL_KERN_MALLOC_NAMES` sysctl table; `poison_*` (`subr_poison.c`) come later.
+//! Status: `ported`: the flags, the memory types with their names, the allocator constants,
+//! the `kmemstats`/`kmemusage`/`kmembuckets` structures and the `CTL_KERN_MALLOC_NAMES`
+//! sysctl table. The functions and globals it declares are `kern_malloc.rs`'s (with
+//! `kmemxtob`, `btokmemx` and `btokup`) and `subr_poison.rs`'s (`poison_*`).
 //!
 //! ## Deviations
 //! - `kmemusage`'s union of `freecnt`/`pagecnt` is one `u16` with two accessor pairs.
