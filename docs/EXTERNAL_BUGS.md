@@ -272,6 +272,7 @@ means EmiBSD's code has it too ("Bugs the port reproduces").
 | EXT-232 | `sys/arch/amd64/include/segments.h:75` | eight macros cannot be expanded: `IDXDYNSEL` and `GDYNSEL` name an undefined `DYNSEL_START`, the six `IS*DP` read a `d_type` member no descriptor has | — (the macros have no user) | cosmetic | read | the eight are not declared | open |
 | EXT-233 | `sys/sys/socket.h:322` | `CTL_NET_NAMES` has 36 entries while `NET_MAXID` (`AF_MAX`) is 37: `AF_FRAME` (36) was added without a name | — (sysctl(8) only; the kernel does not read the table) | cosmetic | read | the table has the header's 36 entries | open |
 | EXT-234 | `sys/kern/kern_malloc.c:312` | the "Data modified on freelist" message of a bad freelist link prints `(int32_t *)&addr - (int32_t *)kbp`: the distance from the bucket to a local variable, not a word of the object | — (a `DIAGNOSTIC` kernel whose freelist was already overwritten) | cosmetic | read | prints the word of the block that holds the link | open |
+| EXT-236 | `sys/arch/arm64/arm64/pmap.c:511` | `pmap_vp_page_alloc` turns `PR_NOWAIT` into a try-lock of `kernel_map`: `pmap_enter` fails whenever another CPU holds that lock, and with no swap `uvm_fault` returns `ENOMEM` and the process is killed, with memory to spare | local (a threaded program on a machine without swap) | process killed | read; the port lost the race under QEMU | the pool's pages come through the direct map | open |
 
 ## Entries (EXT-1 to EXT-8, EXT-192 to EXT-197)
 
@@ -850,6 +851,34 @@ Every C line in this and the following sections is at the pin 3ce1f3f79392, unde
   deviation listed in the file).
 - Severity: cosmetic.
 - Fix: add `{ "frame", CTLTYPE_NODE }` (or `{ 0, 0 }`) as entry 36.
+
+### EXT-236: a busy `kernel_map` makes arm64's `pmap_enter` fail, and without swap that kills
+
+- Where: `sys/arch/arm64/arm64/pmap.c:510-520` (`pmap_vp_page_alloc`), `:399-447`
+  (`pmap_vp_enter`), `sys/uvm/uvm_fault.c:1131-1151` and `:1505-1530`, `sys/uvm/uvm_swap.c`
+  (`uvm_swapisfull`), at 3ce1f3f79392.
+- What: the page tables of a user pmap come from `pmap_vp_pool`, whose allocator asks
+  `kernel_map` for two pages with `km_alloc(.., &kv_any, &kp_dirty, &kd)` and
+  `kd.kd_trylock = ISSET(flags, PR_NOWAIT)`. `pmap_vp_enter` runs under the pmap's mutex and
+  so asks with `PR_NOWAIT`: the request is a try-lock of `kernel_map`, and it fails whenever
+  another CPU holds that lock (a thread being created or reaped maps and unmaps its u-area
+  there). `pmap_enter` then returns `ENOMEM` although memory is free. `uvm_fault` unlocks
+  and asks `uvm_swapisfull()` before it tries `pmap_populate`; with no swap configured that
+  is `0 >= 0`, true, so the fault fails with `ENOMEM` and the trap handler kills the
+  process ("out of swap").
+- Reach: any threaded program on an arm64 machine without swap; the window is as long as
+  the other CPU holds `kernel_map`, short on hardware, long when a virtual CPU is
+  descheduled while it holds the lock.
+- Verified: read. Reproduced in the port, which had the same code for one commit
+  (7fdbf65c): `thrtest 300` (300 rounds of thread creation on two CPUs, QEMU TCG) was
+  killed in 2 runs of 4, with `km_alloc` failing for a `PR_NOWAIT` request while the pool
+  held 188 tables, all in use. Not tried on OpenBSD itself.
+- Port's handling: `sys/arch/arm64/arm64/pmap.rs`, `pmap_vp_page_alloc` takes the two pages
+  through the direct map (`uvm_pglistalloc`), which involves no map lock, so a `PR_NOWAIT`
+  request fails only when there is no memory (a deviation listed in the file).
+- Severity: a process killed without cause; no memory unsafety.
+- Fix: call `pmap_populate` before the `uvm_swapisfull` test (it can sleep for the tables),
+  or let the allocator fall back to an interrupt-safe allocation when the try-lock fails.
 
 ### EXT-234: malloc's "invalid addr" message prints the address of a local variable
 

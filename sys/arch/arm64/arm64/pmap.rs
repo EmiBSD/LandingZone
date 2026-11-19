@@ -98,12 +98,18 @@
 //! - User pmaps (M6): `pmap_create`/`pmap_pinit`/`pmap_destroy`/`pmap_release`,
 //!   `pmap_vp_destroy`, `pmap_enter`/`pmap_remove`/`pmap_remove_pted`, the pv lists
 //!   (`pmap_enter_pv`/`pmap_remove_pv`), `pmap_activate`/`pmap_deactivate`/`pmap_setttb`
-//!   and the ASIDs. The vp tables of user pmaps come from `pmap_vp_pool` (its allocator,
-//!   `pmap_vp_allocator`, takes one table of two pages at a time from `kernel_map`) and
+//!   and the ASIDs. The vp tables of user pmaps come from `pmap_vp_pool` and
 //!   their pteds from `pmap_pted_pool`, as in the C, with `pmap_vp_populate` and
 //!   `pmap_populate` (`__HAVE_PMAP_POPULATE`) and the per-CPU caches of
 //!   `pmap_init_percpu`; only the kernel's tables come from the two-page allocator
-//!   `pmap_vp_pages` (`pmap_kvp_alloc`). The ASID bitmap
+//!   `pmap_vp_pages` (`pmap_kvp_alloc`). `pmap_vp_allocator` takes a table's two pages
+//!   through the direct map (`uvm_pglistalloc`), like `pmap_kvp_alloc`, where the C's
+//!   `pmap_vp_page_alloc` asks `kernel_map` (`km_alloc` with `kv_any`): a `PR_NOWAIT`
+//!   request there is a try-lock of `kernel_map`, it fails whenever another CPU holds that
+//!   lock, `pmap_enter` then fails with memory to spare, and a machine with no swap kills
+//!   the faulting process (`uvm_fault`'s `uvm_swapisfull`). The thread stress of
+//!   `smoke-thrsleep` lost that race about every other run under QEMU (EXTERNAL_BUGS
+//!   EXT-236). The ASID bitmap
 //!   is 8-bit (`pmap_nasid` 256 and a bitmap that size; the 16-bit probe of
 //!   `id_aa64mmfr0_el1` is not done). `pmap_setpauthkeys` (pointer authentication) is M7.
 //! - M11a (`MULTIPROCESSOR`): the ASID allocator is the C's, under `pmap_asid_mtx`
@@ -160,11 +166,9 @@ use crate::sys::queue::ListEntry;
 use crate::sys::queue::ListHead;
 use crate::sys::types::{Paddr, Vaddr, Vsize};
 use crate::uvm::uvm_extern::Vmspace;
-use crate::uvm::uvm_extern::{
-    KMEM_DYN_INITIALIZER, KmemDynMode, PROT_MASK, UVM_PLA_NOWAIT, UVM_PLA_ZERO, VmProt,
-};
+use crate::uvm::uvm_extern::{PROT_MASK, UVM_PLA_NOWAIT, UVM_PLA_WAITOK, UVM_PLA_ZERO, VmProt};
 use crate::uvm::uvm_init::UVM;
-use crate::uvm::uvm_km::{KP_DIRTY, KV_ANY, km_alloc, km_free};
+use crate::uvm::uvm_page::uvm_pglistfree;
 use crate::uvm::uvm_page::{
     PHYS_TO_VM_PAGE, Pglist, VmPage, uvm_page_physsteal, uvm_pglistalloc, vm_page_to_phys,
 };
@@ -308,7 +312,7 @@ static PMAP_PMAP_POOL: Pool = Pool::new();
 static PMAP_PTED_POOL: Pool = Pool::new();
 /// `pmap_vp_pool`: the pool of the vp tables of user pmaps (`struct pmapvp0`: two pages).
 static PMAP_VP_POOL: Pool = Pool::new();
-/// `pmap_vp_allocator`: `pmap_vp_pool`'s pages, one table each, straight from `kernel_map`.
+/// `pmap_vp_allocator`: `pmap_vp_pool`'s pages, one table each (see the module's deviations).
 static PMAP_VP_ALLOCATOR: PoolAllocator = PoolAllocator {
     pa_alloc: pmap_vp_page_alloc,
     pa_free: pmap_vp_page_free,
@@ -776,21 +780,41 @@ pub fn pmap_vp_populate(pm: &Pmap, va: usize) {
     }
 }
 
-/// `pmap_vp_page_alloc`: a page of `pmap_vp_pool`, which is one table, from `kernel_map`.
+/// `pmap_vp_page_alloc`: a page of `pmap_vp_pool`, which is one table: two physically
+/// contiguous pages through the direct map (see the module's deviations), not zeroed
+/// (`kp_dirty`); it sleeps for them with `PR_WAITOK`.
 fn pmap_vp_page_alloc(pp: &Pool, flags: i32, _slowdown: &mut i32) -> Option<NonNull<u8>> {
-    let kd = KmemDynMode {
-        kd_waitok: flags & PR_WAITOK != 0,
-        kd_trylock: flags & PR_NOWAIT != 0,
-        // kd_slowdown: the single-page thread is not used with a direct map (uvm_km.rs).
-        ..KMEM_DYN_INITIALIZER
-    };
-
-    km_alloc(pp.pr_pgsize.get() as usize, &KV_ANY, &KP_DIRTY, &kd)
+    let pgl = Pglist::new();
+    pgl.init();
+    uvm_pglistalloc(
+        pp.pr_pgsize.get() as usize,
+        Paddr::new(0),
+        Paddr::new(usize::MAX),
+        Paddr::new(0),
+        Paddr::new(0),
+        &pgl,
+        1,
+        if flags & PR_WAITOK != 0 {
+            UVM_PLA_WAITOK
+        } else {
+            UVM_PLA_NOWAIT
+        },
+    )
+    .ok()?;
+    NonNull::new(pmap_map_direct(pgl.first()?).as_usize() as *mut u8)
 }
 
-/// `pmap_vp_page_free`.
+/// `pmap_vp_page_free`: gives the pages of a table back.
 fn pmap_vp_page_free(pp: &Pool, v: NonNull<u8>) {
-    km_free(v, pp.pr_pgsize.get() as usize, &KV_ANY, &KP_DIRTY);
+    let pgl = Pglist::new();
+    pgl.init();
+    for off in (0..pp.pr_pgsize.get() as usize).step_by(PAGE_SIZE) {
+        if let Some(pg) = pmap_unmap_direct(Vaddr::new(v.as_ptr() as usize + off)) {
+            // SAFETY: a page of ours, on no queue (it came out of uvm_pglistalloc).
+            unsafe { pgl.insert_tail(pg) };
+        }
+    }
+    uvm_pglistfree(&pgl);
 }
 
 /// Two zeroed, physically contiguous pages through the direct map (see the module's
