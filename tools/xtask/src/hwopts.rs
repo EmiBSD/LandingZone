@@ -1589,18 +1589,42 @@ pub(crate) fn poll_screenshot(serial: &str) -> Result<()> {
     mon.set_read_timeout(Some(Duration::from_secs(10)))?;
     // The greeting ends with the prompt; the command's reply with the next one.
     read_prompt(&mut mon)?;
-    writeln!(mon, "screendump {}", ppm.display())?;
-    read_prompt(&mut mon)?;
-    let started = Instant::now();
-    while !ppm_complete(&ppm) {
-        if started.elapsed() > Duration::from_secs(10) {
-            return Err(format!("{}: screendump wrote no picture", ppm.display()).into());
+    let grid = serial.lines().find(|l| l.contains(GRID_PREFIX));
+    // A text the console just wrote reaches a virtio-gpu scanout asynchronously (the driver
+    // flushes later), so under load the first picture can miss the last glyphs: with
+    // --screen-text the picture is taken again, every 200 ms for at most 3 s, until it shows
+    // the text. after_smoke still checks the last picture exactly as before.
+    let retry_until = Instant::now() + Duration::from_secs(3);
+    loop {
+        let _ = fs::remove_file(&ppm);
+        writeln!(mon, "screendump {}", ppm.display())?;
+        read_prompt(&mut mon)?;
+        let started = Instant::now();
+        while !ppm_complete(&ppm) {
+            if started.elapsed() > Duration::from_secs(10) {
+                return Err(format!("{}: screendump wrote no picture", ppm.display()).into());
+            }
+            std::thread::sleep(Duration::from_millis(50));
         }
-        std::thread::sleep(Duration::from_millis(50));
+        let shows_text = match (SCREEN_TEXT.get(), grid) {
+            (Some((row, col, text)), Some(grid)) => fs::read(&ppm)
+                .ok()
+                .and_then(|bytes| {
+                    parse_ppm(&bytes)
+                        .ok()
+                        .map(|p| check_screen_text(&p, grid, *row, *col, text).is_ok())
+                })
+                .unwrap_or(false),
+            _ => true,
+        };
+        if shows_text || Instant::now() >= retry_until {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(200));
     }
     println!("xtask: screendump {} (saw {after:?})", ppm.display());
     if SCREEN_TEXT.get().is_some()
-        && let Some(grid) = serial.lines().find(|l| l.contains(GRID_PREFIX))
+        && let Some(grid) = grid
         && let Ok(mut g) = GRID_LINE.lock()
     {
         *g = Some(grid.to_string());
