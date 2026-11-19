@@ -31,23 +31,25 @@ Done:
   timeout wheel (a host test that aborted now and then).
 - TDk (TD1a, 2026-11-15): the kernel built inside the VM; the "EmiBSD" ELF note,
   `__thrsleep`, sysarch, the direct map's UXN (hvf), pins +emibsd.5/+emibsd.6 without rustup.
-- TD1 so far (2026-11-18): 53 of the 138 `wip` rows closed, 85 left (`ports status`: 237
-  `todo`, 85 `wip`, 109 `skipped`, 1229 `ported`). Headers read whole beside their ports
+- TD1 so far (2026-11-18): 56 of the 138 `wip` rows closed, 82 left (`ports status`: 237
+  `todo`, 82 `wip`, 109 `skipped`, 1232 `ported`). Headers read whole beside their ports
   and closed or completed (armreg.h, specialreg.h, exec_elf.h, smr.h's lists, the device id
   tables by `cargo xtask gen-devs`, the sysctl name tables of socket.h, if.h and in.h,
   time.h, route.h, uvm_pager.h, uvm_pmap.h, malloc.h, syscall_mi.h), and files finished:
   profil(2) (subr_prof.c, kern_clock.c, gmon.h), subr_poison.c with kern_malloc.c,
   subr_pool.c (its ddb printers and pool_chk), kern_clockintr.c (its sysctl and printers),
-  kern_resource.c, kern_exec.c, both vm_machdep.c. Checks the C makes and the port only
+  kern_resource.c, kern_exec.c, both vm_machdep.c, subr_log.c (the `/dev/klog` device),
+  kern_timeout.c, kern_subr.c (startup hooks). Checks the C makes and the port only
   reported are real: RLIMIT_NPROC in fork, MAP_STACK at every system call, RLIMIT_DATA in
-  mprotect, the null device on a set-id exec's closed descriptors; arm64 has per-process
+  mprotect, the null device on a set-id exec's closed descriptors, copyin's refusal of
+  execute-only text on amd64 without PKU; arm64 has per-process
   pointer authentication keys and the C's `pmap_vp_pool` with `pmap_populate`. The tracker
   itself was repaired (20 rows carried another row's notes, 18 another file's blob, since
   2026-10-04) and `ports check` now compares blobs. Seven slips of the C logged on the way
   (EXT-229, EXT-231 to EXT-236), one boot fault fixed (SVE, EXT-230, `smoke-sve`).
 
 Next:
-- TD1 the `wip` rows (85 left: the uvm, kern and arch files by cluster); TD2 the `unported!` stubs; TD3 swapctl, SysV IPC, ptrace, ktrace;
+- TD1 the `wip` rows (82 left: the uvm, kern and arch files by cluster); TD2 the `unported!` stubs; TD3 swapctl, SysV IPC, ptrace, ktrace;
   TD4 the other MI files; TD5 networking; TD6 the arch files. Drivers are not in TD.
 - TB, the boot debt (the user's milestone of 2026-11-16, after TD6): the BIOS boot programs
   of amd64, booting from softraid in efiboot, rdboot; 44 rows (docs/ROADMAP.md). Limine is
