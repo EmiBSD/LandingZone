@@ -60,9 +60,9 @@
 //! - `pin_check` is the C's: a system call must come from the call site the executable's
 //!   `PT_OPENBSD_SYSCALLS` table (`ps_pin`, loaded by `exec`) or `pinsyscalls(2)`
 //!   (`ps_libcpin`) names for its number, or be `sigreturn` from the signal trampoline;
-//!   anything else gets `SIGABRT` (`sigabort`). Its message goes to the console with
-//!   `printf` where the C's `uprintf` writes to the process's terminal: `smoke-boot`
-//!   expects the line on the serial console, from a process that has no terminal.
+//!   anything else gets `SIGABRT` (`sigabort`). Its message goes to the process's terminal
+//!   through `uprintf`, as in the C (the user's decision of 2026-11-19: "tal como el
+//!   original"); a process with no controlling terminal prints nothing.
 //! - dt(4) and `KTRACE` are left out (the user's decision of 2026-11-19).
 //!   `SYSCALL_DEBUG` is the feature `syscall_debug`.
 //! - `SY_NOLOCK` (M11e): honoured as in C for the system calls whose bodies are audited for
@@ -77,8 +77,7 @@ use core::sync::atomic::Ordering;
 use crate::kern::kern_pledge::{pledge_fail, pledge_syscall};
 use crate::kern::kern_sig::{sigabort, single_thread_set, userret};
 use crate::kern::sched_bsd::preempt;
-use crate::kern::subr_prf::Str;
-use crate::kprintf;
+use crate::kern::subr_prf::{Str, uprintf};
 use crate::machine::Machine;
 use crate::machine::cpu::Cpu;
 use crate::machine::signal::MachineSignal;
@@ -199,7 +198,7 @@ pub fn pin_check(p: &Proc, code: Register) -> Result<(), Errno> {
         }
     };
     // XXX remove or simplify this uprintf() call after OpenBSD 7.5 release
-    kprintf!(
+    uprintf(format_args!(
         "{}[{}]: pinsyscalls addr {:x} code {}, pinoff {:#x} (pin{} {} {:x}-{:x} {:x}) \
          (libcpin{} {} {:x}-{:x} {:x}) error {}\n",
         Str(pr.comm()),
@@ -218,7 +217,7 @@ pub fn pin_check(p: &Proc, code: Register) -> Result<(), Errno> {
         plibcpin.pn_end.get(),
         plibcpin.pn_end.get().wrapping_sub(plibcpin.pn_start.get()),
         error as i32
-    );
+    ));
     pr.ps_acflag.set(pr.ps_acflag.get() | APINSYS);
 
     // Try to stop threads immediately, because this process is suspect
