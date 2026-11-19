@@ -12,3 +12,853 @@
 # function = "timeout_sync_order"
 # reason = "#ifdef WITNESS: not configured"
 # approved = "YYYY-MM-DD"
+
+# 2026-11-19: the user approved by name the 141 functions whose #if is false on amd64 and
+# arm64 GENERIC.MP ("si son falsas, no van"; the list was target/debt/EXCEPTIONS-BY-NAME.md,
+# from `cargo xtask ports missing` at 50b3e66c). pgrpdump (#ifdef DEBUG) is one of them.
+
+[[exception]]
+c = "sys/lib/libz/crc32.c"
+function = "write_table"
+reason = "not configured: `defined(DYNAMIC_CRC_TABLE) && defined(MAKECRCH)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/crc32.c"
+function = "write_table32hi"
+reason = "not configured: `defined(DYNAMIC_CRC_TABLE) && defined(MAKECRCH)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/crc32.c"
+function = "write_table64"
+reason = "not configured: `defined(DYNAMIC_CRC_TABLE) && defined(MAKECRCH)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/crc32.c"
+function = "main"
+reason = "not configured: `defined(DYNAMIC_CRC_TABLE) && defined(MAKECRCH)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/crc32.c"
+function = "crc_word"
+reason = "not configured: `!(defined(ARMCRC32)) && defined(W)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/crc32.c"
+function = "crc_word_big"
+reason = "not configured: `!(defined(ARMCRC32)) && defined(W)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/zutil.c"
+function = "z_error"
+reason = "not configured: `defined(ZLIB_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/zutil.c"
+function = "zcalloc"
+reason = "not configured: `!defined(Z_SOLO) && defined(SYS16BIT) && defined(__TURBOC__)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/zutil.c"
+function = "zcfree"
+reason = "not configured: `!defined(Z_SOLO) && defined(SYS16BIT) && defined(__TURBOC__)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/deflate.c"
+function = "check_match"
+reason = "not configured: `defined(ZLIB_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/trees.c"
+function = "gen_trees_header"
+reason = "not configured: `defined(GEN_TREES_H)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/inftrees.c"
+function = "main"
+reason = "not configured: `defined(MAKEFIXED)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/ddb/db_run.c"
+function = "db_set_single_step"
+reason = "not configured: `defined(SOFTWARE_SSTEP)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/ddb/db_run.c"
+function = "db_clear_single_step"
+reason = "not configured: `defined(SOFTWARE_SSTEP)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/uvm/uvm_page.c"
+function = "uvm_page_own"
+reason = "not configured: `defined(UVM_PAGE_TRKOWN)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/kern/kern_lock.c"
+function = "_mtx_init_flags"
+reason = "not configured: `defined(WITNESS)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/ofw/fdt.c"
+function = "fdt_print_property"
+reason = "not configured: `defined(DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/ofw/fdt.c"
+function = "fdt_print_node"
+reason = "not configured: `defined(DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/ofw/fdt.c"
+function = "fdt_print_node_recurse"
+reason = "not configured: `defined(DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/ofw/fdt.c"
+function = "fdt_print_tree"
+reason = "not configured: `defined(DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/kern/kern_event.c"
+function = "kqueue_do_check"
+reason = "not configured: `defined(KQUEUE_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/kern/subr_prof.c"
+function = "prof_init"
+reason = "not configured: `defined(GPROF) || defined(DDBPROF)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/kern/subr_prof.c"
+function = "prof_state_toggle"
+reason = "not configured: `defined(GPROF) || defined(DDBPROF)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/kern/subr_prof.c"
+function = "sysctl_doprof"
+reason = "not configured: `defined(GPROF) || defined(DDBPROF)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/kern/subr_prof.c"
+function = "gmonclock"
+reason = "not configured: `defined(GPROF) || defined(DDBPROF)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/kern/kern_proc.c"
+function = "pgrpdump"
+reason = "not configured: `defined(DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/uvm/uvm_addr.c"
+function = "uaddr_lin_create"
+reason = "not configured: `0` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/uvm/uvm_addr.c"
+function = "uaddr_lin_select"
+reason = "not configured: `0` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/uvm/uvm_addr.c"
+function = "uaddr_rnd_print"
+reason = "not configured: `0 && defined(DEBUG) || defined(DDB)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/kern/exec_elf.c"
+function = "coredump_elf"
+reason = "not configured: `defined(SMALL_KERNEL)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/bpf_filter.c"
+function = "bpf_memcpy"
+reason = "not configured: `!defined(_KERNEL)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/bpf_filter.c"
+function = "bpf_mem_ldw"
+reason = "not configured: `!defined(_KERNEL)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/bpf_filter.c"
+function = "bpf_mem_ldh"
+reason = "not configured: `!defined(_KERNEL)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/bpf_filter.c"
+function = "bpf_mem_ldb"
+reason = "not configured: `!defined(_KERNEL)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/bpf_filter.c"
+function = "bpf_filter"
+reason = "not configured: `!defined(_KERNEL)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/bpf_filter.c"
+function = "bpf_lfilter"
+reason = "not configured: `!defined(_KERNEL)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/bpf_filter.c"
+function = "_bpf_filter"
+reason = "not configured: `!defined(_KERNEL)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/rtsock.c"
+function = "rtm_bfd"
+reason = "not configured: `defined(BFD)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/wg_noise.c"
+function = "upcall_get"
+reason = "not configured: `defined(WGTEST)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/wg_noise.c"
+function = "upcall_set"
+reason = "not configured: `defined(WGTEST)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/wg_noise.c"
+function = "upcall_drop"
+reason = "not configured: `defined(WGTEST)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/wg_noise.c"
+function = "noise_counter_test"
+reason = "not configured: `defined(WGTEST)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/wg_noise.c"
+function = "noise_handshake_init"
+reason = "not configured: `defined(WGTEST)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/wg_noise.c"
+function = "noise_handshake_test"
+reason = "not configured: `defined(WGTEST)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/wg_noise.c"
+function = "noise_speed_test"
+reason = "not configured: `defined(WGTEST)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/wg_noise.c"
+function = "noise_test"
+reason = "not configured: `defined(WGTEST)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/wg_cookie.c"
+function = "cookie_ratelimit_timings_test"
+reason = "not configured: `defined(WGTEST)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/wg_cookie.c"
+function = "cookie_ratelimit_capacity_test"
+reason = "not configured: `defined(WGTEST)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/wg_cookie.c"
+function = "cookie_mac_test"
+reason = "not configured: `defined(WGTEST)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/wg_cookie.c"
+function = "cookie_test"
+reason = "not configured: `defined(WGTEST)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/kern/kern_sysctl.c"
+function = "debug_sysctl"
+reason = "not configured: `defined(DEBUG_SYSCTL)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/net/if_media.c"
+function = "ifmedia_printword"
+reason = "not configured: `defined(IFMEDIA_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/pci/if_vmx.c"
+function = "vmx_dmamem_free"
+reason = "not configured: `defined(notyet)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/ic/vga.c"
+function = "vga_pick_monitor_type"
+reason = "not configured: `defined(__alpha__)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/kern/vfs_lockf.c"
+function = "lf_print"
+reason = "not configured: `defined(LOCKF_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/kern/vfs_lockf.c"
+function = "lf_printlist"
+reason = "not configured: `defined(LOCKF_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/scsi/scsi_base.c"
+function = "scsi_show_sense"
+reason = "not configured: `defined(SCSIDEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/scsi/scsi_base.c"
+function = "scsi_show_xs"
+reason = "not configured: `defined(SCSIDEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/scsi/scsi_base.c"
+function = "scsi_show_mem"
+reason = "not configured: `defined(SCSIDEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/scsi/scsi_base.c"
+function = "scsi_show_flags"
+reason = "not configured: `defined(SCSIDEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/scsi/scsi_base.c"
+function = "scsi_show_inquiry_header"
+reason = "not configured: `defined(SCSIDEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/scsi/scsi_base.c"
+function = "scsi_show_inquiry_match"
+reason = "not configured: `defined(SCSIDEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/scsi/cd.c"
+function = "cd_eject"
+reason = "not configured: `defined(__macppc__)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/ic/siop.c"
+function = "siop_printstats"
+reason = "not configured: `defined(SIOP_STATS)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/softraid.c"
+function = "sr_meta_print"
+reason = "not configured: `defined(SR_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/softraid.c"
+function = "sr_dump_block"
+reason = "not configured: `defined(SR_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/softraid.c"
+function = "sr_dump_mem"
+reason = "not configured: `defined(SR_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/softraid_raid5.c"
+function = "sr_raid5_scrub"
+reason = "not configured: `0` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/softraid_crypto.c"
+function = "sr_crypto_dumpkeys"
+reason = "not configured: `defined(SR_DEBUG0)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/usbdi.c"
+function = "usbd_dump_iface"
+reason = "not configured: `defined(USB_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/usbdi.c"
+function = "usbd_dump_device"
+reason = "not configured: `defined(USB_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/usbdi.c"
+function = "usbd_dump_endpoint"
+reason = "not configured: `defined(USB_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/usbdi.c"
+function = "usbd_dump_queue"
+reason = "not configured: `defined(USB_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/usbdi.c"
+function = "usbd_dump_pipe"
+reason = "not configured: `defined(USB_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/usb_mem.c"
+function = "usb_block_real_freemem"
+reason = "not configured: `0` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/hid/hidkbd.c"
+function = "hidkbdtracedump"
+reason = "not configured: `defined(HIDKBD_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/wscons/wsemul_vt100.c"
+function = "wsemul_vt100_jump_scroll"
+reason = "not configured: `defined(HAVE_JUMP_SCROLL)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/xhci.c"
+function = "xhci_dump_trb"
+reason = "not configured: `defined(XHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/xhci.c"
+function = "xhci_cmd_noop"
+reason = "not configured: `defined(XHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ukbd.c"
+function = "ukbd_gdium_munge"
+reason = "not configured: `defined(__loongson__)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/umass.c"
+function = "umass_reset"
+reason = "not configured: `0` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/umass.c"
+function = "umass_bbb_dump_cbw"
+reason = "not configured: `defined(UMASS_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/umass.c"
+function = "umass_bbb_dump_csw"
+reason = "not configured: `defined(UMASS_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/umass.c"
+function = "umass_dump_buffer"
+reason = "not configured: `defined(UMASS_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/acpi/dsdt.c"
+function = "acpi_walkmem"
+reason = "not configured: `defined(ACPI_MEMDEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/acpi/dsdt.c"
+function = "aml_dump"
+reason = "not configured: `defined(ACPI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/acpi/dsdt.c"
+function = "aml_print_resource"
+reason = "not configured: `defined(ACPI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/acpi/dsdt.c"
+function = "aml_showstack"
+reason = "not configured: `defined(ACPI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/acpi/acpicpu_x86.c"
+function = "acpicpu_set_throttle"
+reason = "not configured: `0` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/acpi/acpicpu_x86.c"
+function = "acpicpu_find_cstate"
+reason = "not configured: `0` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libsa/printf.c"
+function = "kprintn64"
+reason = "not configured: `defined(LIBSA_LONGLONG_PRINTF)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libsa/arc4.c"
+function = "rc4_crypt"
+reason = "not configured: `defined(notneeded)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libsa/ufs.c"
+function = "ffs_oldfscompat"
+reason = "not configured: `defined(COMPAT_UFS)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libsa/ufs2.c"
+function = "ffs_oldfscompat"
+reason = "not configured: `defined(COMPAT_UFS)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/stand/boot/vars.c"
+function = "Xdebug"
+reason = "not configured: `defined(DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/arch/amd64/stand/efiboot/cmd_i386.c"
+function = "Xregs"
+reason = "not configured: `defined(DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/arch/arm64/stand/efiboot/fdt.c"
+function = "fdt_print_property"
+reason = "not configured: `defined(DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/arch/arm64/stand/efiboot/fdt.c"
+function = "fdt_print_node"
+reason = "not configured: `defined(DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/arch/arm64/stand/efiboot/fdt.c"
+function = "fdt_print_node_recurse"
+reason = "not configured: `defined(DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/arch/arm64/stand/efiboot/fdt.c"
+function = "fdt_print_tree"
+reason = "not configured: `defined(DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/ata/wd.c"
+function = "wdformat"
+reason = "not configured: `defined(B_FORMAT)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ehci.c"
+function = "ehci_dump_regs"
+reason = "not configured: `defined(EHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ehci.c"
+function = "ehci_dump"
+reason = "not configured: `defined(EHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ehci.c"
+function = "ehci_dump_link"
+reason = "not configured: `defined(EHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ehci.c"
+function = "ehci_dump_sqtds"
+reason = "not configured: `defined(EHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ehci.c"
+function = "ehci_dump_sqtd"
+reason = "not configured: `defined(EHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ehci.c"
+function = "ehci_dump_qtd"
+reason = "not configured: `defined(EHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ehci.c"
+function = "ehci_dump_sqh"
+reason = "not configured: `defined(EHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ehci.c"
+function = "ehci_dump_itd"
+reason = "not configured: `defined(EHCI_DEBUG) && notyet` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ehci.c"
+function = "ehci_dump_exfer"
+reason = "not configured: `defined(EHCI_DEBUG) && defined(DIAGNOSTIC)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/pci/ehci_pci.c"
+function = "ehci_pci_givecontroller"
+reason = "not configured: `0` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uhci.c"
+function = "uhci_dumpregs"
+reason = "not configured: `defined(UHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uhci.c"
+function = "uhci_dump_td"
+reason = "not configured: `defined(UHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uhci.c"
+function = "uhci_dump_qh"
+reason = "not configured: `defined(UHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uhci.c"
+function = "uhci_dump"
+reason = "not configured: `defined(UHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uhci.c"
+function = "uhci_dump_all"
+reason = "not configured: `defined(UHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uhci.c"
+function = "uhci_dump_qhs"
+reason = "not configured: `defined(UHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uhci.c"
+function = "uhci_dump_tds"
+reason = "not configured: `defined(UHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uhci.c"
+function = "uhci_dump_xfer"
+reason = "not configured: `defined(UHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uhci.c"
+function = "uhci_dump_xfers"
+reason = "not configured: `defined(UHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uhci.c"
+function = "exdump"
+reason = "not configured: `defined(UHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ohci.c"
+function = "ohci_free_std_chain"
+reason = "not configured: `0` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ohci.c"
+function = "ohci_dumpregs"
+reason = "not configured: `defined(OHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ohci.c"
+function = "ohci_dump_tds"
+reason = "not configured: `defined(OHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ohci.c"
+function = "ohci_dump_td"
+reason = "not configured: `defined(OHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ohci.c"
+function = "ohci_dump_itd"
+reason = "not configured: `defined(OHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ohci.c"
+function = "ohci_dump_itds"
+reason = "not configured: `defined(OHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/ohci.c"
+function = "ohci_dump_ed"
+reason = "not configured: `defined(OHCI_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/pv/viogpu.c"
+function = "viogpu_fb_probe"
+reason = "not configured: `0` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/sdmmc/sdmmc.c"
+function = "sdmmc_ioctl"
+reason = "not configured: `defined(SDMMC_IOCTL)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/sdmmc/sdmmc.c"
+function = "sdmmc_dump_command"
+reason = "not configured: `defined(SDMMC_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/sdmmc/sdmmc_mem.c"
+function = "sdmmc_print_cid"
+reason = "not configured: `defined(SDMMC_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/sdmmc/sdhc.c"
+function = "sdhc_dump_regs"
+reason = "not configured: `defined(SDHC_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uaudio.c"
+function = "uaudio_isoname"
+reason = "not configured: `defined(UAUDIO_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uaudio.c"
+function = "uaudio_modename"
+reason = "not configured: `defined(UAUDIO_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uaudio.c"
+function = "uaudio_usagename"
+reason = "not configured: `defined(UAUDIO_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uaudio.c"
+function = "uaudio_rates_print"
+reason = "not configured: `defined(UAUDIO_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uaudio.c"
+function = "uaudio_ranges_print"
+reason = "not configured: `defined(UAUDIO_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uaudio.c"
+function = "uaudio_print_unit"
+reason = "not configured: `defined(UAUDIO_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uaudio.c"
+function = "uaudio_mixer_print"
+reason = "not configured: `defined(UAUDIO_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/usb/uaudio.c"
+function = "uaudio_conf_print"
+reason = "not configured: `defined(UAUDIO_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
