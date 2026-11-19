@@ -97,12 +97,12 @@
 //! the DVD structure and authentication requests, and hands the rest to `scsi_do_ioctl`.
 //!
 //! ## Deviations
-//! - `dma_alloc(9)` (`kern/dma_alloc.c`) is not ported. Small fixed-size buffers (the table
-//!   of contents, the sub-channel reply, the READ CAPACITY replies, the mode sense buffer)
-//!   are locals, as in `sd.rs`: every command here is synchronous (`scsi_xs_sync`), so they
-//!   outlive the transfer. The DVD buffers (up to 2052 bytes) come from `malloc(9)` through
-//!   `scsiconf.rs`'s `DmaBuf`, freed when dropped. The allocation failures the C tests for
-//!   on the locals cannot happen.
+//! - Small fixed-size buffers (the table of contents, the sub-channel reply, the READ
+//!   CAPACITY replies, the mode sense buffer) are locals, as in `sd.rs`, where the C
+//!   `dma_alloc`s them: every command here is synchronous (`scsi_xs_sync`), so they outlive
+//!   the transfer, and the allocation failures the C tests for on them cannot happen. The
+//!   DVD buffers (up to 2052 bytes) are `scsiconf.rs`'s `DmaBuf` (`dma_alloc(9)`), freed
+//!   when dropped.
 //! - The C's `-1`-less errno returns are `Result<(), Errno>`. `cd_getvol` keeps the C's
 //!   `return 0` after a failed mode sense (the C ignores `error`).
 //! - The in-core label is handled as in `sd.rs`: `cdgetdisklabel` builds the label in a
@@ -209,9 +209,9 @@ use crate::sys::dkio::{
 use crate::sys::errno::Errno::{self, *};
 use crate::sys::fcntl::FWRITE;
 use crate::sys::ioctl::{ioctl_arg, ioctl_ret};
-use crate::sys::malloc::M_WAITOK;
 use crate::sys::mtio::{MTIOCTOP, MTOFFL, MTRETEN};
 use crate::sys::param::howmany;
+use crate::sys::pool::{PR_WAITOK, PR_ZERO};
 use crate::sys::proc::Proc;
 use crate::sys::scsiio::{SCIOCCOMMAND, SCIOCDEBUG, SCIOCIDENTIFY, SCIOCRESET};
 use crate::sys::stat::S_IFCHR;
@@ -2454,7 +2454,7 @@ pub const DVD_AUTH_BUFSIZE: usize = 20;
 
 /// `dvd_auth`: a step of the DVD authentication (`DVD_AUTH`).
 pub fn dvd_auth(sc: &CdSoftc, a: &mut DvdAuthinfo) -> Result<(), Errno> {
-    let mut buf = DmaBuf::new(DVD_AUTH_BUFSIZE, M_WAITOK).ok_or(ENOMEM)?;
+    let mut buf = DmaBuf::new(DVD_AUTH_BUFSIZE, PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
     let buf_ptr = buf.bytes().as_mut_ptr();
 
     let xs = scsi_xs_get(sc.link(), 0).ok_or(ENOMEM)?;
@@ -2702,7 +2702,7 @@ fn dvd_read_generic(
 
 /// `dvd_read_physical`: the physical format information of the four layers.
 pub fn dvd_read_physical(sc: &CdSoftc, s: &mut DvdStruct) -> Result<(), Errno> {
-    let mut buf = DmaBuf::new(DVD_READ_PHYSICAL_BUFSIZE, M_WAITOK).ok_or(ENOMEM)?;
+    let mut buf = DmaBuf::new(DVD_READ_PHYSICAL_BUFSIZE, PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
 
     let layer_num = s.physical().layer_num;
     dvd_read_generic(
@@ -2741,7 +2741,7 @@ pub const DVD_READ_COPYRIGHT_BUFSIZE: usize = 8;
 
 /// `dvd_read_copyright`: the copyright information.
 pub fn dvd_read_copyright(sc: &CdSoftc, s: &mut DvdStruct) -> Result<(), Errno> {
-    let mut buf = DmaBuf::new(DVD_READ_COPYRIGHT_BUFSIZE, M_WAITOK).ok_or(ENOMEM)?;
+    let mut buf = DmaBuf::new(DVD_READ_COPYRIGHT_BUFSIZE, PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
 
     let layer_num = s.copyright().layer_num;
     dvd_read_generic(
@@ -2794,7 +2794,7 @@ fn dvd_read_structure_cmd(
 
 /// `dvd_read_disckey`: the disc key.
 pub fn dvd_read_disckey(sc: &CdSoftc, s: &mut DvdStruct) -> Result<(), Errno> {
-    let mut buf = DmaBuf::new(DVD_STRUCTURE_DATA_SIZE, M_WAITOK).ok_or(ENOMEM)?;
+    let mut buf = DmaBuf::new(DVD_STRUCTURE_DATA_SIZE, PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
 
     let agid = s.disckey().agid;
     dvd_read_structure_cmd(sc, &mut buf, s.r#type(), Some(agid))?;
@@ -2811,7 +2811,7 @@ pub const DVD_READ_BCA_BUFLEN: usize = 4 + 188;
 
 /// `dvd_read_bca`: the burst cutting area.
 pub fn dvd_read_bca(sc: &CdSoftc, s: &mut DvdStruct) -> Result<(), Errno> {
-    let mut buf = DmaBuf::new(DVD_READ_BCA_BUFLEN, M_WAITOK).ok_or(ENOMEM)?;
+    let mut buf = DmaBuf::new(DVD_READ_BCA_BUFLEN, PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
 
     dvd_read_generic(sc, &mut buf, DVD_READ_BCA_BUFLEN, s.r#type(), None)?;
 
@@ -2828,7 +2828,7 @@ pub fn dvd_read_bca(sc: &CdSoftc, s: &mut DvdStruct) -> Result<(), Errno> {
 
 /// `dvd_read_manufact`: the manufacturing information.
 pub fn dvd_read_manufact(sc: &CdSoftc, s: &mut DvdStruct) -> Result<(), Errno> {
-    let mut buf = DmaBuf::new(DVD_STRUCTURE_DATA_SIZE, M_WAITOK).ok_or(ENOMEM)?;
+    let mut buf = DmaBuf::new(DVD_STRUCTURE_DATA_SIZE, PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
 
     dvd_read_structure_cmd(sc, &mut buf, s.r#type(), None)?;
 

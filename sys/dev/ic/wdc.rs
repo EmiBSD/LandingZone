@@ -101,8 +101,6 @@
 //! - `wdc_scrub_xfer` takes the transfer by pointer (it zeroes it whole) and is `unsafe`.
 //! - The `xfer->c_start`-style calls through NULL, `chp->wdc` NULL and the missing hooks
 //!   panic (the methods of `WdcXfer` and `ChannelSoftc`).
-//! - `dma_alloc(9)` is not ported: `wdc_ioc_ata_cmd`'s buffer is `scsiconf`'s `DmaBuf`
-//!   (`malloc(9)`).
 //! - The xfer pool's `inited` flag is an atomic; the transfers come from `wdc_xfer_pool`
 //!   through `wdc_xfer_iopool` as in the C.
 
@@ -2483,7 +2481,7 @@ pub fn wdc_ioc_ata_cmd(drvp: &AtaDriveDatas, atareq: &mut Atareq) -> Result<(), 
     // The buffer, freed (dma_free) when it goes out of scope (`err:`).
     let mut buf = None;
     if datalen > 0 {
-        let Some(mut b) = DmaBuf::new(datalen, M_NOWAIT) else {
+        let Some(mut b) = DmaBuf::new(datalen, PR_NOWAIT | PR_ZERO) else {
             return Err(ENOMEM);
         };
         wdc_c.data.set(b.bytes().as_mut_ptr());

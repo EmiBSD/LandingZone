@@ -65,9 +65,8 @@
 //!   (`sys/conf.rs`); the request structures are read out of it and written back into it
 //!   (`ioctl_arg`, `ioctl_ret`), where the C changes them in place. The adapter's `ioctl`
 //!   still gets the raw pointer its type takes.
-//! - `dma_alloc(9)` (`kern/dma_alloc.c`) is not ported: the data buffers come from
-//!   `malloc(9)` through `scsiconf.rs`'s `DmaBuf`, freed when it is dropped, after the
-//!   transfer has been given back (`scsi_xs_put`), as the C frees them before.
+//! - The data buffers are `scsiconf.rs`'s `DmaBuf` (`dma_alloc(9)`), freed when dropped,
+//!   after the transfer has been given back (`scsi_xs_put`), where the C frees them before.
 //! - `SCSIDEBUG` is not configured: the `SC_DEBUG`/`SC_DEBUG_SENSE` sites are comments.
 //!   `SCIOCDEBUG` still sets the link's `SDEV_DB1`..`SDEV_DB4` bits, as in C.
 //! - `ATAIOCCOMMAND`'s `atareq_t` comes from `sys/ataio.rs`, ported for this file.
@@ -96,8 +95,8 @@ use crate::sys::ataio::{
 use crate::sys::errno::Errno::{self, *};
 use crate::sys::fcntl::FWRITE;
 use crate::sys::ioctl::{ioctl_arg, ioctl_ret};
-use crate::sys::malloc::M_WAITOK;
 use crate::sys::param::MAXPHYS;
+use crate::sys::pool::{PR_WAITOK, PR_ZERO};
 use crate::sys::scsiio::{
     SCCMD_BUSY, SCCMD_OK, SCCMD_READ, SCCMD_SENSE, SCCMD_TIMEOUT, SCCMD_UNKNOWN, SCCMD_WRITE,
     SCIOCCOMMAND, SCIOCDEBUG, SCIOCIDENTIFY, SENSEBUFLEN, ScsiAddr, Scsireq, TYPE_ATAPI, TYPE_SCSI,
@@ -162,7 +161,7 @@ fn xs_data(xs: &ScsiXfer, len: usize) -> Result<Option<DmaBuf>, Errno> {
     if len == 0 {
         return Ok(None);
     }
-    let mut buf = DmaBuf::new(len, M_WAITOK).ok_or(ENOMEM)?;
+    let mut buf = DmaBuf::new(len, PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
     let bytes = buf.bytes();
     // SAFETY: the buffer is the caller's until it drops it, which it does only after
     // `scsi_xs_put` (or `clear_data`); nothing else touches it meanwhile. `len <= MAXPHYS`

@@ -68,7 +68,7 @@
 //!   C would dereference NULL); the other functions find their port through it and do nothing
 //!   more when it is not there.
 //! - `dma_alloc(9)` (`kern/dma_alloc.c`) is not ported: the IDENTIFY buffer is a
-//!   `scsiconf.rs` `DmaBuf`, the TRIM range list of UNMAP `malloc(9)`ed (`M_DEVBUF`).
+//!   `scsiconf.rs` `DmaBuf`, the TRIM range list of UNMAP a `dma_alloc(9)` block.
 //! - The functions that return an errno (`atascsi_probe`, `atascsi_detach`,
 //!   `atascsi_port_identify`, `atascsi_port_set_features`, `ata_polled`) return
 //!   `Result<(), Errno>`; `atascsi_passthru_map`'s 0/1 is a `Result<(), ()>`-like `bool`
@@ -93,6 +93,7 @@ use core::sync::atomic::{AtomicI32, Ordering};
 
 use crate::conf::vers::OSRELEASE;
 use crate::dev::ata::pmreg::{SATA_PMP_CONTROL_PORT, SATA_PMP_MAX_PORTS};
+use crate::kern::dma_alloc::{dma_alloc, dma_free};
 use crate::kern::kern_malloc::{free, malloc, mallocarray};
 use crate::kern::kern_task::{SYSTQ, task_add, task_set};
 use crate::kern::subr_autoconf::{config_detach, config_found};
@@ -132,6 +133,7 @@ use crate::sys::buf::Buf;
 use crate::sys::device::Device;
 use crate::sys::errno::Errno;
 use crate::sys::malloc::{M_DEVBUF, M_WAITOK, M_ZERO};
+use crate::sys::pool::{PR_WAITOK, PR_ZERO};
 use crate::sys::task::Task;
 use crate::sys::timeout::Timeout;
 
@@ -1354,7 +1356,7 @@ pub fn atascsi_probe(link: &'static ScsiLink) -> Result<(), Errno> {
         // sometimes this prevents identification from working, so we retry a few times with
         // a fairly long delay.
 
-        let Some(mut identify) = DmaBuf::new(size_of::<AtaIdentify>(), M_WAITOK) else {
+        let Some(mut identify) = DmaBuf::new(size_of::<AtaIdentify>(), PR_WAITOK | PR_ZERO) else {
             panic(format_args!("atascsi_probe: dma_alloc(PR_WAITOK) failed"));
         };
 
@@ -2195,14 +2197,14 @@ pub fn atascsi_disk_unmap_task(xxs: *mut c_void) {
     let as_ = atascsi_link_as(link);
     let xa = atascsi_xs_xa(xs);
 
-    let Some(trims) = malloc(512, M_DEVBUF, M_WAITOK | M_ZERO) else {
+    let Some(trims) = dma_alloc(512, PR_WAITOK | PR_ZERO) else {
         panic(format_args!(
             "atascsi_disk_unmap_task: dma_alloc(PR_WAITOK) failed"
         ));
     };
 
     let Some(ap) = atascsi_lookup_port(link) else {
-        free(trims, M_DEVBUF, 512);
+        dma_free(trims, 512);
         atascsi_done(xs, XS_DRIVER_STUFFUP);
         return;
     };
@@ -2216,7 +2218,7 @@ pub fn atascsi_disk_unmap_task(xxs: *mut c_void) {
         let d: &ScsiUnmapDesc = wire_ref(&descs[i * size_of::<ScsiUnmapDesc>()..]);
         if _4btol(&d.logical_blocks) > ATA_DSM_TRIM_MAX_LEN {
             // fail:
-            free(trims, M_DEVBUF, 512);
+            dma_free(trims, 512);
             atascsi_done(xs, XS_DRIVER_STUFFUP);
             return;
         }
@@ -2252,7 +2254,7 @@ pub fn atascsi_disk_unmap_done(xa: &'static AtaXfer) {
     let xs = xa.xs();
 
     if let Some(trims) = NonNull::new(xa.data.get()) {
-        free(trims, M_DEVBUF, 512);
+        dma_free(trims, 512);
     }
 
     xs.error

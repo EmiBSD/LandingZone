@@ -181,9 +181,9 @@
 //!   and the `#ifdef SCSIDEBUG` blocks (debug masks in `scsi_probe_link`, the protocol
 //!   level and the link's state in `scsi_print_link`, the match trace in `scsi_inqmatch`)
 //!   are comments.
-//! - `dma_alloc(9)` (`kern/dma_alloc.c`) is not ported: the INQUIRY, REPORT LUNS and VPD
-//!   buffers come from `malloc(9)` through `DmaBuf`, freed when dropped (`dma_free`); the
-//!   `M_TEMP` identifier buffer of `scsi_devid_pg80` is one too.
+//! - The INQUIRY, REPORT LUNS and VPD buffers are `DmaBuf`s, `dma_alloc(9)` with the C's
+//!   flags, freed when dropped (`dma_free`); the `M_TEMP` identifier buffer of
+//!   `scsi_devid_pg80` is an ordinary one, as the C's `malloc`.
 //! - The integer results are `Result<(), Errno>`; the "nothing there" `EINVAL` the probe
 //!   functions pass up is `Err(EINVAL)`, and the `goto bad` of `scsi_probe_link` with an
 //!   error of 0 is `Ok(())` after the link is freed.
@@ -213,6 +213,7 @@ use core::mem::{offset_of, size_of};
 use core::sync::atomic::{AtomicI32, Ordering};
 
 use crate::dev::bio::{bio_register, bio_unregister};
+use crate::kern::dma_alloc::{dma_alloc, dma_free};
 use crate::kern::kern_malloc::{free, malloc};
 use crate::kern::subr_autoconf::{
     config_attach, config_deactivate, config_detach, config_search, config_suspend,
@@ -243,6 +244,7 @@ use crate::sys::errno::Errno::{self, *};
 use crate::sys::ioctl::ioctl_arg;
 use crate::sys::malloc::{M_CANFAIL, M_DEVBUF, M_NOWAIT, M_WAITOK, M_ZERO};
 use crate::sys::mutex::Mutex;
+use crate::sys::pool::{PR_NOWAIT, PR_WAITOK, PR_ZERO};
 use crate::sys::queue::{SimpleqEntry, SimpleqHead, SlistEntry, SlistHead, TailqEntry, TailqHead};
 use crate::sys::scsiio::{SBIOCDETACH, SBIOCPROBE, SbiocDevice};
 use crate::sys::systm::COLD;
@@ -1030,19 +1032,17 @@ impl AsRef<ScsiInquiryPattern> for ScsiQuirkInquiryPattern {
 }
 
 /// A `dma_alloc(9)` buffer, given back on drop (`dma_free`).
-///
-/// `kern/dma_alloc.c` is not ported: the bytes come from `malloc(9)` (`M_DEVBUF`), which
-/// both archs' `bus_dma` can map, always zeroed (`PR_ZERO`).
 pub(crate) struct DmaBuf {
     addr: NonNull<u8>,
     len: usize,
 }
 
 impl DmaBuf {
-    /// `dma_alloc(len, flags | PR_ZERO)`, `flags` being `M_WAITOK` or `M_NOWAIT`; `None`
-    /// when the memory is not there.
-    pub(crate) fn new(len: usize, flags: i32) -> Option<Self> {
-        let addr = malloc(len.max(1), M_DEVBUF, flags | M_ZERO)?;
+    /// `dma_alloc(len, prflags)`: `prflags` are the C's (`PR_WAITOK` or `PR_NOWAIT`, with or
+    /// without `PR_ZERO`); `None` when the pool has nothing or `len` is over 64 KB, the C's
+    /// NULL.
+    pub(crate) fn new(len: usize, prflags: i32) -> Option<Self> {
+        let addr = dma_alloc(len, prflags)?;
         Some(Self { addr, len })
     }
 
@@ -1061,7 +1061,7 @@ impl DmaBuf {
 
 impl Drop for DmaBuf {
     fn drop(&mut self) {
-        free(self.addr, M_DEVBUF, self.len.max(1));
+        dma_free(self.addr, self.len);
     }
 }
 
@@ -1781,7 +1781,8 @@ fn scsi_probe_link(
         }
 
         // Now go ask the device all about itself.
-        let Some(mut inqmem) = DmaBuf::new(size_of::<ScsiInquiryData>(), M_NOWAIT) else {
+        let Some(mut inqmem) = DmaBuf::new(size_of::<ScsiInquiryData>(), PR_NOWAIT | PR_ZERO)
+        else {
             // SC_DEBUG(link, SDEV_DB2, ("dma_alloc(inqbuf) failed.\n")).
             break 'bad Err(ENOMEM);
         };
@@ -1900,6 +1901,7 @@ fn scsi_probe_link(
             && scsi_get_link(sb, target, 1).is_none()
             && sb.sb_luns.get() > 1
             && let Some(mut usbinqbuf) = DmaBuf::new(size_of::<ScsiInquiryData>(), M_NOWAIT)
+        // the C passes M_NOWAIT
         {
             link.lun.set(1);
             let _ = scsi_inquire(
@@ -2115,7 +2117,7 @@ fn scsi_get_target_luns(sb: &'static ScsibusSoftc, target: i32) -> ScsiLunArray 
         return lunarray;
     }
 
-    let Some(mut report) = DmaBuf::new(size_of::<ScsiReportLunsData>(), M_WAITOK) else {
+    let Some(mut report) = DmaBuf::new(size_of::<ScsiReportLunsData>(), PR_WAITOK) else {
         return lunarray;
     };
 
@@ -2337,7 +2339,8 @@ fn scsi_devid(link: &'static ScsiLink) {
     }
 
     'wwn: {
-        let Some(mut pg) = DmaBuf::new(size_of::<ScsiVpdHdr>() + PG_LIST, M_WAITOK) else {
+        let Some(mut pg) = DmaBuf::new(size_of::<ScsiVpdHdr>() + PG_LIST, PR_WAITOK | PR_ZERO)
+        else {
             break 'wwn;
         };
 
@@ -2380,11 +2383,11 @@ fn scsi_devid_pg83(link: &'static ScsiLink) -> Result<(), Errno> {
     let hdrlen = size_of::<ScsiVpdHdr>();
     let dhdrlen = size_of::<ScsiVpdDevidHdr>();
 
-    let mut hdr = DmaBuf::new(hdrlen, M_WAITOK).ok_or(ENOMEM)?;
+    let mut hdr = DmaBuf::new(hdrlen, PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
     scsi_inquire_vpd(link, hdr.bytes(), SI_PG_DEVID, flags)?;
 
     let len = hdrlen + _2btol(&hdr.wire::<ScsiVpdHdr>().page_length) as usize;
-    let mut pgbuf = DmaBuf::new(len, M_WAITOK).ok_or(ENOMEM)?;
+    let mut pgbuf = DmaBuf::new(len, PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
     scsi_inquire_vpd(link, pgbuf.bytes(), SI_PG_DEVID, flags)?;
     let pg = pgbuf.bytes();
 
@@ -2449,7 +2452,7 @@ fn scsi_devid_pg80(link: &'static ScsiLink) -> Result<(), Errno> {
     let flags = scsi_autoconf.load(Ordering::Relaxed);
     let hdrlen = size_of::<ScsiVpdHdr>();
 
-    let mut hdr = DmaBuf::new(hdrlen, M_WAITOK).ok_or(ENOMEM)?;
+    let mut hdr = DmaBuf::new(hdrlen, PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
     scsi_inquire_vpd(link, hdr.bytes(), SI_PG_SERIAL, flags)?;
 
     let len = _2btol(&hdr.wire::<ScsiVpdHdr>().page_length) as usize;
@@ -2458,14 +2461,15 @@ fn scsi_devid_pg80(link: &'static ScsiLink) -> Result<(), Errno> {
     }
 
     let pglen = hdrlen + len;
-    let mut pg = DmaBuf::new(pglen, M_WAITOK).ok_or(ENOMEM)?;
+    let mut pg = DmaBuf::new(pglen, PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
     scsi_inquire_vpd(link, pg.bytes(), SI_PG_SERIAL, flags)?;
 
     let inqdata = link.inqdata.get();
     let (vlen, plen) = (inqdata.vendor.len(), inqdata.product.len());
     let idlen = vlen + plen + len;
-    let mut id = DmaBuf::new(idlen, M_WAITOK).ok_or(ENOMEM)?;
-    let idb = id.bytes();
+    // malloc(idlen, M_TEMP, M_WAITOK) in the C: an ordinary buffer, not dma_alloc(9).
+    let mut id = alloc::vec![0u8; idlen];
+    let idb = &mut id[..];
     idb[..vlen].copy_from_slice(&inqdata.vendor);
     idb[vlen..vlen + plen].copy_from_slice(&inqdata.product);
     idb[vlen + plen..].copy_from_slice(&pg.bytes()[hdrlen..]);

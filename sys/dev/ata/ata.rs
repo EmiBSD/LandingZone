@@ -49,8 +49,6 @@
 //! Upstream: sys/dev/ata/ata.c @ 3ce1f3f79392
 //!
 //! ## Deviations
-//! - `dma_alloc(9)` is not ported: the IDENTIFY buffer is `scsiconf`'s `DmaBuf`
-//!   (`malloc(9)`), freed when it goes out of scope (`dma_free`).
 //! - `ata_get_params` and `ata_set_mode` give their command to `wdc_exec_command` from their
 //!   own frame, so `flags` must hold `AT_WAIT` or `AT_POLL` (every caller passes `at_poll`,
 //!   `AT_WAIT` or `AT_POLL`); without either they panic, where the C would leave the
@@ -75,7 +73,7 @@ use crate::dev::ic::wdcreg::{
 };
 use crate::kern::subr_prf::{panic, snprintf};
 use crate::scsi::scsiconf::DmaBuf;
-use crate::sys::malloc::M_NOWAIT;
+use crate::sys::pool::{PR_NOWAIT, PR_ZERO};
 
 /// `ATAPARAMS_SIZE`.
 const ATAPARAMS_SIZE: usize = 512;
@@ -144,7 +142,7 @@ pub fn ata_get_params(drvp: &AtaDriveDatas, flags: u8, prms: &mut Ataparams) -> 
         return CMD_ERR;
     }
 
-    let Some(mut tb) = DmaBuf::new(ATAPARAMS_SIZE, M_NOWAIT) else {
+    let Some(mut tb) = DmaBuf::new(ATAPARAMS_SIZE, PR_NOWAIT | PR_ZERO) else {
         return CMD_AGAIN;
     };
     wdc_c.flags.set(AT_READ | u16::from(flags));

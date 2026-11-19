@@ -64,7 +64,7 @@
 //! - Metadata buffers are cell views (`&[Cell<u8>]`, `SrMetaView` structures); `sr_rw`
 //!   reads into and writes from such a view. Its `struct buf` (a local in C) is a `bufpool`
 //!   item, as `physio` makes one, because `VOP_STRATEGY`/`biowait` take `&'static Buf`;
-//!   `dma_alloc` is `DmaBuf` (`kern/dma_alloc.c` is not ported: `malloc(9)` memory).
+//!   its `dma_alloc` buffer is a `DmaBuf`, freed when dropped.
 //! - `sr_meta_save`'s fake work unit and `sr_rebuild`'s two `struct scsi_xfer` locals are
 //!   allocated (`sr_malloc`, `scsi_xfer_pool`), for the same reason.
 //! - `sr_ccb_free` clears `sd_ccb` after freeing it (the C leaves the pointer dangling).
@@ -129,6 +129,7 @@ use crate::dev::biovar::{
 use crate::dev::rnd::arc4random_buf;
 use crate::dev::softraidvar::*;
 use crate::kassert;
+use crate::kern::dma_alloc::{dma_alloc, dma_free};
 use crate::kern::kern_kthread::{kthread_create, kthread_create_deferred, kthread_exit};
 use crate::kern::kern_lock::{mtx_enter, mtx_init, mtx_leave};
 use crate::kern::kern_malloc::{free, malloc, mallocarray};
@@ -189,7 +190,7 @@ use crate::sys::ioccom::{iocgroup, iocparm_len};
 use crate::sys::lock::{LK_EXCLUSIVE, LK_RETRY};
 use crate::sys::malloc::{M_DEVBUF, M_NOWAIT, M_WAITOK, M_ZERO};
 use crate::sys::param::{DEV_BSHIFT, DEV_BSIZE, MAXPHYS, MAXPRI, NODEV, PRIBIO, PWAIT};
-use crate::sys::pool::{PR_WAITOK, PR_ZERO};
+use crate::sys::pool::{PR_NOWAIT, PR_WAITOK, PR_ZERO};
 use crate::sys::queue::{SlistEntry, SlistHead};
 use crate::sys::sensors::{
     SENSOR_DRIVE, SENSOR_DRIVE_FAIL, SENSOR_DRIVE_ONLINE, SENSOR_DRIVE_PFAIL, SENSOR_DRIVE_REBUILD,
@@ -627,7 +628,7 @@ pub fn sr_rw(
 
     let mut size = buf.len();
     let dma_bufsize = size.min(MAXPHYS);
-    let Some(mut dma_buf) = DmaBuf::new(dma_bufsize, M_WAITOK) else {
+    let Some(mut dma_buf) = DmaBuf::new(dma_bufsize, PR_WAITOK) else {
         return Err(Errno::ENOMEM);
     };
 
@@ -4992,12 +4993,12 @@ pub fn sr_set_vol_state(sd: &'static SrDiscipline) {
 /// `None` when there is none.
 pub fn sr_block_get(_sd: &SrDiscipline, length: i64) -> Option<NonNull<u8>> {
     let len = usize::try_from(length).ok()?;
-    malloc(len.max(1), M_DEVBUF, M_NOWAIT | M_ZERO)
+    dma_alloc(len, PR_NOWAIT | PR_ZERO)
 }
 
 /// `sr_block_put`: frees an [`sr_block_get`] block of `length` bytes.
 pub fn sr_block_put(_sd: &SrDiscipline, ptr: NonNull<u8>, length: i64) {
-    free(ptr, M_DEVBUF, usize::try_from(length).unwrap_or(0).max(1));
+    dma_free(ptr, usize::try_from(length).unwrap_or(0));
 }
 
 /// `sr_checksum_print` (`SR_DEBUG` callers only).
@@ -5321,7 +5322,7 @@ pub fn sr_rebuild(sd: &'static SrDiscipline) {
 
     // currently this is 64k therefore we can use dma_alloc
     let buflen = (SR_REBUILD_IO_SIZE as usize) << DEV_BSHIFT;
-    let Some(mut buf) = DmaBuf::new(buflen, M_WAITOK) else {
+    let Some(mut buf) = DmaBuf::new(buflen, PR_WAITOK) else {
         return;
     };
     let (Some((xs_r_mem, xs_r)), Some((xs_w_mem, xs_w))) = (sr_xs_alloc(), sr_xs_alloc()) else {
