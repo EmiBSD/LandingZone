@@ -4149,11 +4149,11 @@ notes = "curve25519_clamp_secret/generate_secret and the prototypes; shares the 
 [[file]]
 c = "sys/crypto/curve25519.c"
 rust = "sys/crypto/curve25519.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "348890fe78029f62aacff574a4d91b88dd3796af"
 deps = ["sys/crypto/curve25519.h", "sys/lib/libkern/explicit_bzero.c", "sys/lib/libkern/timingsafe_bcmp.c"]
-notes = "the 10x(25.5-bit) limb implementation: the fiat-crypto straight-line fe_mul/fe_sqr/mul121666 are loops over the limb pairs with the same carry chain (identical limbs), fe_freeze/tobytes/frombytes loops, the ladder as written; curve25519 and curve25519_generate_public return bool; RFC 7748 5.2 (both vectors, iterated 1 and 1000) and 6.1 tested, the 1000000 iteration left out for its running time; licence: ISC (Donenfeld, fiat-crypto authors); TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 7 C function(s) not in its Rust file: get_unaligned_le32, addcarryx_u25, addcarryx_u26, subborrow_u25, subborrow_u26, fe_copy, fe_copy_lt"
+notes = "the 10x(25.5-bit) limb implementation: the fiat-crypto straight-line fe_mul/fe_sqr/mul121666 are loops over the limb pairs with the same carry chain (identical limbs), fe_freeze/tobytes/frombytes loops, the ladder as written; curve25519 and curve25519_generate_public return bool; RFC 7748 5.2 (both vectors, iterated 1 and 1000) and 6.1 tested, the 1000000 iteration left out for its running time; licence: ISC (Donenfeld, fiat-crypto authors); TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 7 C function(s) not in its Rust file: get_unaligned_le32, addcarryx_u25, addcarryx_u26, subborrow_u25, subborrow_u26, fe_copy, fe_copy_lt; each now has its fn with its C name, and ports check accepts the row as ported"
 
 [[file]]
 c = "sys/crypto/sha1.h"

@@ -73,9 +73,9 @@
 //!   `fe_sqr_impl` is that multiplication with both operands equal (fiat's squaring forms the
 //!   identical sums with the symmetry folded in). `fe_mul_121666_impl` is the multiplication by
 //!   the element `(121666, 0, ..., 0)`, which is how the C's copy was derived.
-//! - `fe_freeze`, `fe_tobytes` and `fe_frombytes` are loops over the limb widths instead of
-//!   unrolled steps; `addcarryx_*`/`subborrow_*` are one function each, parameterised by the
-//!   limb width.
+//! - `fe_freeze` and `fe_tobytes` are loops over the limb widths instead of unrolled steps;
+//!   `fe_freeze` calls `addcarryx_u25`/`addcarryx_u26` and `subborrow_u25`/`subborrow_u26`
+//!   by each limb's width, in the C's order.
 //! - The helpers that fill an `fe` through a pointer (`fe_add`, `fe_sub`, `fe_mul_*`, `fe_sq_*`,
 //!   `fe_invert`) return it by value: the C calls alias their output with an input
 //!   (`fe_mul_ttt(&t0, &t0, &t1)`), which a `&mut` and a `&` of one object cannot express.
@@ -158,18 +158,31 @@ pub fn curve25519_generate_secret(secret: &mut [u8; CURVE25519_KEY_SIZE]) {
     curve25519_clamp_secret(secret);
 }
 
+/// `get_unaligned_le32`: the little-endian 32-bit word at the start of `a`.
+fn get_unaligned_le32(a: &[u8]) -> u32 {
+    u32::from_le_bytes([a[0], a[1], a[2], a[3]])
+}
+
 /// `fe_frombytes_impl`: ignores the top bit of `s`.
 fn fe_frombytes_impl(h: &mut [u32; 10], s: &[u8; 32]) {
-    let mut t = [0u8; 40];
-    let mut pos = 0usize;
-
-    t[..32].copy_from_slice(s);
-    for (limb, bits) in h.iter_mut().zip(LIMB_BITS) {
-        let mut w = [0u8; 8];
-        w.copy_from_slice(&t[pos / 8..pos / 8 + 8]);
-        *limb = ((u64::from_le_bytes(w) >> (pos % 8)) & ((1u64 << bits) - 1)) as u32;
-        pos += bits as usize;
-    }
+    let a0 = get_unaligned_le32(&s[0..]);
+    let a1 = get_unaligned_le32(&s[4..]);
+    let a2 = get_unaligned_le32(&s[8..]);
+    let a3 = get_unaligned_le32(&s[12..]);
+    let a4 = get_unaligned_le32(&s[16..]);
+    let a5 = get_unaligned_le32(&s[20..]);
+    let a6 = get_unaligned_le32(&s[24..]);
+    let a7 = get_unaligned_le32(&s[28..]);
+    h[0] = a0 & ((1 << 26) - 1); // 26 used, 32-26 left.   26
+    h[1] = (a0 >> 26) | ((a1 & ((1 << 19) - 1)) << 6); // (32-26) + 19 =  6+19 = 25
+    h[2] = (a1 >> 19) | ((a2 & ((1 << 13) - 1)) << 13); // (32-19) + 13 = 13+13 = 26
+    h[3] = (a2 >> 13) | ((a3 & ((1 << 6) - 1)) << 19); // (32-13) +  6 = 19+ 6 = 25
+    h[4] = a3 >> 6; // (32- 6)              = 26
+    h[5] = a4 & ((1 << 25) - 1); //                        25
+    h[6] = (a4 >> 25) | ((a5 & ((1 << 19) - 1)) << 7); // (32-25) + 19 =  7+19 = 26
+    h[7] = (a5 >> 19) | ((a6 & ((1 << 12) - 1)) << 13); // (32-19) + 12 = 13+12 = 25
+    h[8] = (a6 >> 12) | ((a7 & ((1 << 6) - 1)) << 20); // (32-12) +  6 = 20+ 6 = 26
+    h[9] = (a7 >> 6) & ((1 << 25) - 1); //                                     25
 }
 
 /// `fe_frombytes`.
@@ -177,18 +190,33 @@ fn fe_frombytes(h: &mut Fe, s: &[u8; 32]) {
     fe_frombytes_impl(&mut h.v, s);
 }
 
-/// `addcarryx_u25` and `addcarryx_u26`: `a + b + c` reduced to `bits` bits, with the carry out.
-/// The sum extracts `bits` bits of result and one bit of carry, so 32 bits are enough.
-fn addcarryx(bits: u32, c: u32, a: u32, b: u32, low: &mut u32) -> u32 {
+/// `addcarryx_u25`: `a + b + c` reduced to 25 bits, with the carry out. This function
+/// extracts 25 bits of result and 1 bit of carry (26 total), so a 32-bit intermediate is
+/// sufficient.
+fn addcarryx_u25(c: u32, a: u32, b: u32, low: &mut u32) -> u32 {
     let x = a.wrapping_add(b).wrapping_add(c);
-    *low = x & ((1 << bits) - 1);
-    (x >> bits) & 1
+    *low = x & ((1 << 25) - 1);
+    (x >> 25) & 1
 }
 
-/// `subborrow_u25` and `subborrow_u26`: `a - b - c` reduced to `bits` bits, with the borrow.
-fn subborrow(bits: u32, c: u32, a: u32, b: u32, low: &mut u32) -> u32 {
+/// `addcarryx_u26`: `a + b + c` reduced to 26 bits, with the carry out (27 bits in all).
+fn addcarryx_u26(c: u32, a: u32, b: u32, low: &mut u32) -> u32 {
+    let x = a.wrapping_add(b).wrapping_add(c);
+    *low = x & ((1 << 26) - 1);
+    (x >> 26) & 1
+}
+
+/// `subborrow_u25`: `a - b - c` reduced to 25 bits, with the borrow (26 bits in all).
+fn subborrow_u25(c: u32, a: u32, b: u32, low: &mut u32) -> u32 {
     let x = a.wrapping_sub(b).wrapping_sub(c);
-    *low = x & ((1 << bits) - 1);
+    *low = x & ((1 << 25) - 1);
+    x >> 31
+}
+
+/// `subborrow_u26`: `a - b - c` reduced to 26 bits, with the borrow (27 bits in all).
+fn subborrow_u26(c: u32, a: u32, b: u32, low: &mut u32) -> u32 {
+    let x = a.wrapping_sub(b).wrapping_sub(c);
+    *low = x & ((1 << 26) - 1);
     x >> 31
 }
 
@@ -204,12 +232,20 @@ fn fe_freeze(out: &mut [u32; 10], in1: &[u32; 10]) {
     let mut diff = [0u32; 10];
     let mut borrow = 0u32;
     for i in 0..10 {
-        borrow = subborrow(LIMB_BITS[i], borrow, in1[i], P_LIMBS[i], &mut diff[i]);
+        borrow = if LIMB_BITS[i] == 26 {
+            subborrow_u26(borrow, in1[i], P_LIMBS[i], &mut diff[i])
+        } else {
+            subborrow_u25(borrow, in1[i], P_LIMBS[i], &mut diff[i])
+        };
     }
     let x49 = cmovznz32(borrow, 0x0, 0xffffffff);
     let mut carry = 0u32;
     for i in 0..10 {
-        carry = addcarryx(LIMB_BITS[i], carry, diff[i], x49 & P_LIMBS[i], &mut out[i]);
+        carry = if LIMB_BITS[i] == 26 {
+            addcarryx_u26(carry, diff[i], x49 & P_LIMBS[i], &mut out[i])
+        } else {
+            addcarryx_u25(carry, diff[i], x49 & P_LIMBS[i], &mut out[i])
+        };
     }
 }
 
@@ -233,6 +269,16 @@ fn fe_tobytes(s: &mut [u8; 32], f: &Fe) {
     }
     // 255 bits: seven are left for the last byte.
     s[idx] = acc as u8;
+}
+
+/// `fe_copy`: h = f.
+fn fe_copy(h: &mut Fe, f: &Fe) {
+    h.v = f.v;
+}
+
+/// `fe_copy_lt`: the loose element `h` = f.
+fn fe_copy_lt(h: &mut FeLoose, f: &Fe) {
+    h.v = f.v;
 }
 
 /// `fe_0`: h = 0.
@@ -424,7 +470,8 @@ fn fe_loose_invert(z: &FeLoose) -> Fe {
 
 /// `fe_invert`.
 fn fe_invert(z: &Fe) -> Fe {
-    let l = FeLoose { v: z.v };
+    let mut l = FeLoose::default();
+    fe_copy_lt(&mut l, z);
     fe_loose_invert(&l)
 }
 
@@ -479,7 +526,8 @@ pub fn curve25519(
     fe_frombytes(&mut x1, point);
     let mut x2 = fe_1();
     let mut z2 = fe_0();
-    let mut x3 = x1;
+    let mut x3 = Fe::default();
+    fe_copy(&mut x3, &x1);
     let mut z3 = fe_1();
     let mut x2l = FeLoose::default();
     let mut z2l = FeLoose::default();
