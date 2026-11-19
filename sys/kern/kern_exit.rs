@@ -312,7 +312,7 @@ pub fn exit1(p: &Proc, xexit: i32, xsig: i32, flags: i32) -> ! {
         // SYSVSEM: not configured.
         killjobc(pr);
         let _ = crate::kern::kern_acct::acct_process(p);
-        // KTRACE: not configured.
+        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
 
         crate::kern::kern_unveil::unveil_destroy(pr);
 
@@ -816,7 +816,7 @@ pub fn sys_wait4(q: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result<()
     }
     if retval[0] > 0 && rusagep != 0 {
         copyout(&ru.to_bytes(), rusagep)?;
-        // KTRACE: not configured.
+        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
     }
     Ok(())
 }
@@ -849,7 +849,7 @@ pub fn sys_waitid(q: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result<(
         retval,
     )?;
     copyout_obj(&info, uap.info.get() as usize)?;
-    // KTRACE: not configured.
+    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
     retval[0] = 0;
     Ok(())
 }

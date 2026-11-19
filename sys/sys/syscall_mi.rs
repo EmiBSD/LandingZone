@@ -181,7 +181,7 @@ pub fn pin_check(p: &Proc, code: Register) -> Result<(), Errno> {
     };
 
     // die:
-    // KTRACE (KTR_PINSYSCALL): not configured.
+    // KTRACE (KTR_PINSYSCALL): configured in GENERIC.MP, not ported yet (TD3).
     kernel_lock(); // KERNEL_LOCK()
     let pinoff = pin
         .zip(usize::try_from(code).ok())

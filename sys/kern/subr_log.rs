@@ -890,7 +890,7 @@ pub fn dosendsyslog(p: &Proc, buf: SyslogBuf, nbyte: usize, flags: i32) -> Resul
         }
     }
 
-    // KTRACE: not configured.
+    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
     let mut len = nbyte;
     let (base, segflg) = match buf {
         SyslogBuf::User(addr) => (addr + start, UioSeg::UIO_USERSPACE),

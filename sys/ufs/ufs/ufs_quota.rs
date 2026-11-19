@@ -93,7 +93,7 @@
 //!   and the cached dquots of the previous table are forgotten with it.
 //! - `dqhashtbl`, `dqhash` and `dqhashkey` are `StaticCell`s written by `ufs_quota_init`
 //!   only, before any UFS is mounted.
-//! - `KTRACE` is not configured: `ktrquota` is not called.
+//! - `KTRACE` is configured in GENERIC.MP, not ported yet (TD3): `ktrquota` is not called.
 //! - The `DIAGNOSTIC` checks (`chkdquot`, the `vfs_isbusy` and `VOP_ISLOCKED` panics) are
 //!   under feature `diagnostic`.
 
@@ -812,7 +812,7 @@ pub fn quotaoff(p: &Proc, mp: &'static Mount, type_: usize) -> Result<(), Errno>
 fn getquota(mp: &'static Mount, id: u32, type_: usize, addr: usize) -> Result<(), Errno> {
     let dq = dqget(None, id, vfstoufs(mp), type_)?;
     let error = copyout_obj(&dq.dq_dqb.get(), addr);
-    // KTRACE (KTR_STRUCT, ktrquota): not configured.
+    // KTRACE (KTR_STRUCT, ktrquota): configured in GENERIC.MP, not ported yet (TD3).
 
     dqrele(None, Some(dq));
     error
@@ -876,7 +876,7 @@ fn setquota(mp: &'static Mount, id: u32, type_: usize, addr: usize) -> Result<()
     let ump = vfstoufs(mp);
 
     let newlim: Dqblk = copyin_obj(addr)?;
-    // KTRACE (KTR_STRUCT, ktrquota): not configured.
+    // KTRACE (KTR_STRUCT, ktrquota): configured in GENERIC.MP, not ported yet (TD3).
 
     let dq = dqget(None, id, ump, type_)?;
     dqwait(dq, PINOD + 1, "setquota");
@@ -938,7 +938,7 @@ fn setuse(mp: &'static Mount, id: u32, type_: usize, addr: usize) -> Result<(), 
     let ump = vfstoufs(mp);
 
     let usage: Dqblk = copyin_obj(addr)?;
-    // KTRACE (KTR_STRUCT, ktrquota): not configured.
+    // KTRACE (KTR_STRUCT, ktrquota): configured in GENERIC.MP, not ported yet (TD3).
 
     let dq = dqget(None, id, ump, type_)?;
     dqwait(dq, PINOD + 1, "setuse");

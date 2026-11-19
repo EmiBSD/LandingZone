@@ -1919,7 +1919,8 @@ impl FileWalk<'_> {
         if let Some(vp) = fdp.fd_rdir.get() {
             self.fillit(None, None, KERN_FILE_RDIR, Some(vp), Some(pr))?;
         }
-        // ps_tracevp (KERN_FILE_TRACE) does not exist: KTRACE is not configured.
+        // ps_tracevp (KERN_FILE_TRACE) does not exist: KTRACE is configured in GENERIC.MP,
+        // not ported yet (TD3).
         let mut i = 0;
         while i < fdp.fd_nfiles.load(Ordering::Relaxed) {
             if let Some(fp) = fd_getfile(fdp, i) {
@@ -2311,7 +2312,7 @@ pub fn fill_kproc(pr: &Process, ki: &mut KinfoProc, p: Option<&Proc>, show_point
     ki.p_iticks = tu.tu_ticks[TU_ITICKS].get();
     ki.p_cpticks = p.p_cpticks.get() as i32;
 
-    // p_tracep, p_traceflag: KTRACE is not configured.
+    // p_tracep, p_traceflag: KTRACE is configured in GENERIC.MP, not ported yet (TD3).
 
     ki.p_siglist =
         (p.p_siglist.load(Ordering::Relaxed) | pr.ps_siglist.load(Ordering::Relaxed)) as i32;

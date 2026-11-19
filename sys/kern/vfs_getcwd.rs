@@ -61,7 +61,7 @@
 //! - `DIRBLKSIZ` is `ufs/ufs/dir.h`'s (`DEV_BSIZE`); that header waits for ufs.
 //! - With no root file system (no `rootvnode`) or no current directory, the walk fails with
 //!   `ENOENT`, as `namei` does (`vfs_lookup.rs`).
-//! - `KTRACE` is not configured.
+//! - `KTRACE` is configured in GENERIC.MP, not ported yet (TD3).
 
 use core::ffi::c_void;
 use core::ptr::{self, NonNull};
@@ -517,7 +517,7 @@ pub fn sys___getcwd(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Resul
     // Put the result into user buffer
     .and_then(|()| copyoutstr(&path[bp..], uap.buf.get() as usize).map(|_| ()));
 
-    // KTRACE: not configured.
+    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
 
     free(mem, M_TEMP, len);
 

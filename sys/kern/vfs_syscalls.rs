@@ -76,7 +76,7 @@
 //!   reaches `single_thread_clear`; the pathname buffer is a `NameiBuf` given back on drop.
 //! - `option FIFO` is not configured (`miscfs/fifofs` is not ported): `mkfifo` answers
 //!   `EOPNOTSUPP` as the C does without it.
-//! - `KTRACE` is not configured.
+//! - `KTRACE` is configured in GENERIC.MP, not ported yet (TD3).
 
 use core::ffi::c_void;
 use core::ptr::{self, NonNull};
@@ -1023,7 +1023,7 @@ pub fn sys___realpath(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Res
 
     let error = copyoutstr(rp, uap.resolved.get() as usize).map(|_| ());
 
-    // KTRACE: not configured.
+    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
     if let Some(buf) = NonNull::new(nd.ni_cnd.cn_pnbuf) {
         pool_put(&NAMEI_POOL, buf);
     }
@@ -1064,7 +1064,7 @@ fn unveil_path(p: &Proc, path: usize, permissions: &[u8]) -> Result<(), Errno> {
     let pathname = NameiBuf::get()?;
     let pathlen = copyinstr(path, pathname.as_mut())?;
 
-    // KTRACE: not configured.
+    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
     if pathlen < 2 {
         return Err(Errno::EINVAL);
     }
@@ -2046,7 +2046,7 @@ pub fn dofstatat(p: &Proc, fd: i32, path: *const u8, buf: usize, flag: i32) -> R
     if suser(p).is_err() {
         sb.st_gen = 0;
     }
-    // KTRACE: not configured.
+    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
     copyout(&sb.to_bytes(), buf)
 }
 
@@ -2528,7 +2528,7 @@ fn utimes_times(tptr: usize) -> Result<[Timespec; 2], Errno> {
     let mut ts = [Timespec::new(0, 0); 2];
     if tptr != 0 {
         let tv = copyin_timevals(tptr)?;
-        // KTRACE: not configured.
+        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
         if !tv[0].is_valid() || !tv[1].is_valid() {
             return Err(Errno::EINVAL);
         }
@@ -2551,7 +2551,7 @@ fn utimens_times(tsp: usize) -> Result<[Timespec; 2], Errno> {
             if t.tv_nsec == UTIME_NOW || t.tv_nsec == UTIME_OMIT {
                 continue;
             }
-            // KTRACE: not configured.
+            // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
             if !t.is_valid() {
                 return Err(Errno::EINVAL);
             }
@@ -2607,7 +2607,7 @@ pub fn doutimensat(
 pub fn dovutimens(p: &Proc, vp: &'static Vnode, ts: &mut [Timespec; 2]) -> Result<(), Errno> {
     let mut vattr = Vattr::new();
 
-    // KTRACE: not configured.
+    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
 
     vattr_null(&mut vattr);
 

@@ -61,7 +61,8 @@
 //! `process_initialize`, `fork_check_maxthread`, `alloctid`, `allocpid`, `ispidtaken` and
 //! `freepid`; part b2 adds `forkstat`, `thread_new`, `process_new`, `fork_thread_start`,
 //! `fork1` and `proc_trampoline_mi`, enough for kernel threads. M8 adds `fork_return`,
-//! `sys_fork`, `sys_vfork`, `sys___tfork` and `thread_fork` (the file is complete); the
+//! `sys_fork`, `sys_vfork`, `sys___tfork` and `thread_fork` (the file is `wip`: its KTRACE
+//! and dt(4) calls are missing); the
 //! child returns to user mode through the machine's `child_return` (`machine::cpu`).
 //!
 //! ## Deviations
@@ -225,7 +226,7 @@ pub fn sys___tfork(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result<
         tf_tid: word(1),
         tf_stack: word(2),
     };
-    // KTRACE: not configured.
+    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
     if tcb_invalid(param.tf_tcb) {
         return Err(Errno::EINVAL);
     }
@@ -589,7 +590,7 @@ pub fn fork1(
         curpr.ps_flags.fetch_or(PS_ISPWAIT, Ordering::Relaxed);
     }
 
-    // KTRACE: not configured.
+    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
 
     // Finish creating the child thread. cpu_fork() will copy and update the pcb and make
     // the child ready to run. If this is a normal user fork, the child will exit directly to

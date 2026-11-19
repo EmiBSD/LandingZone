@@ -407,11 +407,11 @@ pub fn sys_sigaction(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Resu
         }
         sa.sa_mask &= !bit;
         copyout_obj(&sa, osa)?;
-        // KTRACE: not configured.
+        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
     }
     if nsa != 0 {
         let mut sa: Sigaction = copyin_obj(nsa)?;
-        // KTRACE: not configured.
+        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
         setsigvec(p, signum, &mut sa);
     }
     Ok(())
@@ -851,7 +851,7 @@ pub fn trapsignal(p: &Proc, signum: i32, trapno: u64, code: i32, sigval: Sigval)
         && p.p_sigmask.get() & mask == 0
     {
         let si = initsiginfo(signum, trapno, code, sigval);
-        // KTRACE: not configured.
+        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
         if sendsig(
             ctx.sig_action,
             signum,
@@ -1661,7 +1661,7 @@ pub fn postsig(p: &Proc, signum: i32, sctx: &Sigctx) {
     };
     let si = initsiginfo(signum, trapno, code, sigval);
 
-    // KTRACE: not configured.
+    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
     if sctx.sig_action == SIG_DFL {
         // Default action, where the default is to kill the process. (Other cases were
         // ignored above.)
@@ -1945,7 +1945,7 @@ pub fn sys___thrsigdivert(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> 
 
     if timeout != 0 {
         let ts: Timespec = copyin_obj(timeout)?;
-        // KTRACE: not configured.
+        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
         if !ts.is_valid() {
             timeinvalid = true;
         } else {
@@ -1987,7 +1987,7 @@ pub fn sys___thrsigdivert(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> 
             let info = uap.info.get() as usize;
             if info != 0 {
                 copyout_obj(&si, info)?;
-                // KTRACE: not configured.
+                // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
             }
             Ok(())
         }

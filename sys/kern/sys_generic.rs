@@ -65,8 +65,8 @@
 //! `sys_ioctl` reach the file through `fd_getfile_mode` and call its `fileops`. M8:
 //! `sys_select`, `sys_pselect`, `dopselect`, `pselregister`, `pselcollect`, `selwakeup`,
 //! `pollout`, `sys_poll`, `sys_ppoll`, `doppoll`, `ppollregister_evts`, `ppollregister`,
-//! `ppollcollect` and `sys_utrace` (`KTRACE` is not configured: it succeeds and records
-//! nothing, the C's `#else`); the file is complete.
+//! `ppollcollect` and `sys_utrace` (it succeeds and records nothing, the C's `#else`). The
+//! file is not complete: `KTRACE` is configured in `GENERIC.MP` and not ported yet (TD3).
 //!
 //! ## Deviations
 //! - `iovec_copyin(uiov, aiov, iovcnt)` returns the iovecs (the caller's `aiov` or a
@@ -78,7 +78,7 @@
 //!   (and for fifos and ttys), as in C.
 //! - `sys_ioctl`'s argument buffer is a byte slice of `max(IOCPARM_LEN(com), sizeof(caddr_t))`
 //!   bytes, from the 128-byte stack buffer or `malloc(M_IOCTLOPS)`.
-//! - `KTRACE` is not configured.
+//! - `KTRACE` is configured in GENERIC.MP, not ported yet (TD3).
 //! - `select(2)`/`poll(2)` are OpenBSD's, built on the thread's poll kqueue
 //!   (`kern_event.rs`): `kqpoll_init` and `kqpoll_done` take the thread, and `kqpoll_init`
 //!   can fail (`ENOMEM`, the kqueue pool cannot sleep yet), which fails the call. The fd
@@ -562,7 +562,7 @@ pub fn sys_select(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result<(
     let utv = uap.tv.get() as usize;
     if utv != 0 {
         let tv: Timeval = copyin_obj(utv)?;
-        // KTRACE: not configured.
+        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
         if tv.tv_sec < 0 || !tv.is_valid() {
             return Err(Errno::EINVAL);
         }
@@ -591,7 +591,7 @@ pub fn sys_pselect(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result<
     let uts = uap.ts.get() as usize;
     if uts != 0 {
         let ts: Timespec = copyin_obj(uts)?;
-        // KTRACE: not configured.
+        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
         if ts.tv_sec < 0 || !ts.is_valid() {
             return Err(Errno::EINVAL);
         }
@@ -665,7 +665,7 @@ pub fn dopselect(
                 }
             }
         }
-        // KTRACE: not configured.
+        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
 
         if let Some(mask) = sigmask {
             dosigsuspend(p, mask & !sigcantmask());
@@ -749,7 +749,7 @@ pub fn dopselect(
                 }
             }
         }
-        // KTRACE: not configured.
+        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
     }
 
     kqpoll_done(p, nd as u32);
@@ -883,7 +883,7 @@ pub fn sys_ppoll(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result<()
     let uts = uap.ts.get() as usize;
     if uts != 0 {
         let ts: Timespec = copyin_obj(uts)?;
-        // KTRACE: not configured.
+        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
         if ts.tv_sec < 0 || !ts.is_valid() {
             return Err(Errno::EINVAL);
         }
@@ -1019,7 +1019,7 @@ pub fn doppoll(
         Err(Errno::EWOULDBLOCK) | Ok(()) => pollout(&pl, fds),
         other => other,
     };
-    // KTRACE: not configured.
+    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
 
     kqpoll_done(p, nfds);
 

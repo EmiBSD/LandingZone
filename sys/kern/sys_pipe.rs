@@ -67,7 +67,7 @@
 //!   hooked pipe through `kn_hook` ([`kn_pipe`]).
 //! - `fo_ioctl`'s `data` is the kernel copy of the argument (`sys_ioctl`), at least an `int`
 //!   wide; the `int` is read and written in native byte order.
-//! - `KTRACE` is not configured (`ktrfds`).
+//! - `KTRACE` is configured in GENERIC.MP, not ported yet (TD3) (`ktrfds`).
 
 use core::ffi::c_void;
 use core::ptr::{self, NonNull};
@@ -332,7 +332,7 @@ pub fn dopipe(p: &Proc, ufds: usize, flags: i32) -> Result<(), Errno> {
     let error = copyout(&fds, ufds);
     if error.is_ok() {
         fdpunlock(fdp);
-        // KTRACE (ktrfds): not configured.
+        // KTRACE (ktrfds): configured in GENERIC.MP, not ported yet (TD3).
     } else {
         // fdrelease() unlocks fdp.
         let _ = fdrelease(p, fd0);
