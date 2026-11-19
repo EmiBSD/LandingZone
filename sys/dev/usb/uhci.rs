@@ -70,8 +70,9 @@
 //!
 //! ## Deviations
 //! - `UHCI_DEBUG` is not in GENERIC: the `DPRINTF`s, the `uhci_dump_*` functions,
-//!   `uhcinoloop` and `thesc` are absent, as in a kernel built without it; so are `UREAD4`,
-//!   `UHCISTS` and `UHCI_CURFRAME`, which only that code uses. `UHCI_CTL_LOOP` is not
+//!   `uhcinoloop` and `thesc` are absent, as in a kernel built without it; so are `UHCISTS`
+//!   and `UHCI_CURFRAME`, macros which only that code uses (`UREAD4`, a function, is here,
+//!   `__unused` as in the C). `UHCI_CTL_LOOP` is not
 //!   defined in C either: control QHs do not loop. The `DIAGNOSTIC` blocks (`isdone`, the
 //!   `TD_IS_FREE` check of `uhci_free_std`, the start functions' request checks, the QH
 //!   search's end check, `uhci_detach`'s assertion, ...) are under feature `diagnostic`.
@@ -159,7 +160,7 @@ use crate::kern::subr_prf::{panic, printf};
 use crate::machine::bus::{
     BUS_DMASYNC_POSTREAD, BUS_DMASYNC_POSTWRITE, BUS_DMASYNC_PREREAD, BUS_DMASYNC_PREWRITE,
     BUS_SPACE_BARRIER_READ, BUS_SPACE_BARRIER_WRITE, BusSize, bus_space_barrier, bus_space_read_1,
-    bus_space_read_2, bus_space_write_1, bus_space_write_2, bus_space_write_4,
+    bus_space_read_2, bus_space_read_4, bus_space_write_1, bus_space_write_2, bus_space_write_4,
 };
 use crate::machine::cpu::{curproc, delay};
 use crate::machine::intr::{splsoftassert, splx};
@@ -511,6 +512,15 @@ pub fn UREAD2(sc: &UhciSoftc, r: BusSize) -> u16 {
     ubarr(sc);
     let (t, h) = sc.regs();
     bus_space_read_2(t, h, r)
+}
+
+/// `UREAD4(sc, r)`: `__unused` in the C too (only `UHCI_DEBUG`'s `uhci_dumpregs` reads a
+/// 32-bit register).
+#[allow(non_snake_case)] // the C name
+pub fn UREAD4(sc: &UhciSoftc, r: BusSize) -> u32 {
+    ubarr(sc);
+    let (t, h) = sc.regs();
+    bus_space_read_4(t, h, r)
 }
 
 /// `UHCICMD(sc, cmd)`.
