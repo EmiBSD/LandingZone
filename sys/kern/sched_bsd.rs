@@ -485,7 +485,7 @@ pub fn mi_switch() {
 
     if !ptr::eq(p, nextproc) {
         UVMEXP.swtch.fetch_add(1, Ordering::Relaxed);
-        // TRACEPOINT(sched, off__cpu, ...): dt(4), configured in GENERIC.MP, not ported yet.
+        // TRACEPOINT(sched, off__cpu, ...): dt(4), left out (the user, 2026-11-19).
         // SAFETY: `p` is the running thread, `nextproc` a runnable one the scheduler just
         // took off the run queue (or idle); both have a kernel stack and a pcb, and the
         // scheduler lock serialises the switch.
@@ -544,7 +544,7 @@ pub fn setrunnable(p: &Proc) {
     let prio = match p.p_stat.get() {
         SSTOP => {
             let prio = p.p_usrpri.get();
-            // TRACEPOINT(sched, unstop, ...): dt(4), configured in GENERIC.MP, not ported yet.
+            // TRACEPOINT(sched, unstop, ...): dt(4), left out (the user, 2026-11-19).
             // If not yet stopped or asleep, unstop but don't add to runq
             if p.p_flag.load(Ordering::Relaxed) & P_INSCHED != 0 {
                 if !p.p_wchan.get().is_null() {
@@ -559,7 +559,7 @@ pub fn setrunnable(p: &Proc) {
         }
         SSLEEP => {
             let prio = p.p_slppri.get();
-            // TRACEPOINT(sched, wakeup, ...): dt(4), configured in GENERIC.MP, not ported yet.
+            // TRACEPOINT(sched, wakeup, ...): dt(4), left out (the user, 2026-11-19).
             // if not yet asleep, don't add to runqueue
             if p.p_flag.load(Ordering::Relaxed) & P_INSCHED != 0 {
                 return;

@@ -117,7 +117,7 @@
 //!   (`uvm_map_printit`, `uvm_object_printit`, `uvm_page_printit`) wait for their
 //!   subsystems; `SYSVSHM` and `DEADBEEF0` are not configured; `PMAP_CHECK_COPYIN` is the
 //!   machine's `pmap_check_copyin()` (amd64 without PKU), read where the C has the `#ifdef`;
-//!   `TRACEPOINT` (dt(4)) is configured in `GENERIC.MP` but not ported yet.
+//!   `TRACEPOINT` (dt(4)) is left out (the user's decision of 2026-11-19).
 //! - `UVM_MAP_CLIP_START`/`END` are [`uvm_map_clip_start_at`]/[`uvm_map_clip_end_at`].
 //! - `uvm_map_fix_space` reuses a free-only entry that already starts at the address where
 //!   the C would allocate a new one (a kernel map whose first entry is free space at
@@ -929,7 +929,7 @@ pub fn uvm_mapent_addr_insert(map: &VmMap, entry: &VmMapEntry) {
     kdassert!(entry.start.get() <= entry.end.get());
     kdassert!(entry.start.get() & PAGE_MASK == 0 && entry.end.get() & PAGE_MASK == 0);
 
-    // TRACEPOINT(uvm, map_insert, ...): dt(4), configured in GENERIC.MP, not ported yet.
+    // TRACEPOINT(uvm, map_insert, ...): dt(4), left out (the user, 2026-11-19).
 
     uvm_map_req_write(map);
     // SAFETY: the map is write-locked (asserted above when it has references) and the entry
@@ -954,7 +954,7 @@ pub fn uvm_mapent_addr_insert(map: &VmMap, entry: &VmMapEntry) {
 
 /// `uvm_mapent_addr_remove`: handle address tree removal.
 pub fn uvm_mapent_addr_remove(map: &VmMap, entry: &VmMapEntry) {
-    // TRACEPOINT(uvm, map_remove, ...): dt(4), configured in GENERIC.MP, not ported yet.
+    // TRACEPOINT(uvm, map_remove, ...): dt(4), left out (the user, 2026-11-19).
 
     uvm_map_req_write(map);
     // SAFETY: the map is write-locked and the entry is on its address tree (every caller

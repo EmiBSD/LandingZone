@@ -81,8 +81,8 @@
 //!   file descriptor table there is no `fd_rdir` to release. `WCOREFLAG` is `<sys/wait.h>`'s
 //!   value, kept here until that header is ported.
 //! - `WITNESS`, `SMALL_KERNEL` and `PMAP_CHECK_COPYIN` are not configured. dt(4)'s
-//!   `TRACEPOINT` is configured in `GENERIC.MP` but not ported yet; `KTRACE` is left out
-//!   (the user's decision of 2026-11-19). The kernel lock is taken where the C takes it (M11a; nothing without
+//!   `TRACEPOINT` and `KTRACE` are left out (the user's decision of 2026-11-19). The kernel
+//!   lock is taken where the C takes it (M11a; nothing without
 //!   `MULTIPROCESSOR`).
 //! - `sys_sigreturn` lives in `machdep.c` (amd64) and `sig_machdep.c` (arm64); the system
 //!   call table finds `pub fn sys_*` only under `sys/kern` and `sys/uvm`, so the entry here
@@ -1590,7 +1590,7 @@ pub fn proc_stop_setup(p: &Proc) {
     // fixed.
     crate::kern::sched_bsd::sched_assert_locked();
 
-    // TRACEPOINT(sched, stop, NULL): dt(4), configured in GENERIC.MP, not ported yet.
+    // TRACEPOINT(sched, stop, NULL): dt(4), left out (the user, 2026-11-19).
 
     p.p_flag.fetch_or(P_INSCHED, Ordering::Relaxed);
     p.p_stat.set(SSTOP);

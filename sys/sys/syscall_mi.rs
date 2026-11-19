@@ -63,8 +63,7 @@
 //!   anything else gets `SIGABRT` (`sigabort`). Its message goes to the console with
 //!   `printf` where the C's `uprintf` writes to the process's terminal: `smoke-boot`
 //!   expects the line on the serial console, from a process that has no terminal.
-//! - dt(4) is configured in `GENERIC.MP` but not ported yet: its calls are missing, so the
-//!   row is `wip`. `KTRACE` is left out (the user's decision of 2026-11-19).
+//! - dt(4) and `KTRACE` are left out (the user's decision of 2026-11-19).
 //!   `SYSCALL_DEBUG` is the feature `syscall_debug`.
 //! - `SY_NOLOCK` (M11e): honoured as in C for the system calls whose bodies are audited for
 //!   `MULTIPROCESSOR`; a `NOLOCK` system call whose body is not audited yet is listed in
@@ -253,7 +252,7 @@ pub fn mi_syscall(
         crate::kern::kern_xxx::scdebug_call(p, code, argp);
         kernel_unlock(); // KERNEL_UNLOCK()
     }
-    // dt(4): configured in GENERIC.MP, not ported yet. KTRACE: left out (user, 2026-11-19).
+    // dt(4), KTRACE: left out (the user, 2026-11-19).
 
     // SP must be within MAP_STACK space
     let mut ie = p.p_spinentry.get();
@@ -307,14 +306,14 @@ pub fn mi_syscall_return(
         kernel_unlock(); // KERNEL_UNLOCK()
     }
     let _ = (code, error, retval);
-    // dt(4): configured in GENERIC.MP, not ported yet. KTRACE: left out (user, 2026-11-19).
+    // dt(4), KTRACE: left out (the user, 2026-11-19).
     userret(p);
 }
 
 /// `mi_child_return`: finish MI stuff for a new process/thread to return.
 #[inline]
 pub fn mi_child_return(p: &Proc) {
-    // TRACEPOINT(sched, on__cpu, NULL): dt(4), configured in GENERIC.MP, not ported yet.
+    // TRACEPOINT(sched, on__cpu, NULL): dt(4), left out (the user, 2026-11-19).
 
     userret(p);
 
@@ -332,7 +331,7 @@ pub fn mi_child_return(p: &Proc) {
         crate::kern::kern_xxx::scdebug_ret(p, code as Register, 0, &child_retval);
         kernel_unlock(); // KERNEL_UNLOCK()
     }
-    // dt(4): configured in GENERIC.MP, not ported yet. KTRACE: left out (user, 2026-11-19).
+    // dt(4), KTRACE: left out (the user, 2026-11-19).
 }
 
 /// `mi_ast`: do the specific processing necessary for an AST.

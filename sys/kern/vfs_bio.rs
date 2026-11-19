@@ -97,7 +97,7 @@
 //!   ...) are atomics, `bufhead`, `cleancache` and `dirtyqueue` `Sync` statics changed at
 //!   `splbio`.
 //! - `getblk` and `buf_get` return `Option` (the C's NULL); `incore` likewise.
-//! - The cleaner's `TRACEPOINT`s (`dt(4)`, configured in `GENERIC.MP`) are not ported yet;
+//! - The cleaner's `TRACEPOINT`s (dt(4)) are left out (the user's decision of 2026-11-19);
 //!   `HIBERNATE` is not configured
 //!   (`hibernate_suspend_bufcache`); the DDB printer `bcstats_print` waits for the ddb
 //!   command loop (`db_command.c`).
@@ -1239,7 +1239,7 @@ pub fn buf_daemon(_arg: *mut core::ffi::c_void) {
         loop {
             bp = bufcache_getdirtybuf();
             let Some(b) = bp else { break };
-            // TRACEPOINT(vfs, cleaner, ...): dt(4), configured in GENERIC.MP, not ported yet.
+            // TRACEPOINT(vfs, cleaner, ...): dt(4), left out (the user, 2026-11-19).
 
             if unclean_pages() < LODIRTYPAGES.load(Ordering::Relaxed)
                 && BCSTATS.kvaslots_avail.load(Ordering::Relaxed) > 2 * RESERVE_SLOTS
@@ -1541,7 +1541,7 @@ pub fn bufcache_take(bp: &'static Buf) {
 
     let pages = bufpages_of(bp);
 
-    // TRACEPOINT(vfs, bufcache_take, ...): dt(4), configured in GENERIC.MP, not ported yet.
+    // TRACEPOINT(vfs, bufcache_take, ...): dt(4), left out (the user, 2026-11-19).
 
     let cache = &CLEANCACHE;
     let queue = if !bp.isset(B_DELWRI) {
@@ -1612,7 +1612,7 @@ pub fn bufcache_release(bp: &'static Buf) {
     kassert!(bp.isset(B_BC));
     let pages = bufpages_of(bp);
 
-    // TRACEPOINT(vfs, bufcache_rel, ...): dt(4), configured in GENERIC.MP, not ported yet.
+    // TRACEPOINT(vfs, bufcache_rel, ...): dt(4), left out (the user, 2026-11-19).
 
     let queue = if !bp.isset(B_DELWRI) {
         let (queue, queuepages, which) = if bp.isset(B_WARM | B_COLD) {

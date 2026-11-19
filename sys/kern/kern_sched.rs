@@ -350,7 +350,7 @@ pub fn sched_toidle() -> ! {
     idle.p_stat.set(SRUN);
 
     UVMEXP.swtch.fetch_add(1, Ordering::Relaxed);
-    // TRACEPOINT(sched, off__cpu, ...): dt(4), configured in GENERIC.MP, not ported yet.
+    // TRACEPOINT(sched, off__cpu, ...): dt(4), left out (the user, 2026-11-19).
     // SAFETY: `idle` is runnable and never on a queue; the dead thread's context is not
     // saved, as the C's NULL old proc asks.
     unsafe { Machine::cpu_switchto(None, idle) };
@@ -376,7 +376,7 @@ pub fn setrunqueue(ci: Option<&'static CpuInfo>, p: &Proc, prio: u8) {
 
     let spc = Machine::ci_schedstate(ci);
     spc.spc_nrun.fetch_add(1, Ordering::Relaxed);
-    // TRACEPOINT(sched, enqueue, ...): dt(4), configured in GENERIC.MP, not ported yet.
+    // TRACEPOINT(sched, enqueue, ...): dt(4), left out (the user, 2026-11-19).
 
     // SAFETY: `p` is on no run queue (it is being made runnable), under the scheduler lock,
     // and a thread outlives its stay on a run queue.
@@ -404,7 +404,7 @@ pub fn remrunqueue(p: &Proc) {
     };
     let spc = Machine::ci_schedstate(ci);
     spc.spc_nrun.fetch_sub(1, Ordering::Relaxed);
-    // TRACEPOINT(sched, dequeue, ...): dt(4), configured in GENERIC.MP, not ported yet.
+    // TRACEPOINT(sched, dequeue, ...): dt(4), left out (the user, 2026-11-19).
 
     // SAFETY: `p` is SRUN on `queue` of its CPU, under the scheduler lock.
     unsafe { spc.spc_qs[queue].remove(p) };
@@ -643,7 +643,7 @@ pub fn sched_steal_proc(self_: &'static CpuInfo) -> Option<&'static Proc> {
         }
         let best = best?;
 
-        // TRACEPOINT(sched, steal, ...): dt(4), configured in GENERIC.MP, not ported yet.
+        // TRACEPOINT(sched, steal, ...): dt(4), left out (the user, 2026-11-19).
 
         remrunqueue(best);
         best.p_cpu.set(self_);

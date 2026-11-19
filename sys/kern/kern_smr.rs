@@ -47,8 +47,7 @@
 //! ## Deviations
 //! - `WITNESS` is not configured: `smr_lock_obj`, `smr_lock_type` and the
 //!   `WITNESS_INIT`/`WITNESS_CHECKORDER`/`WITNESS_LOCK`/`WITNESS_UNLOCK` calls are absent;
-//!   dt(4) is configured in `GENERIC.MP` but not ported yet: the `TRACEPOINT`s are
-//!   missing, so the row is `wip`.
+//!   dt(4)'s `TRACEPOINT`s are left out (the user's decision of 2026-11-19).
 //! - `smr_expedite`, `smr_ndeferred` and `smr_grace_period` are atomics (`smr_lock`
 //!   protects the first two as in C; the third is the C's `READ_ONCE`/`WRITE_ONCE`);
 //!   `smr_deferred` is a simple queue made `Sync`, changed under `smr_lock`.
@@ -183,7 +182,7 @@ pub fn smr_thread(_arg: *mut c_void) {
         while let Some(smr) = deferred.first() {
             // SAFETY: `smr` is the first entry of this thread's private queue.
             unsafe { deferred.remove_head() };
-            // TRACEPOINT(smr, called, ...): dt(4), configured in GENERIC.MP, not ported yet.
+            // TRACEPOINT(smr, called, ...): dt(4), left out (the user, 2026-11-19).
             // The call may free the entry: read it first.
             let (func, arg) = (smr.smr_func.get(), smr.smr_arg.get());
             let Some(func) = func else {
@@ -237,7 +236,7 @@ pub fn smr_grace_wait() {
 
 /// `smr_wakeup`: the timeout that ends the SMR thread's pause.
 pub fn smr_wakeup(_arg: *mut c_void) {
-    // TRACEPOINT(smr, wakeup, NULL): dt(4), configured in GENERIC.MP, not ported yet.
+    // TRACEPOINT(smr, wakeup, NULL): dt(4), left out (the user, 2026-11-19).
     wakeup(ptr::from_ref(&SMR_NDEFERRED));
 }
 
@@ -328,7 +327,7 @@ pub fn smr_call_impl(
     spc.spc_smrexpedite
         .set(spc.spc_smrexpedite.get() | u8::from(expedite));
     splx(s);
-    // TRACEPOINT(smr, call, ...): dt(4), configured in GENERIC.MP, not ported yet.
+    // TRACEPOINT(smr, call, ...): dt(4), left out (the user, 2026-11-19).
 
     // If this call was made from an interrupt context that preempted idle state, dispatch
     // the local queue to the shared queue immediately. The entries would linger in the
@@ -361,7 +360,7 @@ pub fn smr_barrier_impl(expedite: bool) {
         expedite,
     );
     cond_wait(&c, "smrbar");
-    // TRACEPOINT(smr, barrier_exit, ...): dt(4), configured in GENERIC.MP, not ported yet.
+    // TRACEPOINT(smr, barrier_exit, ...): dt(4), left out (the user, 2026-11-19).
 }
 /* </CODE> */
 

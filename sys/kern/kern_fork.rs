@@ -61,8 +61,7 @@
 //! `process_initialize`, `fork_check_maxthread`, `alloctid`, `allocpid`, `ispidtaken` and
 //! `freepid`; part b2 adds `forkstat`, `thread_new`, `process_new`, `fork_thread_start`,
 //! `fork1` and `proc_trampoline_mi`, enough for kernel threads. M8 adds `fork_return`,
-//! `sys_fork`, `sys_vfork`, `sys___tfork` and `thread_fork` (the file is `wip`: its dt(4)
-//! calls are missing); the
+//! `sys_fork`, `sys_vfork`, `sys___tfork` and `thread_fork` (the file is `wip`); the
 //! child returns to user mode through the machine's `child_return` (`machine::cpu`).
 //!
 //! ## Deviations
@@ -510,7 +509,7 @@ pub fn fork_check_maxthread(uid: Uid) -> Result<(), Errno> {
 fn fork_thread_start(p: &Proc, parent: &Proc, flags: i32) {
     sched_lock();
     let ci = sched_choosecpu_fork(parent, flags);
-    // TRACEPOINT(sched, fork, ...): dt(4), configured in GENERIC.MP, not ported yet.
+    // TRACEPOINT(sched, fork, ...): dt(4), left out (the user, 2026-11-19).
     setrunqueue(Some(ci), p, p.p_usrpri.get());
     sched_unlock();
 }
