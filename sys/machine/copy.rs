@@ -24,14 +24,17 @@
 //! Milestone M6 (part a) adds them to the contract; the host double copies within its one
 //! address space. With `kern_sig.c`, [`copyin_obj`] and [`copyout_obj`] copy a whole ABI
 //! structure (`copyin(uaddr, &sa, sizeof(sa))`) for the types marked [`AbiPod`].
+//!
+//! `copyin` and `copyinstr` are `kern_subr.c`'s wrappers (`PMAP_CHECK_COPYIN`) over the
+//! machine's `_copyin` and `_copyinstr`: they live in `kern/kern_subr.rs`, the module of
+//! their C file (the user's decision of 2026-11-19), and this module re-exports them, so
+//! every caller keeps `machine::copy::copyin`.
 
 use core::mem::MaybeUninit;
 use core::slice;
 
-use crate::kern::kern_subr::check_copyin;
+pub use crate::kern::kern_subr::{copyin, copyinstr};
 use crate::machine::Machine;
-use crate::machine::cpu::curproc;
-use crate::machine::pmap::pmap_check_copyin;
 use crate::sys::errno::Errno;
 
 /// The copy routines between user and kernel space.
@@ -104,33 +107,9 @@ pub fn copyout_obj<T: AbiPod>(obj: &T, uaddr: usize) -> Result<(), Errno> {
     copyout(buf, uaddr)
 }
 
-/// `copyin`: the machine's `_copyin`, after `kern_subr.c`'s check of the regions the
-/// process may execute and not read, on a machine that needs it (`PMAP_CHECK_COPYIN`).
-pub fn copyin(uaddr: usize, kbuf: &mut [u8]) -> Result<(), Errno> {
-    if pmap_check_copyin()
-        && let Some(p) = curproc()
-    {
-        check_copyin(p, uaddr, kbuf.len())?;
-    }
-    Machine::copyin(uaddr, kbuf)
-}
-
 /// `copyout` on the selected machine.
 pub fn copyout(kbuf: &[u8], uaddr: usize) -> Result<(), Errno> {
     Machine::copyout(kbuf, uaddr)
-}
-
-/// `copyinstr`: the machine's `_copyinstr`, then the same check over the bytes the string
-/// took: the copyin checks must come after figuring out the string length, since the
-/// buffer size may cross into another ELF segment.
-pub fn copyinstr(uaddr: usize, kbuf: &mut [u8]) -> Result<usize, Errno> {
-    let alen = Machine::copyinstr(uaddr, kbuf)?;
-    if pmap_check_copyin()
-        && let Some(p) = curproc()
-    {
-        check_copyin(p, uaddr, alen)?;
-    }
-    Ok(alen)
 }
 
 /// `copyin32` on the selected machine.

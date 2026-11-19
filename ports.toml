@@ -2411,11 +2411,11 @@ notes = "every function: crset, the id syscalls (getpid/getthrid/getppid/getpgrp
 [[file]]
 c = "sys/kern/kern_subr.c"
 rust = "sys/kern/kern_subr.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "65bb9b5fa6cdc52a421f82a2c32cacad2165f8d1"
 deps = ["sys/kern/kern_malloc.c", "sys/sys/uio.h", "sys/kern/sched_bsd.c"]
-notes = "M5: hashinit (returns the table as a slice) and hashfree; the hooks (hook_establish/disestablish, dohooks) wait for their first user; M7b (kern_descrip.c): uiomove (the kernel buffer as a slice; UIO_SYSSPACE through kcopy) and ureadc; PMAP_CHECK_COPYIN not configured; host tests; TD1: the hook lists (hook_establish, hook_disestablish under DIAGNOSTIC's membership check, dohooks with HOOK_REMOVE and HOOK_FREE; struct hook_desc and the startuphook_* wrappers of systm.h; main runs dostartuphooks); check_copyin, with the C's copyin and copyinstr wrappers of PMAP_CHECK_COPYIN as machine::copy's entry points (amd64 without PKU refuses a copyin from a region the map lists as execute-only); every function of the C file has its port (read again whole); TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 2 C function(s) not in its Rust file: copyinstr, copyin"
+notes = "M5: hashinit (returns the table as a slice) and hashfree; the hooks (hook_establish/disestablish, dohooks) wait for their first user; M7b (kern_descrip.c): uiomove (the kernel buffer as a slice; UIO_SYSSPACE through kcopy) and ureadc; PMAP_CHECK_COPYIN not configured; host tests; TD1: the hook lists (hook_establish, hook_disestablish under DIAGNOSTIC's membership check, dohooks with HOOK_REMOVE and HOOK_FREE; struct hook_desc and the startuphook_* wrappers of systm.h; main runs dostartuphooks); check_copyin, with the C's copyin and copyinstr wrappers of PMAP_CHECK_COPYIN here (moved from sys/machine/copy.rs on 2026-11-19, the user's decision; machine::copy re-exports them as every caller's entry points) (amd64 without PKU refuses a copyin from a region the map lists as execute-only); every function of the C file has its port (read again whole); TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 2 C function(s) not in its Rust file: copyinstr, copyin; moved into kern_subr.rs on 2026-11-19, and ports check accepts the row as ported"
 
 [[file]]
 c = "sys/kern/kern_kthread.c"

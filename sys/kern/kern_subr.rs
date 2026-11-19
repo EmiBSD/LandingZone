@@ -66,10 +66,11 @@
 //!   pointer plus an out-parameter mask; callers mask with `len() - 1`.
 //! - `uiomove(cp, n, uio)` takes the kernel buffer as a slice whose length is `n`.
 //! - Under `PMAP_CHECK_COPYIN` the C defines `copyin` and `copyinstr` here, over the
-//!   machine's `_copyin` and `_copyinstr`. `check_copyin` is here; the two wrappers are the
-//!   entry points every caller already uses, `machine::copy::copyin` and `copyinstr`
-//!   (`sys/machine/copy.rs`), which make the check when the machine's
-//!   `pmap_check_copyin()` says so.
+//!   machine's `_copyin` and `_copyinstr`. They are here with `check_copyin`, and they make
+//!   the check when the machine's `pmap_check_copyin()` says so (the `#ifdef` read at run
+//!   time: amd64 without PKU). `machine::copy` re-exports them, so every caller keeps
+//!   `machine::copy::copyin` (moved from `sys/machine/copy.rs` on 2026-11-19, the user's
+//!   decision).
 
 use core::cell::Cell;
 use core::ffi::c_void;
@@ -80,7 +81,10 @@ use crate::kassert;
 use crate::kern::kern_malloc::{free, malloc, mallocarray};
 use crate::kern::sched_bsd::preempt;
 use crate::kern::subr_prf::panic;
-use crate::machine::copy::{copyin, copyout, kcopy};
+use crate::machine::Machine;
+use crate::machine::copy::{UserCopy, copyout, kcopy};
+use crate::machine::cpu::curproc;
+use crate::machine::pmap::pmap_check_copyin;
 use crate::sys::errno::Errno;
 use crate::sys::malloc::{M_DEVBUF, M_NOWAIT};
 use crate::sys::proc::Proc;
@@ -117,6 +121,30 @@ pub fn check_copyin(p: &Proc, vstart: usize, len: usize) -> Result<(), Errno> {
         }
     }
     Ok(())
+}
+
+/// `copyinstr`: the machine's `_copyinstr`, then the same check over the bytes the string
+/// took: the copyin checks must come after figuring out the string length, since the
+/// buffer size may cross into another ELF segment.
+pub fn copyinstr(uaddr: usize, kbuf: &mut [u8]) -> Result<usize, Errno> {
+    let alen = Machine::copyinstr(uaddr, kbuf)?;
+    if pmap_check_copyin()
+        && let Some(p) = curproc()
+    {
+        check_copyin(p, uaddr, alen)?;
+    }
+    Ok(alen)
+}
+
+/// `copyin`: the machine's `_copyin`, after the check of the regions the process may
+/// execute and not read, on a machine that needs it (`PMAP_CHECK_COPYIN`).
+pub fn copyin(uaddr: usize, kbuf: &mut [u8]) -> Result<(), Errno> {
+    if pmap_check_copyin()
+        && let Some(p) = curproc()
+    {
+        check_copyin(p, uaddr, kbuf.len())?;
+    }
+    Machine::copyin(uaddr, kbuf)
 }
 
 /// `uiomove(cp, n, uio)`: moves `cp.len()` bytes (at most `uio_resid`) between the kernel
