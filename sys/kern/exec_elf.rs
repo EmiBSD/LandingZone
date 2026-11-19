@@ -121,7 +121,7 @@ use core::ffi::c_void;
 use core::ptr::{self, NonNull};
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use crate::kern::exec_subr::{exec_process_vmcmds, exec_setup_stack};
+use crate::kern::exec_subr::{exec_process_vmcmds, exec_setup_stack, kill_vmcmds, new_vmcmd};
 use crate::kern::kern_malloc::{free, malloc, mallocarray};
 use crate::kern::vfs_lookup::{namei, ndinit};
 use crate::kern::vfs_subr::vput;
@@ -310,7 +310,8 @@ pub fn elf_load_psection<'a>(
     if ph.p_flags & PF_W != 0 {
         psize = trunc_page(lsize as usize) as u64;
         if psize > 0 {
-            vcset.push(
+            new_vmcmd(
+                vcset,
                 VmcmdProc::MapPagedvn,
                 psize as usize,
                 base as usize,
@@ -321,7 +322,8 @@ pub fn elf_load_psection<'a>(
             );
         }
         if psize != lsize {
-            vcset.push(
+            new_vmcmd(
+                vcset,
                 VmcmdProc::MapReadvn,
                 (lsize - psize) as usize,
                 (base + psize) as usize,
@@ -332,7 +334,8 @@ pub fn elf_load_psection<'a>(
             );
         }
     } else {
-        vcset.push(
+        new_vmcmd(
+            vcset,
             VmcmdProc::MapPagedvn,
             psize as usize,
             base as usize,
@@ -348,7 +351,16 @@ pub fn elf_load_psection<'a>(
     let rf = round_page(addr.wrapping_add(ph.p_filesz).wrapping_add(diff) as usize);
 
     if rm != rf {
-        vcset.push(VmcmdProc::MapZero, rm - rf, rf, None, 0, *prot, flags);
+        new_vmcmd(
+            vcset,
+            VmcmdProc::MapZero,
+            rm - rf,
+            rf,
+            None,
+            0,
+            *prot,
+            flags,
+        );
     }
     *size = msize;
 }
@@ -699,7 +711,8 @@ fn elf_load_file_vnode(
                     return Err((Errno::ENOMEM, true));
                 }
                 randomizequota -= pp.p_memsz;
-                epp.ep_vmcmds.push(
+                new_vmcmd(
+                    &mut epp.ep_vmcmds,
                     VmcmdProc::Randomize,
                     pp.p_memsz as usize,
                     pp.p_vaddr.wrapping_add(pos) as usize,
@@ -713,7 +726,8 @@ fn elf_load_file_vnode(
             // DT_DEBUG is not ready on mips (only)
             PT_DYNAMIC => {}
 
-            PT_GNU_RELRO | PT_OPENBSD_MUTABLE => epp.ep_vmcmds.push(
+            PT_GNU_RELRO | PT_OPENBSD_MUTABLE => new_vmcmd(
+                &mut epp.ep_vmcmds,
                 VmcmdProc::Mutable,
                 pp.p_memsz as usize,
                 pp.p_vaddr.wrapping_add(pos) as usize,
@@ -772,7 +786,7 @@ pub fn exec_elf_makecmds(
         Err(e) => {
             // bad:
             epp.ep_interp = None;
-            epp.ep_vmcmds.kill();
+            kill_vmcmds(&mut epp.ep_vmcmds);
             Err(e)
         }
     }
@@ -999,7 +1013,8 @@ fn exec_elf_makecmds_inner(p: &Proc, epp: &mut ExecPackage<'_>) -> Result<(), Er
                     return Err(Errno::ENOMEM);
                 }
                 randomizequota -= pp.p_memsz;
-                epp.ep_vmcmds.push(
+                new_vmcmd(
+                    &mut epp.ep_vmcmds,
                     VmcmdProc::Randomize,
                     pp.p_memsz as usize,
                     pp.p_vaddr.wrapping_add(exe_base) as usize,
@@ -1013,7 +1028,8 @@ fn exec_elf_makecmds_inner(p: &Proc, epp: &mut ExecPackage<'_>) -> Result<(), Er
             // DT_DEBUG is not ready on mips (only)
             PT_DYNAMIC => {}
 
-            PT_GNU_RELRO | PT_OPENBSD_MUTABLE => epp.ep_vmcmds.push(
+            PT_GNU_RELRO | PT_OPENBSD_MUTABLE => new_vmcmd(
+                &mut epp.ep_vmcmds,
                 VmcmdProc::Mutable,
                 pp.p_memsz as usize,
                 pp.p_vaddr.wrapping_add(exe_base) as usize,
@@ -1094,7 +1110,7 @@ pub fn exec_elf_fixup(p: &Proc, epp: &mut ExecPackage<'_>) -> Result<(), Errno> 
     if let Some(interp) = &interp
         && let Err(error) = elf_load_file(p, interp.as_str(), epp)
     {
-        epp.ep_vmcmds.kill();
+        kill_vmcmds(&mut epp.ep_vmcmds);
         return Err(error);
     }
     // We have to do this ourselves...
@@ -1686,7 +1702,7 @@ mod tests {
                 }
             }
             free_pins(npins, pins);
-            vmcmds.kill();
+            kill_vmcmds(&mut vmcmds);
         }
     }
 }

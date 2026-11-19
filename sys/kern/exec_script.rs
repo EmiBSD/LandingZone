@@ -82,6 +82,7 @@ use alloc::vec::Vec;
 use core::ptr;
 use core::sync::atomic::Ordering;
 
+use crate::kern::exec_subr::kill_vmcmds;
 use crate::kern::kern_descrip::{falloc, fdinsert, fdrelease};
 use crate::kern::kern_exec::{check_exec, namei_pnbuf_put};
 use crate::kern::vfs_lookup::ndinitat;
@@ -313,7 +314,7 @@ fn exec_script_fail(
     namei_pnbuf_put(ndp);
 
     // free any vmspace-creation commands, and release their references
-    epp.ep_vmcmds.kill();
+    kill_vmcmds(&mut epp.ep_vmcmds);
 
     Err(error)
 }

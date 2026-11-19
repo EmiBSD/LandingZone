@@ -86,7 +86,7 @@ use core::sync::atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering};
 use crate::dev::rnd::{arc4random, arc4random_buf};
 use crate::kern::exec_elf::{exec_elf_fixup, exec_elf_makecmds};
 use crate::kern::exec_script::exec_script_makecmds;
-use crate::kern::exec_subr::exec_process_vmcmds;
+use crate::kern::exec_subr::{exec_process_vmcmds, kill_vmcmds};
 use crate::kern::kern_clock::stopprofclock;
 use crate::kern::kern_descrip::{
     closef, falloc, fd_getfile, fdinsert, fdprepforexec, fdrelease, fdremove,
@@ -397,7 +397,7 @@ pub fn check_exec(
                 Err(e) if epp.ep_flags & EXEC_DESTR != 0 => return Err(e),
                 Err(e) => {
                     // free any vmspace-creation commands, and release their references
-                    epp.ep_vmcmds.kill();
+                    kill_vmcmds(&mut epp.ep_vmcmds);
                     exec_free_package(epp);
                     e
                 }
@@ -453,7 +453,7 @@ fn check_exec_switch(
     }
 
     // free any vmspace-creation commands, and release their references
-    epp.ep_vmcmds.kill();
+    kill_vmcmds(&mut epp.ep_vmcmds);
     exec_free_package(epp);
     error
 }
@@ -579,7 +579,7 @@ fn execve_common(
     // argument buffer, then freehdr.
     let bad = |pack: &mut ExecPackage<'_>, nid: &mut Nameidata<'_>, error: Errno| {
         // free the vmspace-creation commands, and release their references
-        pack.ep_vmcmds.kill();
+        kill_vmcmds(&mut pack.ep_vmcmds);
         // kill any opened file descriptor, if necessary
         if pack.ep_flags & EXEC_HASFD != 0 {
             pack.ep_flags &= !EXEC_HASFD;
@@ -710,7 +710,7 @@ fn execve_common(
             <Machine as VmParam>::VM_MIN_ADDRESS,
             <Machine as VmParam>::VM_MAXUSER_ADDRESS,
         );
-        pack.ep_vmcmds.kill();
+        kill_vmcmds(&mut pack.ep_vmcmds);
         exec_free_package(pack);
         namei_pnbuf_put(nid);
         if let Some(vp) = pack.ep_vp {

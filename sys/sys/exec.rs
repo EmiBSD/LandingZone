@@ -72,9 +72,9 @@
 //!   file system exists, a memory image (`ep_image`). A vmcmd that reads the file names it
 //!   with an [`ExecFile`]: the vnode (referenced as `new_vmcmd` does) or the image, read at
 //!   `ev_offset`.
-//! - `exec_vmcmd_set` is a `Vec` instead of the growable array with
-//!   `EXEC_DEFAULT_VMCMD_SETSIZE`; `new_vmcmd`/`vmcmdset_extend`/`kill_vmcmds` are
-//!   `ExecVmcmdSet::{push, kill}`.
+//! - `exec_vmcmd_set` is a `Vec` created with room for `EXEC_DEFAULT_VMCMD_SETSIZE` commands
+//!   (`evs_cnt` is its capacity); `new_vmcmd`, `vmcmdset_extend` and `kill_vmcmds` are in
+//!   `kern/exec_subr.rs`, the module of their C file.
 //! - `ep_hdr` is an owned buffer of `exec_maxhdrsz` bytes (the C's `malloc(M_EXEC)`);
 //!   `ep_interp` is a `namei_pool` buffer that gives itself back when dropped; `ep_ndp` is
 //!   passed to `check_exec` and to the exec switch's functions as an argument instead of
@@ -90,7 +90,6 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::ptr::NonNull;
 
-use crate::kern::vfs_subr::{vref, vrele};
 use crate::kern::vfs_syscalls::NameiBuf;
 use crate::sys::errno::Errno;
 use crate::sys::exec_elf::ElfEhdr;
@@ -187,57 +186,23 @@ pub struct ExecVmcmd<'a> {
 }
 
 /// `struct exec_vmcmd_set`: the vmcmds, in order.
-#[derive(Default)]
 pub struct ExecVmcmdSet<'a> {
-    /// `evs_cmds` (`evs_used` is its length).
+    /// `evs_cmds`: `evs_used` is its length and `evs_cnt` its capacity.
     pub evs_cmds: Vec<ExecVmcmd<'a>>,
 }
 
-impl<'a> ExecVmcmdSet<'a> {
-    /// `VMCMDSET_INIT`.
-    pub const fn new() -> Self {
+impl ExecVmcmdSet<'_> {
+    /// `VMCMDSET_INIT`: room for `EXEC_DEFAULT_VMCMD_SETSIZE` commands.
+    pub fn new() -> Self {
         Self {
-            evs_cmds: Vec::new(),
+            evs_cmds: Vec::with_capacity(EXEC_DEFAULT_VMCMD_SETSIZE),
         }
     }
+}
 
-    /// `new_vmcmd(evsp, proc, len, addr, vp, offset, prot, flags)` (`NEW_VMCMD2`): create a
-    /// new vmcmd structure and fill in its fields based on function call arguments; make
-    /// sure objects ref'd by the vmcmd are 'held'.
-    #[allow(clippy::too_many_arguments)] // the C's signature
-    pub fn push(
-        &mut self,
-        proc: VmcmdProc,
-        len: usize,
-        addr: usize,
-        vp: Option<ExecFile<'a>>,
-        offset: usize,
-        prot: VmProt,
-        flags: u32,
-    ) {
-        if let Some(ExecFile::Vnode(vp)) = vp {
-            vref(vp);
-        }
-        self.evs_cmds.push(ExecVmcmd {
-            ev_proc: proc,
-            ev_len: len,
-            ev_addr: addr,
-            ev_vp: vp,
-            ev_offset: offset,
-            ev_prot: prot,
-            ev_flags: flags,
-        });
-    }
-
-    /// `kill_vmcmds`: release the commands' vnodes and reset the set.
-    pub fn kill(&mut self) {
-        for vcp in &self.evs_cmds {
-            if let Some(ExecFile::Vnode(vp)) = vcp.ev_vp {
-                vrele(vp);
-            }
-        }
-        // Free old vmcmds and reset the array.
-        self.evs_cmds.clear();
+impl Default for ExecVmcmdSet<'_> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -397,8 +362,7 @@ pub const EXEC_NOBTCFI: u32 = 0x0040;
 /// `EXEC_PROFILE`: profiled binary.
 pub const EXEC_PROFILE: u32 = 0x0080;
 
-/// `EXEC_DEFAULT_VMCMD_SETSIZE`: # of cmds in set to start. The set is a `Vec` here, which
-/// grows by itself; the C's starting size is what it is created with.
+/// `EXEC_DEFAULT_VMCMD_SETSIZE`: # of cmds in set to start; `vmcmdset_extend` doubles it.
 pub const EXEC_DEFAULT_VMCMD_SETSIZE: usize = 12;
 
 // a_mid - keep sorted in numerical order for sanity's sake

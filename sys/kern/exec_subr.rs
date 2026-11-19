@@ -68,6 +68,7 @@
 //! - The 4-clause licence (advertising clause) was accepted by the user at M2 for this
 //!   project.
 
+use alloc::vec::Vec;
 use core::ptr::NonNull;
 
 use crate::dev::rnd::{
@@ -77,14 +78,15 @@ use crate::dev::rnd::{
 use crate::kassert;
 use crate::kern::kern_malloc::{free, malloc};
 use crate::kern::sched_bsd::r#yield;
+use crate::kern::vfs_subr::{vref, vrele};
 use crate::kern::vfs_vnops::vn_rdwr;
 use crate::machine::copy::copyout;
 use crate::machine::pmap::pmap_check_copyin;
 use crate::machine::{Machine, VmParam};
 use crate::sys::errno::Errno;
 use crate::sys::exec::{
-    ELF_RANDOMIZE_LIMIT, ExecFile, ExecPackage, ExecVmcmd, VMCMD_BASE, VMCMD_IMMUTABLE,
-    VMCMD_RELATIVE, VMCMD_STACK, VmcmdProc,
+    ELF_RANDOMIZE_LIMIT, EXEC_DEFAULT_VMCMD_SETSIZE, ExecFile, ExecPackage, ExecVmcmd,
+    ExecVmcmdSet, VMCMD_BASE, VMCMD_IMMUTABLE, VMCMD_RELATIVE, VMCMD_STACK, VmcmdProc,
 };
 use crate::sys::malloc::{M_TEMP, M_WAITOK};
 use crate::sys::mman::{
@@ -99,7 +101,7 @@ use crate::sys::uio::{UioRw, UioSeg};
 use crate::sys::vnode::IO_UNIT;
 use crate::uvm::uvm_extern::{
     PROT_MASK, UVM_FLAG_COPYONW, UVM_FLAG_FIXED, UVM_FLAG_OVERLAY, UVM_FLAG_STACK,
-    UVM_UNKNOWN_OFFSET, uvm_mapflag,
+    UVM_UNKNOWN_OFFSET, VmProt, uvm_mapflag,
 };
 use crate::uvm::uvm_map::{uvm_map, uvm_map_check_copyin_add, uvm_map_immutable, uvm_map_protect};
 use crate::uvm::uvm_param::{round_page, trunc_page};
@@ -111,6 +113,63 @@ const RANDOMIZE_CTX_THRESHOLD: usize = 512;
 
 /// `MAXSSIZ_GUARD`: the guard below the stack's maximum extent.
 const MAXSSIZ_GUARD: usize = 1024 * 1024;
+
+/// `new_vmcmd(evsp, proc, len, addr, vp, offset, prot, flags)` (`NEW_VMCMD2`): create a new
+/// vmcmd structure and fill in its fields based on function call arguments; make sure objects
+/// ref'd by the vmcmd are 'held'.
+#[allow(clippy::too_many_arguments)] // the C's signature
+pub fn new_vmcmd<'a>(
+    evsp: &mut ExecVmcmdSet<'a>,
+    proc: VmcmdProc,
+    len: usize,
+    addr: usize,
+    vp: Option<ExecFile<'a>>,
+    offset: usize,
+    prot: VmProt,
+    flags: u32,
+) {
+    if evsp.evs_cmds.len() >= evsp.evs_cmds.capacity() {
+        vmcmdset_extend(evsp);
+    }
+    if let Some(ExecFile::Vnode(vp)) = vp {
+        vref(vp);
+    }
+    evsp.evs_cmds.push(ExecVmcmd {
+        ev_proc: proc,
+        ev_len: len,
+        ev_addr: addr,
+        ev_vp: vp,
+        ev_offset: offset,
+        ev_prot: prot,
+        ev_flags: flags,
+    });
+}
+
+/// `vmcmdset_extend(evsp)`: double the room of a full command set.
+pub fn vmcmdset_extend(evsp: &mut ExecVmcmdSet<'_>) {
+    #[cfg(feature = "diagnostic")]
+    if evsp.evs_cmds.len() < evsp.evs_cmds.capacity() {
+        crate::kern::subr_prf::panic(format_args!("vmcmdset_extend: not necessary"));
+    }
+
+    let ocnt = evsp.evs_cmds.capacity();
+    kassert!(ocnt > 0);
+
+    // figure out number of entries in new set, and reallocate the command set
+    evsp.evs_cmds.reserve_exact(ocnt);
+}
+
+/// `kill_vmcmds(evsp)`: release the commands' vnodes and reset the set.
+pub fn kill_vmcmds(evsp: &mut ExecVmcmdSet<'_>) {
+    for vcp in &evsp.evs_cmds {
+        if let Some(ExecFile::Vnode(vp)) = vcp.ev_vp {
+            vrele(vp);
+        }
+    }
+
+    // Free old vmcmds and reset the array.
+    evsp.evs_cmds = Vec::with_capacity(EXEC_DEFAULT_VMCMD_SETSIZE);
+}
 
 /// `exec_process_vmcmds`: runs the package's vmcmds in order, resolving `VMCMD_RELATIVE`
 /// addresses against the last `VMCMD_BASE` command, then kills the set. The first error
@@ -147,7 +206,7 @@ pub fn exec_process_vmcmds(p: &Proc, epp: &mut ExecPackage<'_>) -> Result<(), Er
         }
     }
 
-    epp.ep_vmcmds.kill();
+    kill_vmcmds(&mut epp.ep_vmcmds);
 
     error
 }
@@ -458,7 +517,8 @@ pub fn exec_setup_stack(_p: &Proc, epp: &mut ExecPackage<'_>) -> Result<(), Errn
     // mapping proc, which is unnecessary
     //
     // note that in memory, things assumed to be: 0 ....... ep_maxsaddr <stack> ep_minsaddr
-    epp.ep_vmcmds.push(
+    new_vmcmd(
+        &mut epp.ep_vmcmds,
         VmcmdProc::MapZero,
         (epp.ep_minsaddr - epp.ep_ssize) - epp.ep_maxsaddr,
         epp.ep_maxsaddr,
@@ -467,7 +527,8 @@ pub fn exec_setup_stack(_p: &Proc, epp: &mut ExecPackage<'_>) -> Result<(), Errn
         PROT_NONE,
         VMCMD_IMMUTABLE,
     );
-    epp.ep_vmcmds.push(
+    new_vmcmd(
+        &mut epp.ep_vmcmds,
         VmcmdProc::MapZero,
         epp.ep_ssize,
         epp.ep_minsaddr - epp.ep_ssize,
