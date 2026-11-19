@@ -375,6 +375,7 @@ impl Pmap for Machine {
     #[allow(clippy::declare_interior_mutable_const)] // an initializer, copied into every vm_page
     const VM_MDPAGE_INIT: Self::VmPageMd = include::pmap::VM_MDPAGE_INIT;
     const HAVE_PMAP_DIRECT: bool = true;
+    const HAVE_PMAP_POPULATE: bool = false;
     const PMAP_STEAL_MEMORY: bool = true;
     const PMAP_WC: usize = include::pmap::PMAP_WC as usize;
     const PMAP_NOCACHE: usize = include::pmap::PMAP_NOCACHE as usize;
@@ -409,6 +410,10 @@ impl Pmap for Machine {
 
     fn pmap_is_modified(pg: &VmPage) -> bool {
         include::pmap::pmap_is_modified(pg)
+    }
+
+    fn pmap_is_referenced(pg: &VmPage) -> bool {
+        include::pmap::pmap_is_referenced(pg)
     }
 
     unsafe fn pmap_steal_memory(
@@ -500,6 +505,12 @@ impl Pmap for Machine {
     /// No `__HAVE_PMAP_PURGE` on amd64.
     fn pmap_purge(_p: &Proc) {}
 
+    fn pmap_populate(_pmap: &Self::Pmap, _va: Vaddr) {}
+
+    fn pmap_nested(pmap: &Self::Pmap) -> bool {
+        pmap.pmap_nested()
+    }
+
     fn pmap_update(_pmap: &Self::Pmap) {}
 
     fn pmap_growkernel(maxkvaddr: Vaddr) -> Vaddr {
@@ -508,6 +519,10 @@ impl Pmap for Machine {
 
     fn pmap_init() {
         amd64::pmap::pmap_init()
+    }
+
+    fn pmap_init_percpu() {
+        amd64::pmap::pmap_init_percpu()
     }
 
     fn pmap_map_direct(pg: &VmPage) -> Vaddr {

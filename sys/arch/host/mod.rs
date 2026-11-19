@@ -603,6 +603,7 @@ impl Pmap for Machine {
 
     const VM_MDPAGE_INIT: () = ();
     const HAVE_PMAP_DIRECT: bool = true;
+    const HAVE_PMAP_POPULATE: bool = false;
     const PMAP_WC: usize = 0;
     const PMAP_NOCACHE: usize = 0;
     const PMAP_NOMMU: bool = true;
@@ -709,6 +710,10 @@ impl Pmap for Machine {
         false
     }
 
+    fn pmap_is_referenced(_pg: &VmPage) -> bool {
+        false
+    }
+
     /// Boot memory comes from the host allocator and is never returned; the frames it stands
     /// for leave `vm_physmem[]` through `uvm_page_physsteal`, as on a real machine, so
     /// `uvm_page_init`'s page count adds up.
@@ -763,6 +768,12 @@ impl Pmap for Machine {
 
     fn pmap_purge(_p: &Proc) {}
 
+    fn pmap_populate(_pmap: &HostPmap, _va: Vaddr) {}
+
+    fn pmap_nested(_pmap: &HostPmap) -> bool {
+        false
+    }
+
     fn pmap_update(_pmap: &HostPmap) {}
 
     /// The host's page tables never run out.
@@ -771,6 +782,8 @@ impl Pmap for Machine {
     }
 
     fn pmap_init() {}
+
+    fn pmap_init_percpu() {}
 
     /// The "direct map" is the identity: a frame's address is its number.
     fn pmap_map_direct(pg: &VmPage) -> Vaddr {

@@ -494,7 +494,7 @@ pub fn main() -> ! {
     // Enable per-CPU data.
     mbcpuinit();
     crate::kern::kern_event::kqueue_init_percpu();
-    let _ = unported!("pmap_init_percpu");
+    crate::machine::pmap::pmap_init_percpu();
     crate::uvm::uvm_init::uvm_init_percpu();
     crate::kern::subr_evcount::evcount_init_percpu();
 

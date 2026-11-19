@@ -377,6 +377,7 @@ impl Pmap for Machine {
     /// The bootloader's direct map, until the kernel owns its page tables
     /// (`arm64/pmap.rs`, deviations).
     const HAVE_PMAP_DIRECT: bool = true;
+    const HAVE_PMAP_POPULATE: bool = true;
     const PMAP_STEAL_MEMORY: bool = true;
     const PMAP_WC: usize = include::pmap::PMAP_WC as usize;
     const PMAP_NOCACHE: usize = include::pmap::PMAP_NOCACHE as usize;
@@ -411,6 +412,10 @@ impl Pmap for Machine {
 
     fn pmap_is_modified(pg: &VmPage) -> bool {
         arm64::pmap::pmap_is_modified(pg)
+    }
+
+    fn pmap_is_referenced(pg: &VmPage) -> bool {
+        arm64::pmap::pmap_is_referenced(pg)
     }
 
     unsafe fn pmap_steal_memory(
@@ -503,6 +508,14 @@ impl Pmap for Machine {
         arm64::pmap::pmap_purge(p)
     }
 
+    fn pmap_populate(pmap: &Self::Pmap, va: Vaddr) {
+        arm64::pmap::pmap_populate(pmap, va)
+    }
+
+    fn pmap_nested(_pmap: &Self::Pmap) -> bool {
+        false
+    }
+
     fn pmap_update(_pmap: &Self::Pmap) {}
 
     fn pmap_growkernel(maxkvaddr: Vaddr) -> Vaddr {
@@ -511,6 +524,10 @@ impl Pmap for Machine {
 
     fn pmap_init() {
         arm64::pmap::pmap_init()
+    }
+
+    fn pmap_init_percpu() {
+        arm64::pmap::pmap_init_percpu()
     }
 
     fn pmap_map_direct(pg: &VmPage) -> Vaddr {

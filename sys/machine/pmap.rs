@@ -52,6 +52,11 @@ pub trait Pmap {
     const VM_MDPAGE_INIT: Self::VmPageMd;
     /// `__HAVE_PMAP_DIRECT`: physical memory is direct-mapped, so `pmap_map_direct` works.
     const HAVE_PMAP_DIRECT: bool;
+
+    /// `__HAVE_PMAP_POPULATE`: `pmap_populate` makes what a `pmap_enter` at an address needs
+    /// ahead of it. `uvm_fault` calls it after a `pmap_enter` that failed for memory, where a
+    /// machine without it waits for the page daemon.
+    const HAVE_PMAP_POPULATE: bool;
     /// `PMAP_STEAL_MEMORY`: `uvm_pageboot_alloc` defers to `pmap_steal_memory`.
     const PMAP_STEAL_MEMORY: bool;
     /// `uvm_md_constraints[]`: the DMA constraint ranges of the machine, lowest first.
@@ -125,6 +130,9 @@ pub trait Pmap {
     /// `pmap_is_modified(pg)`: whether any mapping of `pg` has its modified bit set.
     fn pmap_is_modified(pg: &VmPage) -> bool;
 
+    /// `pmap_is_referenced(pg)`: whether `pg` was used since its reference bit was cleared.
+    fn pmap_is_referenced(pg: &VmPage) -> bool;
+
     /// `pmap_remove_holes(vm)`: makes the MMU's unmappable holes unavailable in the map
     /// (nothing on amd64 and arm64).
     fn pmap_remove_holes(vm: &Vmspace);
@@ -189,12 +197,25 @@ pub trait Pmap {
     /// a machine without `__HAVE_PMAP_PURGE` (amd64, host) does nothing.
     fn pmap_purge(p: &Proc);
 
+    /// `pmap_populate(pmap, va)` (`__HAVE_PMAP_POPULATE`): allocates, sleeping for memory,
+    /// the page tables and the descriptor a `pmap_enter` at `va` needs. A machine without
+    /// `__HAVE_PMAP_POPULATE` does nothing and is never asked.
+    fn pmap_populate(pmap: &Self::Pmap, va: Vaddr);
+
+    /// `pmap_nested(pmap)`: whether `pmap` is a nested one (a virtual machine's, managed by
+    /// vmm(4) on amd64); false on a machine that does not define it.
+    fn pmap_nested(pmap: &Self::Pmap) -> bool;
+
     /// `pmap_growkernel`: grows the kernel page tables to cover `maxkvaddr`; returns how far
     /// they now reach.
     fn pmap_growkernel(maxkvaddr: Vaddr) -> Vaddr;
 
     /// `pmap_init`: the pmap module's own initialisation, once the page system is up.
     fn pmap_init();
+
+    /// `pmap_init_percpu`: gives the pmap module's pools their per-CPU caches, once the CPUs
+    /// are known.
+    fn pmap_init_percpu();
 
     /// `pmap_map_direct`: the direct-map address of a page (`__HAVE_PMAP_DIRECT`).
     fn pmap_map_direct(pg: &VmPage) -> Vaddr;
@@ -279,6 +300,11 @@ pub fn pmap_is_modified(pg: &VmPage) -> bool {
     Machine::pmap_is_modified(pg)
 }
 
+/// `pmap_is_referenced` on the selected machine.
+pub fn pmap_is_referenced(pg: &VmPage) -> bool {
+    Machine::pmap_is_referenced(pg)
+}
+
 /// `pmap_remove_holes` on the selected machine.
 pub fn pmap_remove_holes(vm: &Vmspace) {
     Machine::pmap_remove_holes(vm)
@@ -358,6 +384,17 @@ pub fn pmap_purge(p: &Proc) {
     Machine::pmap_purge(p)
 }
 
+/// `pmap_populate` on the selected machine (`__HAVE_PMAP_POPULATE`: ask
+/// `Machine::HAVE_PMAP_POPULATE` first).
+pub fn pmap_populate(pmap: &MachinePmap, va: Vaddr) {
+    Machine::pmap_populate(pmap, va)
+}
+
+/// `pmap_nested` on the selected machine.
+pub fn pmap_nested(pmap: &MachinePmap) -> bool {
+    Machine::pmap_nested(pmap)
+}
+
 /// `pmap_update` on the selected machine.
 pub fn pmap_update(pmap: &<Machine as Pmap>::Pmap) {
     Machine::pmap_update(pmap)
@@ -371,6 +408,11 @@ pub fn pmap_growkernel(maxkvaddr: Vaddr) -> Vaddr {
 /// `pmap_init` on the selected machine.
 pub fn pmap_init() {
     Machine::pmap_init()
+}
+
+/// `pmap_init_percpu` on the selected machine.
+pub fn pmap_init_percpu() {
+    Machine::pmap_init_percpu()
 }
 
 /// `pmap_map_direct` on the selected machine.

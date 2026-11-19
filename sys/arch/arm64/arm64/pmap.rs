@@ -84,8 +84,9 @@
 //!   (`uvm_page_physsteal` before `uvm_page_init`, `uvm_pglistalloc` after) instead of
 //!   mapping them at `virtual_avail` with `pmap_kenter_pa` (before) or allocating from the
 //!   `kv_kvp` submap with `km_alloc` (after, which waits for `uvm_map`).
-//! - `pmap_vp_enter` allocates the kernel pmap's tables with `pmap_kvp_alloc`; user pmaps
-//!   need `pmap_vp_pool` (`subr_pool.c`), reported as unported, as is `pmap_vp_populate`.
+//! - `pmap_vp_enter` allocates the kernel pmap's tables with `pmap_kvp_alloc`, where the C
+//!   takes them from `pmap_vp_pool` like a user pmap's; `pmap_growkernel` makes them ahead,
+//!   so neither reaches that path after boot, and before `pmap_init` there is no pool.
 //! - `pmap_zero_page`/`pmap_copy_page` use the direct map instead of the per-CPU
 //!   `zero_page`/`copy_src_page`/`copy_dst_page` windows.
 //! - `pmap_init`: the TTBR0 switch to `pm_pt0pa` and the pools wait for the page tables to
@@ -97,9 +98,12 @@
 //! - User pmaps (M6): `pmap_create`/`pmap_pinit`/`pmap_destroy`/`pmap_release`,
 //!   `pmap_vp_destroy`, `pmap_enter`/`pmap_remove`/`pmap_remove_pted`, the pv lists
 //!   (`pmap_enter_pv`/`pmap_remove_pv`), `pmap_activate`/`pmap_deactivate`/`pmap_setttb`
-//!   and the ASIDs. Every vp table (the kernel's and the users') comes from the two-page
-//!   allocator `pmap_vp_pages` instead of `pmap_vp_pool`, and goes back page by page
-//!   (`pmap_vp_free`); the pteds of user pmaps come from `pmap_pted_pool`. The ASID bitmap
+//!   and the ASIDs. The vp tables of user pmaps come from `pmap_vp_pool` (its allocator,
+//!   `pmap_vp_allocator`, takes one table of two pages at a time from `kernel_map`) and
+//!   their pteds from `pmap_pted_pool`, as in the C, with `pmap_vp_populate` and
+//!   `pmap_populate` (`__HAVE_PMAP_POPULATE`) and the per-CPU caches of
+//!   `pmap_init_percpu`; only the kernel's tables come from the two-page allocator
+//!   `pmap_vp_pages` (`pmap_kvp_alloc`). The ASID bitmap
 //!   is 8-bit (`pmap_nasid` 256 and a bitmap that size; the 16-bit probe of
 //!   `id_aa64mmfr0_el1` is not done). `pmap_setpauthkeys` (pointer authentication) is M7.
 //! - M11a (`MULTIPROCESSOR`): the ASID allocator is the C's, under `pmap_asid_mtx`
@@ -117,7 +121,7 @@
 use core::arch::asm;
 use core::cell::{Cell, UnsafeCell};
 use core::ptr::{self, NonNull};
-use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 use crate::arch::arm64::arm64::cpufunc::{
     cpu_icache_sync_range, cpu_idcache_wbinv_range, cpu_setttb, cpu_tlb_flush,
@@ -143,28 +147,30 @@ use crate::arch::arm64::include::vmparam::{VM_MAX_KERNEL_ADDRESS, VM_MIN_KERNEL_
 use crate::dev::ic::pluart::pluartcn_remap;
 use crate::dev::rnd::arc4random;
 use crate::kern::kern_lock::{mtx_enter, mtx_init, mtx_leave};
-use crate::kern::subr_pool::{pool_get, pool_init, pool_put};
-use crate::machine::intr::{IPL_HIGH, IPL_VM};
+use crate::kern::subr_pool::{pool_cache_init, pool_get, pool_init, pool_put, pool_setlowat};
+use crate::machine::intr::{IPL_HIGH, IPL_NONE, IPL_VM};
 use crate::machine::{Cpu, Machine};
 use crate::sys::errno::Errno;
 use crate::sys::mman::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use crate::sys::mutex::{Mutex, mutex_assert_locked};
-use crate::sys::pool::{PR_NOWAIT, PR_WAITOK, PR_ZERO, Pool};
+use crate::sys::pool::{PR_NOWAIT, PR_WAITOK, PR_ZERO, Pool, PoolAllocator};
 use crate::sys::proc::Proc;
 use crate::sys::proc::Process;
 use crate::sys::queue::ListEntry;
 use crate::sys::queue::ListHead;
 use crate::sys::types::{Paddr, Vaddr, Vsize};
 use crate::uvm::uvm_extern::Vmspace;
-use crate::uvm::uvm_extern::{PROT_MASK, UVM_PLA_NOWAIT, UVM_PLA_ZERO, VmProt};
+use crate::uvm::uvm_extern::{
+    KMEM_DYN_INITIALIZER, KmemDynMode, PROT_MASK, UVM_PLA_NOWAIT, UVM_PLA_ZERO, VmProt,
+};
 use crate::uvm::uvm_init::UVM;
-use crate::uvm::uvm_page::uvm_pglistfree;
+use crate::uvm::uvm_km::{KP_DIRTY, KV_ANY, km_alloc, km_free};
 use crate::uvm::uvm_page::{
     PHYS_TO_VM_PAGE, Pglist, VmPage, uvm_page_physsteal, uvm_pglistalloc, vm_page_to_phys,
 };
 use crate::uvm::uvm_param::{atop, round_page, trunc_page};
 use crate::uvm::uvm_pmap::{PMAP_CANFAIL, PMAP_WIRED};
-use crate::{kassert, queue_adapter, unported};
+use crate::{kassert, queue_adapter};
 
 /// `TTBR1_EL1.BADDR`: bits 47:1 of the register hold the table's physical address.
 const TTBR_BADDR_MASK: u64 = 0x0000_ffff_ffff_fffe;
@@ -300,6 +306,16 @@ static KERNEL_PMAP: Pmap = Pmap::new();
 static PMAP_PMAP_POOL: Pool = Pool::new();
 /// `pmap_pted_pool`: the pool of `struct pte_desc` for user pmaps.
 static PMAP_PTED_POOL: Pool = Pool::new();
+/// `pmap_vp_pool`: the pool of the vp tables of user pmaps (`struct pmapvp0`: two pages).
+static PMAP_VP_POOL: Pool = Pool::new();
+/// `pmap_vp_allocator`: `pmap_vp_pool`'s pages, one table each, straight from `kernel_map`.
+static PMAP_VP_ALLOCATOR: PoolAllocator = PoolAllocator {
+    pa_alloc: pmap_vp_page_alloc,
+    pa_free: pmap_vp_page_free,
+    pa_pagesz: size_of::<Pmapvp0>(),
+};
+/// `pmap_vp_poolcache`: force vp poolcache to allocate late.
+static PMAP_VP_POOLCACHE: AtomicI32 = AtomicI32::new(0);
 /// `PMAP_ASID_MASK`: the ASID bits of `pm_asid`; the generation sits above.
 const PMAP_ASID_MASK: u64 = 0xffff;
 /// `pmap_nasid`: how many ASIDs the CPU has (8-bit, what every arm64 CPU implements;
@@ -563,12 +579,14 @@ pub fn pmap_vp_lookup(
     (vp3.vp(vp_idx3(va)), Some((vp3, vp_idx3(va))))
 }
 
-/// `pool_get(&pmap_vp_pool, PR_NOWAIT | PR_ZERO)`: a zeroed vp table for `pm` (see the
-/// module's deviations).
-fn pmap_vp_alloc(_pm: &Pmap, flags: i32, level: &str) -> Result<*mut Pmapvp0, Errno> {
-    // The kernel's and the user pmaps' tables come from the same two-page allocator (see the
-    // module's deviations).
-    let vp = pmap_kvp_alloc();
+/// `pool_get(&pmap_vp_pool, PR_NOWAIT | PR_ZERO)`: a zeroed vp table for `pm`.
+fn pmap_vp_alloc(pm: &Pmap, flags: i32, level: &str) -> Result<*mut Pmapvp0, Errno> {
+    let vp = if ptr::eq(pm, pmap_kernel()) {
+        // The kernel pmap's tables never come from the pool (see the module's deviations).
+        pmap_kvp_alloc()
+    } else {
+        pool_get(&PMAP_VP_POOL, PR_NOWAIT | PR_ZERO).map(|v| v.as_ptr().cast::<Pmapvp0>())
+    };
     match vp {
         Some(vp) => Ok(vp),
         None => {
@@ -647,9 +665,132 @@ pub fn pmap_vp_enter(pm: &Pmap, va: usize, pted: &PteDesc, flags: i32) -> Result
     Ok(())
 }
 
-/// `pmap_vp_populate`: pre-allocates the vp tables and the pted of `va`; needs the pools.
-pub fn pmap_vp_populate(_pm: &Pmap, _va: usize) {
-    let _ = unported!("pmap_vp_populate (pool_get, subr_pool.c)");
+/// `pool_get(&pmap_vp_pool, PR_WAITOK | PR_ZERO)`: a zeroed vp table, slept for.
+fn pmap_vp_get_waitok() -> *mut Pmapvp0 {
+    let Some(vp) = pool_get(&PMAP_VP_POOL, PR_WAITOK | PR_ZERO) else {
+        #[allow(clippy::panic)] // pool_get(PR_WAITOK) never fails in C
+        {
+            panic!("pmap_vp_pool: pool_get(PR_WAITOK) failed");
+        }
+    };
+    vp.as_ptr().cast::<Pmapvp0>()
+}
+
+/// `pmap_vp_populate`: allocates, sleeping for memory, the vp tables and the pted a
+/// `pmap_enter` at `va` needs, and hangs those that are still missing; the lock is dropped
+/// around every allocation.
+pub fn pmap_vp_populate(pm: &Pmap, va: usize) {
+    let Some(pted_mem) = pool_get(&PMAP_PTED_POOL, PR_WAITOK | PR_ZERO) else {
+        #[allow(clippy::panic)] // pool_get(PR_WAITOK) never fails in C
+        {
+            panic!("pmap_pted_pool: pool_get(PR_WAITOK) failed");
+        }
+    };
+    let mut pted = Some(pted_mem);
+    // `vp` is never null where it is used: each use is followed by a refill.
+    let mut vp = pmap_vp_get_waitok();
+
+    pmap_lock(pm);
+
+    let vp1 = match pm.pm_vp.get() {
+        PmVp::L0(l0) => {
+            // SAFETY: a four-level pmap's `l0` is set when the pmap is made.
+            let Some(l0) = (unsafe { l0.as_ref() }) else {
+                #[allow(clippy::panic)] // the C dereferences the null pointer
+                {
+                    panic!("pmap_vp_populate: pmap without a level-0 table");
+                }
+            };
+            match l0.vp(vp_idx0(va)) {
+                Some(vp1) => vp1,
+                None => {
+                    // SAFETY: a fresh, zeroed table that lives for the pmap's life.
+                    let vp1 = unsafe { &*vp.cast::<Pmapvp1>() };
+                    vp = ptr::null_mut();
+                    pmap_set_l1(pm, va, vp1);
+                    vp1
+                }
+            }
+        }
+        PmVp::L1(l1) => {
+            // SAFETY: a three-level pmap's `l1` is set when the pmap is made.
+            let Some(l1) = (unsafe { l1.as_ref() }) else {
+                #[allow(clippy::panic)] // the C dereferences the null pointer
+                {
+                    panic!("pmap_vp_populate: pmap without a level-1 table");
+                }
+            };
+            l1
+        }
+    };
+
+    if vp.is_null() {
+        pmap_unlock(pm);
+        vp = pmap_vp_get_waitok();
+        pmap_lock(pm);
+    }
+
+    let vp2 = match vp1.vp(vp_idx1(va)) {
+        Some(vp2) => vp2,
+        None => {
+            // SAFETY: as above.
+            let vp2 = unsafe { &*vp.cast::<Pmapvp2>() };
+            vp = ptr::null_mut();
+            pmap_set_l2(pm, va, vp1, vp2);
+            vp2
+        }
+    };
+
+    if vp.is_null() {
+        pmap_unlock(pm);
+        vp = pmap_vp_get_waitok();
+        pmap_lock(pm);
+    }
+
+    let vp3 = match vp2.vp(vp_idx2(va)) {
+        Some(vp3) => vp3,
+        None => {
+            // SAFETY: as above.
+            let vp3 = unsafe { &*vp.cast::<Pmapvp3>() };
+            vp = ptr::null_mut();
+            pmap_set_l3(pm, va, vp2, vp3);
+            vp3
+        }
+    };
+
+    if vp3.vp(vp_idx3(va)).is_none()
+        && let Some(mem) = pted.take()
+    {
+        // SAFETY: a zeroed pool item of `size_of::<PteDesc>()` bytes, suitably aligned;
+        // all-zero is a valid, empty pted. It lives until `pmap_remove_pted` frees it.
+        vp3.set_vp(vp_idx3(va), Some(unsafe { mem.cast::<PteDesc>().as_ref() }));
+    }
+
+    pmap_unlock(pm);
+
+    if let Some(vp) = NonNull::new(vp) {
+        pool_put(&PMAP_VP_POOL, vp.cast::<u8>());
+    }
+    if let Some(mem) = pted {
+        pool_put(&PMAP_PTED_POOL, mem);
+    }
+}
+
+/// `pmap_vp_page_alloc`: a page of `pmap_vp_pool`, which is one table, from `kernel_map`.
+fn pmap_vp_page_alloc(pp: &Pool, flags: i32, _slowdown: &mut i32) -> Option<NonNull<u8>> {
+    let kd = KmemDynMode {
+        kd_waitok: flags & PR_WAITOK != 0,
+        kd_trylock: flags & PR_NOWAIT != 0,
+        // kd_slowdown: the single-page thread is not used with a direct map (uvm_km.rs).
+        ..KMEM_DYN_INITIALIZER
+    };
+
+    km_alloc(pp.pr_pgsize.get() as usize, &KV_ANY, &KP_DIRTY, &kd)
+}
+
+/// `pmap_vp_page_free`.
+fn pmap_vp_page_free(pp: &Pool, v: NonNull<u8>) {
+    km_free(v, pp.pr_pgsize.get() as usize, &KV_ANY, &KP_DIRTY);
 }
 
 /// Two zeroed, physically contiguous pages through the direct map (see the module's
@@ -1072,21 +1213,32 @@ pub fn pmap_init() {
         &PMAP_PMAP_POOL,
         size_of::<Pmap>(),
         0,
-        IPL_VM,
-        PR_WAITOK,
+        IPL_NONE,
+        0,
         "pmap",
         None,
     );
+    pool_setlowat(&PMAP_PMAP_POOL, 2);
     pool_init(
         &PMAP_PTED_POOL,
         size_of::<PteDesc>(),
         0,
         IPL_VM,
-        PR_WAITOK,
+        0,
         "pted",
         None,
     );
-    // pmap_vp_pool: the two-page allocator serves (see the module's deviations).
+    pool_setlowat(&PMAP_PTED_POOL, 20);
+    pool_init(
+        &PMAP_VP_POOL,
+        size_of::<Pmapvp0>(),
+        PAGE_SIZE as u32,
+        IPL_VM,
+        0,
+        "vp",
+        Some(&PMAP_VP_ALLOCATOR),
+    );
+    // pool_setlowat(&pmap_vp_pool, 20): commented out in the C; pmap_create does it.
 
     PMAP_INITIALIZED.store(true, Ordering::Relaxed);
 
@@ -1796,6 +1948,11 @@ fn pmap_enter_locked(
     Ok(())
 }
 
+/// `pmap_populate` (`__HAVE_PMAP_POPULATE`): makes what a `pmap_enter` at `va` needs.
+pub fn pmap_populate(pm: &Pmap, va: Vaddr) {
+    pmap_vp_populate(pm, va.as_usize());
+}
+
 /// `pmap_remove`: remove the given range of mapping entries.
 pub fn pmap_remove(pm: &Pmap, sva: Vaddr, eva: Vaddr) {
     pmap_lock(pm);
@@ -1999,6 +2156,12 @@ fn pmap_fault_fixup_locked(pm: &Pmap, va: usize, ftype: VmProt) -> bool {
     true
 }
 
+/// `pmap_init_percpu`: per-CPU caches for the pted and the vp pools.
+pub fn pmap_init_percpu() {
+    pool_cache_init(&PMAP_PTED_POOL);
+    pool_cache_init(&PMAP_VP_POOL);
+}
+
 /// `pmap_is_referenced`.
 pub fn pmap_is_referenced(pg: &VmPage) -> bool {
     pg.flags() & PG_PMAP_REF != 0
@@ -2085,43 +2248,32 @@ pub fn pmap_remove_pted(pm: &Pmap, pted: &PteDesc) {
     }
 }
 
-/// Returns the two pages of a vp table (see the module's deviations).
+/// `pool_put(&pmap_vp_pool, vp)`: a user pmap's table goes back.
 fn pmap_vp_free(vp: usize) {
-    let pgl = Pglist::new();
-    pgl.init();
-    for off in [0, PAGE_SIZE] {
-        if let Some(pg) = pmap_unmap_direct(Vaddr::new(vp + off)) {
-            // SAFETY: a page of ours, on no queue (it came out of uvm_pglistalloc).
-            unsafe { pgl.insert_tail(pg) };
-        }
+    if let Some(vp) = NonNull::new(vp as *mut u8) {
+        pool_put(&PMAP_VP_POOL, vp);
     }
-    uvm_pglistfree(&pgl);
 }
 
 /// `pmap_pinit`: allocates a full L0/L1 table for `pm` and takes the first reference.
 pub fn pmap_pinit(pm: &Pmap) {
-    // Allocate a full L0/L1 table: user pmaps are three-level (USER_SPACE_BITS 39).
+    // Allocate a full L0/L1 table.
     let l0va = match pm.pm_vp.get() {
         PmVp::L0(_) => {
-            #[allow(clippy::panic)] // user pmaps are never four-level here
-            {
-                panic!("pmap_pinit: four-level user pmap");
-            }
+            let l0 = pmap_vp_get_waitok();
+            pm.pm_vp.set(PmVp::L0(l0));
+            l0 as usize // top level is l0
         }
         PmVp::L1(_) => {
-            let Some(l1) = pmap_kvp_alloc() else {
-                #[allow(clippy::panic)] // the C loops on pool_get(PR_WAITOK) instead
-                {
-                    panic!("pmap_pinit: out of memory for the L1 table");
-                }
-            };
+            let l1 = pmap_vp_get_waitok();
             pm.pm_vp.set(PmVp::L1(l1.cast::<Pmapvp1>()));
             l1 as usize // top level is l1
         }
     };
 
-    pm.pm_pt0pa
-        .set(pmap_direct_unmap(Vaddr::new(l0va)).as_usize() as u64);
+    if let Some(pa) = pmap_extract(pmap_kernel(), Vaddr::new(l0va)) {
+        pm.pm_pt0pa.set(pa.as_usize() as u64);
+    }
 
     pmap_reference(pm);
 }
@@ -2144,7 +2296,10 @@ pub fn pmap_create() -> &'static Pmap {
 
     mtx_init(&pmap.pm_mtx, IPL_VM);
     pmap_pinit(pmap);
-    // pool_setlowat(&pmap_vp_pool, 20): no vp pool.
+    if PMAP_VP_POOLCACHE.load(Ordering::Relaxed) == 0 {
+        pool_setlowat(&PMAP_VP_POOL, 20);
+        PMAP_VP_POOLCACHE.store(20, Ordering::Relaxed);
+    }
     pmap
 }
 

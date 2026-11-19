@@ -82,8 +82,12 @@
 //!
 //! Upstream: sys/uvm/uvm_pmap.h @ 3ce1f3f79392
 //!
-//! Status: `wip`. The prototypes it declares are the methods of `machine::Pmap`, added as the
-//! milestones need them.
+//! Status: `ported`. `struct pmap_statistics`, the `PMAP_*` flags of `pmap_enter` and the
+//! `PMAP_PREFER` defaults are here. Every prototype it declares is a method of
+//! `machine::Pmap`, and its `#ifndef` defaults are what a machine without the option gives:
+//! `PMAP_WC` (the contract's constant), `pmap_nested` (false), `PMAP_GROWKERNEL`,
+//! `PMAP_STEAL_MEMORY`, `__HAVE_PMAP_POPULATE` and `__HAVE_PMAP_PURGE` (constants or
+//! methods that do nothing there).
 //!
 //! ## Deviations
 //! - The `pmap_statistics` counters are [`PmapCounter`]s, relaxed atomic words: a user

@@ -187,7 +187,7 @@ use crate::arch::amd64::include::specialreg::{EFER_NXE, MSR_EFER};
 use crate::arch::amd64::include::vmparam::{VM_MAX_ADDRESS, VM_MAXUSER_ADDRESS};
 use crate::arch::amd64::include::vmparam::{VM_MAX_KERNEL_ADDRESS, VM_MIN_KERNEL_ADDRESS};
 use crate::kern::kern_lock::{mtx_enter, mtx_init, mtx_leave};
-use crate::kern::subr_pool::{pool_get, pool_init, pool_put};
+use crate::kern::subr_pool::{pool_cache_init, pool_get, pool_init, pool_put};
 use crate::machine::intr::IPL_VM;
 #[cfg(feature = "multiprocessor")]
 use crate::machine::intr::{splvm, splx};
@@ -641,6 +641,11 @@ pub fn pmap_init() {
         None,
     );
     PMAP_INITIALIZED.store(true, Ordering::Relaxed);
+}
+
+/// `pmap_init_percpu`: per-CPU caches for the pv entries' pool.
+pub fn pmap_init_percpu() {
+    pool_cache_init(&PMAP_PV_POOL);
 }
 
 /// `pagezero` (`locore.S`): zeroes the page at `va`.

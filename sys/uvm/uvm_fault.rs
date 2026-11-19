@@ -121,9 +121,9 @@
 //!   swap slot before `uvm_swap.c`.
 //! - The fault starts with shared (`RW_READ`) upper and lower locks on every machine, as the
 //!   C does on amd64 and arm64 (the host stands in for them).
-//! - `pmap_nested` is 0 (no vmm), `__HAVE_PMAP_POPULATE` is not configured (the
-//!   `MULTIPROCESSOR` COW paths need `!__HAVE_PMAP_MPSAFE_ENTER_COW`, which both machines
-//!   define), `UVM_PAGE_OWN` is not
+//! - `__HAVE_PMAP_POPULATE` is the machine's `HAVE_PMAP_POPULATE` constant (arm64), read
+//!   where the C has the `#ifdef`. The `MULTIPROCESSOR` COW paths need
+//!   `!__HAVE_PMAP_MPSAFE_ENTER_COW`, which both machines define; `UVM_PAGE_OWN` is not
 //!   configured, `TRACEPOINT` (dt) is not configured.
 
 use core::ptr;
@@ -133,8 +133,8 @@ use crate::kern::kern_synch::{nowake, tsleep_nsec, wakeup};
 use crate::kern::subr_prf::panic;
 use crate::machine::cpu::curproc;
 use crate::machine::pmap::{
-    pmap_clear_modify, pmap_enter, pmap_extract, pmap_page_protect, pmap_resident_count,
-    pmap_unwire, pmap_update,
+    pmap_clear_modify, pmap_enter, pmap_extract, pmap_nested, pmap_page_protect, pmap_populate,
+    pmap_resident_count, pmap_unwire, pmap_update,
 };
 use crate::machine::{Machine, Pmap};
 use crate::sys::errno::Errno;
@@ -634,7 +634,12 @@ pub fn uvmfault_update_stats(ufi: &UvmFaultinfo) {
     let map = ufi.orig_map();
 
     // If this is a nested pmap (eg, a virtual machine pmap managed by vmm(4) on
-    // amd64/i386), don't do any updating, just return. pmap_nested() is 0 here (no vmm).
+    // amd64/i386), don't do any updating, just return.
+    //
+    // pmap_nested() on other archs is #defined to 0, so this is a no-op.
+    if pmap_nested(map.pmap()) {
+        return;
+    }
 
     // Update the maxrss for the process.
     if map.flags.get() & VM_MAP_ISVMSPACE != 0 {
@@ -1189,9 +1194,12 @@ fn uvm_fault_upper(
             // XXX instrumentation
             return Err(Errno::ENOMEM);
         }
-        // __HAVE_PMAP_POPULATE: not configured.
-        // XXX instrumentation
-        uvm_wait("flt_pmfail1");
+        if Machine::HAVE_PMAP_POPULATE {
+            pmap_populate(pmap, Vaddr::new(ufi.orig_rvaddr));
+        } else {
+            // XXX instrumentation
+            uvm_wait("flt_pmfail1");
+        }
         return Err(Errno::ERESTART);
     }
 
@@ -1516,9 +1524,12 @@ fn uvm_fault_lower(
             // XXX instrumentation
             return Err(Errno::ENOMEM);
         }
-        // __HAVE_PMAP_POPULATE: not configured.
-        // XXX instrumentation
-        uvm_wait("flt_pmfail2");
+        if Machine::HAVE_PMAP_POPULATE {
+            pmap_populate(pmap, Vaddr::new(ufi.orig_rvaddr));
+        } else {
+            // XXX instrumentation
+            uvm_wait("flt_pmfail2");
+        }
         return Err(Errno::ERESTART);
     }
 
