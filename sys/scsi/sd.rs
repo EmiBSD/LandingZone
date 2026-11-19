@@ -79,12 +79,8 @@
 //! commands and hands the rest to `scsi_do_ioctl`.
 //!
 //! ## Deviations
-//! - `dma_alloc(9)` (`kern/dma_alloc.c`) is not ported. The fixed-size reply buffers
-//!   (`scsi_read_cap_data*`, `scsi_vpd_*`, the mode sense buffer) are locals, as the callers
-//!   of `scsi_inquire` already pass them: every command here is synchronous
-//!   (`scsi_xs_sync`), so they outlive the transfer, and `bus_dmamap_load` reaches kernel
-//!   stacks through `pmap_extract`. The allocation failures the C tests for them cannot
-//!   happen. `sd_thin_pages`' page of variable length comes from `malloc(9)` (`M_TEMP`).
+//! - The reply buffers (`scsi_read_cap_data*`, `scsi_vpd_*`, the mode sense buffer) are
+//!   `scsiconf.rs`'s `DmaBuf`, `dma_alloc(9)` with the C's flags, freed when dropped.
 //! - The C's `-1` returns (`sd_read_cap*`, `sd_get_parms`) are `Err(EIO)`; every caller
 //!   only tests for non-zero, and `sdopen` turns a failed `sd_get_parms` into `ENXIO` as the
 //!   C does.
@@ -112,7 +108,6 @@
 use core::ffi::c_void;
 use core::mem::{offset_of, size_of};
 use core::ptr::{self, NonNull};
-use core::slice;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use libkern::strlcpy;
@@ -121,7 +116,6 @@ use crate::kern::init_main::BOOTHOWTO;
 use crate::kern::kern_bufq::{
     bufq_dequeue, bufq_destroy, bufq_drain, bufq_init, bufq_peek, bufq_queue,
 };
-use crate::kern::kern_malloc::{free, malloc};
 use crate::kern::kern_physio::{minphys, physio};
 use crate::kern::subr_autoconf::device_unref;
 use crate::kern::subr_disk::{
@@ -156,7 +150,7 @@ use crate::scsi::scsi_disk::{
 };
 use crate::scsi::scsi_ioctl::scsi_do_ioctl;
 use crate::scsi::scsiconf::{
-    _2btol, _3btol, _4btol, _5btol, _8btol, _lto2b, _lto3b, _lto4b, _lto8b, SCSI_AUTOCONF,
+    _2btol, _3btol, _4btol, _5btol, _8btol, _lto2b, _lto3b, _lto4b, _lto8b, DmaBuf, SCSI_AUTOCONF,
     SCSI_DATA_IN, SCSI_DATA_OUT, SCSI_IGNORE_ILLEGAL_REQUEST, SCSI_IGNORE_MEDIA_CHANGE,
     SCSI_IGNORE_NOT_READY, SCSI_NOSLEEP, SCSI_REV_2, SCSI_REV_SPC2, SCSI_SILENT, SDEV_ATAPI,
     SDEV_EJECTING, SDEV_MEDIA_LOADED, SDEV_NOSYNCCACHE, SDEV_OPEN, SDEV_READONLY, SDEV_REMOVABLE,
@@ -181,9 +175,9 @@ use crate::sys::dkio::{
 };
 use crate::sys::errno::Errno::{self, *};
 use crate::sys::fcntl::FWRITE;
-use crate::sys::malloc::{M_NOWAIT, M_TEMP, M_WAITOK, M_ZERO};
 use crate::sys::mtio::{MTIOCTOP, MTOFFL};
 use crate::sys::param::{DEV_BSIZE, howmany};
+use crate::sys::pool::{PR_NOWAIT, PR_WAITOK, PR_ZERO};
 use crate::sys::proc::Proc;
 use crate::sys::reboot::RB_POWERDOWN;
 use crate::sys::scsiio::{SCIOCCOMMAND, SCIOCDEBUG, SCIOCIDENTIFY};
@@ -1219,7 +1213,8 @@ fn dk_inquiry_store(di: &DkInquiry, addr: &mut [u8]) {
 /// `sd_ioctl_inquiry`: `DIOCINQ` when the adapter has no answer: the identification
 /// strings of the inquiry data and the unit serial number VPD page.
 pub fn sd_ioctl_inquiry(sc: &SdSoftc, di: &mut DkInquiry) -> Result<(), Errno> {
-    let mut vpd = ScsiVpdSerial::zeroed();
+    let mut vpdbuf = DmaBuf::new(size_of::<ScsiVpdSerial>(), PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
+    let vpd = vpdbuf.wire::<ScsiVpdSerial>();
 
     if sc.isset(SDF_DYING) {
         return Err(ENXIO);
@@ -1264,7 +1259,10 @@ pub fn sd_ioctl_cache(sc: &SdSoftc, cmd: u64, dkc: &mut DkCache) -> Result<(), E
         return rv;
     }
 
-    let mut buf = ScsiModeSenseBuf::new();
+    let Some(mut dbuf) = DmaBuf::new(size_of::<ScsiModeSenseBuf>(), PR_WAITOK) else {
+        return Err(ENOMEM);
+    };
+    let buf = dbuf.wire::<ScsiModeSenseBuf>();
 
     if sc.isset(SDF_DYING) {
         return Err(ENXIO);
@@ -1273,7 +1271,7 @@ pub fn sd_ioctl_cache(sc: &SdSoftc, cmd: u64, dkc: &mut DkCache) -> Result<(), E
     let (mode, big) = match scsi_do_mode_sense(
         link,
         i32::from(PAGE_CACHING_MODE),
-        &mut buf,
+        buf,
         (size_of::<PageCachingMode>() - 4) as i32,
         flags,
     ) {
@@ -1608,15 +1606,28 @@ pub fn viscpy(dst: &mut [u8], src: &[u8], len: usize) {
     dst[d] = b'\0';
 }
 
+/// The C's `(ISSET(flags, SCSI_NOSLEEP) ? PR_NOWAIT : PR_WAITOK) | PR_ZERO`: the
+/// `dma_alloc` flags of the reply buffers of the probe commands below.
+fn nosleep_prflags(flags: i32) -> i32 {
+    (if flags & SCSI_NOSLEEP != 0 {
+        PR_NOWAIT
+    } else {
+        PR_WAITOK
+    }) | PR_ZERO
+}
+
 /// `sd_read_cap_10`: the capacity from READ CAPACITY (10).
 pub fn sd_read_cap_10(sc: &SdSoftc, flags: i32) -> Result<(), Errno> {
-    let mut rdcap = ScsiReadCapData::zeroed();
+    let Some(mut rdbuf) = DmaBuf::new(size_of::<ScsiReadCapData>(), nosleep_prflags(flags)) else {
+        return Err(EIO);
+    };
+    let rdcap = rdbuf.wire::<ScsiReadCapData>();
 
     if sc.isset(SDF_DYING) {
         return Err(EIO);
     }
 
-    scsi_read_cap_10(sc.link(), &mut rdcap, flags)?;
+    scsi_read_cap_10(sc.link(), rdcap, flags)?;
     if _4btol(&rdcap.addr) == 0 {
         return Err(EIO);
     }
@@ -1631,13 +1642,17 @@ pub fn sd_read_cap_10(sc: &SdSoftc, flags: i32) -> Result<(), Errno> {
 
 /// `sd_read_cap_16`: the capacity from READ CAPACITY (16), and thin provisioning.
 pub fn sd_read_cap_16(sc: &SdSoftc, flags: i32) -> Result<(), Errno> {
-    let mut rdcap = ScsiReadCapData16::zeroed();
+    let Some(mut rdbuf) = DmaBuf::new(size_of::<ScsiReadCapData16>(), nosleep_prflags(flags))
+    else {
+        return Err(EIO);
+    };
+    let rdcap = rdbuf.wire::<ScsiReadCapData16>();
 
     if sc.isset(SDF_DYING) {
         return Err(EIO);
     }
 
-    scsi_read_cap_16(sc.link(), &mut rdcap, flags)?;
+    scsi_read_cap_16(sc.link(), rdcap, flags)?;
     if _8btol(&rdcap.addr) == 0 {
         return Err(EIO);
     }
@@ -1676,52 +1691,45 @@ pub fn sd_read_cap(sc: &SdSoftc, flags: i32) -> Result<(), Errno> {
 
 /// `sd_thin_pages`: whether the device has both VPD pages thin provisioning needs.
 pub fn sd_thin_pages(sc: &SdSoftc, flags: i32) -> Result<(), Errno> {
-    let mut pg = ScsiVpdHdr::zeroed();
+    let len = {
+        let mut hdr = DmaBuf::new(size_of::<ScsiVpdHdr>(), nosleep_prflags(flags)).ok_or(ENOMEM)?;
+
+        if sc.isset(SDF_DYING) {
+            return Err(ENXIO);
+        }
+        scsi_inquire_vpd(sc.link(), hdr.bytes(), SI_PG_SUPPORTED, flags)?;
+
+        _2btol(&hdr.wire::<ScsiVpdHdr>().page_length) as usize
+    };
+
+    let mut pgbuf =
+        DmaBuf::new(size_of::<ScsiVpdHdr>() + len, nosleep_prflags(flags)).ok_or(ENOMEM)?;
+    let pg = pgbuf.bytes();
 
     if sc.isset(SDF_DYING) {
         return Err(ENXIO);
     }
-    scsi_inquire_vpd(sc.link(), pg.as_bytes_mut(), SI_PG_SUPPORTED, flags)?;
+    scsi_inquire_vpd(sc.link(), pg, SI_PG_SUPPORTED, flags)?;
 
-    let len = _2btol(&pg.page_length) as usize;
+    let pages = &pg[size_of::<ScsiVpdHdr>()..];
+    if pages.first() != Some(&SI_PG_SUPPORTED) {
+        return Err(EIO);
+    }
 
-    let total = size_of::<ScsiVpdHdr>() + len;
-    let wait = if flags & SCSI_NOSLEEP != 0 {
-        M_NOWAIT
-    } else {
-        M_WAITOK
-    };
-    let mem = malloc(total, M_TEMP, wait | M_ZERO).ok_or(ENOMEM)?;
-    // SAFETY: `total` zeroed bytes, ours alone until the `free` below.
-    let pg = unsafe { slice::from_raw_parts_mut(mem.as_ptr(), total) };
+    let score = pages
+        .iter()
+        .skip(1)
+        .filter(|&&p| p == SI_PG_DISK_LIMITS || p == SI_PG_DISK_THIN)
+        .count();
 
-    let rv = (|| {
-        if sc.isset(SDF_DYING) {
-            return Err(ENXIO);
-        }
-        scsi_inquire_vpd(sc.link(), pg, SI_PG_SUPPORTED, flags)?;
-
-        let pages = &pg[size_of::<ScsiVpdHdr>()..];
-        if pages.first() != Some(&SI_PG_SUPPORTED) {
-            return Err(EIO);
-        }
-
-        let score = pages
-            .iter()
-            .skip(1)
-            .filter(|&&p| p == SI_PG_DISK_LIMITS || p == SI_PG_DISK_THIN)
-            .count();
-
-        if score < 2 { Err(EOPNOTSUPP) } else { Ok(()) }
-    })();
-
-    free(mem, M_TEMP, total);
-    rv
+    if score < 2 { Err(EOPNOTSUPP) } else { Ok(()) }
 }
 
 /// `sd_vpd_block_limits`: the unmap limits from the block limits VPD page.
 pub fn sd_vpd_block_limits(sc: &SdSoftc, flags: i32) -> Result<(), Errno> {
-    let mut pg = ScsiVpdDiskLimits::zeroed();
+    let mut pgbuf =
+        DmaBuf::new(size_of::<ScsiVpdDiskLimits>(), nosleep_prflags(flags)).ok_or(ENOMEM)?;
+    let pg = pgbuf.wire::<ScsiVpdDiskLimits>();
 
     if sc.isset(SDF_DYING) {
         return Err(ENXIO);
@@ -1741,7 +1749,9 @@ pub fn sd_vpd_block_limits(sc: &SdSoftc, flags: i32) -> Result<(), Errno> {
 
 /// `sd_vpd_thin`: reads the thin provisioning VPD page.
 pub fn sd_vpd_thin(sc: &SdSoftc, flags: i32) -> Result<(), Errno> {
-    let mut pg = ScsiVpdDiskThin::zeroed();
+    let mut pgbuf =
+        DmaBuf::new(size_of::<ScsiVpdDiskThin>(), nosleep_prflags(flags)).ok_or(ENOMEM)?;
+    let pg = pgbuf.wire::<ScsiVpdDiskThin>();
 
     if sc.isset(SDF_DYING) {
         return Err(ENXIO);
@@ -1786,9 +1796,12 @@ pub fn sd_get_parms(sc: &SdSoftc, flags: i32) -> Result<(), Errno> {
     // Work on a copy of the values initialized by sd_read_cap() and sd_thin_params().
     let mut dp = sc.params.get();
 
-    let mut buf = ScsiModeSenseBuf::new();
-
     'validate: {
+        let Some(mut dbuf) = DmaBuf::new(size_of::<ScsiModeSenseBuf>(), PR_NOWAIT) else {
+            break 'validate;
+        };
+        let buf = dbuf.wire::<ScsiModeSenseBuf>();
+
         if sc.isset(SDF_DYING) {
             return Err(EIO); // die
         }
@@ -1797,7 +1810,7 @@ pub fn sd_get_parms(sc: &SdSoftc, flags: i32) -> Result<(), Errno> {
         // thing USB devices will ask for.
         //
         // page0 == NULL is a valid situation.
-        let err = scsi_do_mode_sense(link, 0, &mut buf, 1, flags | SCSI_SILENT);
+        let err = scsi_do_mode_sense(link, 0, buf, 1, flags | SCSI_SILENT);
         if sc.isset(SDF_DYING) {
             return Err(EIO); // die
         }
@@ -1829,12 +1842,12 @@ pub fn sd_get_parms(sc: &SdSoftc, flags: i32) -> Result<(), Errno> {
                 if let Ok((reduced, b)) = scsi_do_mode_sense(
                     link,
                     i32::from(PAGE_REDUCED_GEOMETRY),
-                    &mut buf,
+                    buf,
                     size_of::<PageReducedGeometry>() as i32,
                     flags | SCSI_SILENT,
                 ) {
                     big = b;
-                    scsi_parse_blkdesc(link, &buf, big, None, None, Some(&mut dp.secsize));
+                    scsi_parse_blkdesc(link, buf, big, None, None, Some(&mut dp.secsize));
                     if let Some(off) = reduced {
                         let reduced = PageReducedGeometry::read_from(&buf.buf[off..]);
                         if dp.disksize == 0 {
@@ -1856,7 +1869,7 @@ pub fn sd_get_parms(sc: &SdSoftc, flags: i32) -> Result<(), Errno> {
                     scsi_do_mode_sense(
                         link,
                         i32::from(PAGE_RIGID_GEOMETRY),
-                        &mut buf,
+                        buf,
                         (size_of::<PageRigidGeometry>() - 4) as i32,
                         flags | SCSI_SILENT,
                     )
@@ -1866,7 +1879,7 @@ pub fn sd_get_parms(sc: &SdSoftc, flags: i32) -> Result<(), Errno> {
                 match err {
                     Ok((rigid, b)) => {
                         big = b;
-                        scsi_parse_blkdesc(link, &buf, big, None, None, Some(&mut dp.secsize));
+                        scsi_parse_blkdesc(link, buf, big, None, None, Some(&mut dp.secsize));
                         if let Some(off) = rigid {
                             let rigid = PageRigidGeometry::read_from(&buf.buf[off..]);
                             dp.heads = u32::from(rigid.nheads);
@@ -1884,12 +1897,12 @@ pub fn sd_get_parms(sc: &SdSoftc, flags: i32) -> Result<(), Errno> {
                         if let Ok((flex, b)) = scsi_do_mode_sense(
                             link,
                             i32::from(PAGE_FLEX_GEOMETRY),
-                            &mut buf,
+                            buf,
                             (size_of::<PageFlexGeometry>() - 4) as i32,
                             flags | SCSI_SILENT,
                         ) {
                             big = b;
-                            scsi_parse_blkdesc(link, &buf, big, None, None, Some(&mut dp.secsize));
+                            scsi_parse_blkdesc(link, buf, big, None, None, Some(&mut dp.secsize));
                             if let Some(off) = flex {
                                 let flex = PageFlexGeometry::read_from(&buf.buf[off..]);
                                 dp.sectors = u32::from(flex.ph_sec_tr);

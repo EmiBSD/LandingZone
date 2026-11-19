@@ -1048,8 +1048,9 @@ impl DmaBuf {
 
     /// The buffer's bytes.
     pub(crate) fn bytes(&mut self) -> &mut [u8] {
-        // SAFETY: `len` bytes at `addr` are this buffer's own allocation, zeroed at first and
-        // initialised since, borrowed through `self`.
+        // SAFETY: `len` bytes at `addr` are this buffer's own allocation, borrowed through
+        // `self`; they are kernel memory a pool item covers, zeroed (`PR_ZERO`) or holding an
+        // earlier item's bytes, and any byte is a valid `u8`.
         unsafe { slice::from_raw_parts_mut(self.addr.as_ptr(), self.len) }
     }
 
