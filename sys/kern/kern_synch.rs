@@ -80,7 +80,7 @@
 //! - `tslp_p` (`struct proc *volatile`) is an atomic: the waker clears it with a release
 //!   swap and the sleeper's unlocked reads are acquires, so the waker's last read of the
 //!   entry (its next link) is ordered before the sleeper may return.
-//! - KTRACE (`ktrabstimespec`) is configured in GENERIC.MP, not ported yet (TD3).
+//! - KTRACE (`ktrabstimespec`) is left out (the user's decision of 2026-11-19).
 //! - The sleep functions return `Result<(), Errno>` (`EWOULDBLOCK` on timeout, `EINTR`/
 //!   `ERESTART` from a signal) instead of an `int`.
 //! - The `cold == 2` ddb stack dump is not here (`cold` is a flag, not a counter).
@@ -880,7 +880,7 @@ fn thrsleep(p: &Proc, uap: &SysThrsleepArgs, tsp: Option<Timespec>) -> Result<()
     }
     if let Some(tsp) = tsp {
         let now = clock_gettime(p, clock_id)?;
-        // KTRACE (ktrabstimespec): configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE (ktrabstimespec): left out (the user, 2026-11-19).
 
         if tsp <= now {
             // already passed: still do the unlock

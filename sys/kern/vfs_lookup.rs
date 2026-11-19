@@ -286,7 +286,7 @@ pub fn namei(ndp: &mut Nameidata<'_>) -> Result<(), Errno> {
         Err(e) => return namei_fail(ndp, e),
     };
 
-    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE: left out (the user, 2026-11-19).
 
     // Strip trailing slashes, as requested
     if ndp.ni_cnd.cn_flags & STRIPSLASHES != 0 {

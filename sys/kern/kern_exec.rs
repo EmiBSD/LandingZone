@@ -75,7 +75,7 @@
 //!   skips `namei` and the attribute, mount, access and open checks (an image has no vnode,
 //!   no set[ug]id bits, no realpath), `ep_hdr` is the image's first `exec_maxhdrsz` bytes
 //!   and the vmcmds read the image (`exec_subr.rs`). It goes away when `init` is a file.
-//! - `KTRACE` is configured in GENERIC.MP, not ported yet (TD3).
+//! - `KTRACE` is left out (the user's decision of 2026-11-19).
 //! - The 4-clause licence (advertising clause) was accepted by the user at M2 for this
 //!   project.
 
@@ -631,7 +631,7 @@ fn execve_common(
         return bad(&mut pack, &mut nid, Errno::EINVAL);
     }
 
-    // KTRACE (KTR_EXECARGS): configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE (KTR_EXECARGS): left out (the user, 2026-11-19).
 
     let mut envc = 0;
     // environment does not need to be there
@@ -640,7 +640,7 @@ fn execve_common(
             Ok(n) => envc = n,
             Err(error) => return bad(&mut pack, &mut nid, error),
         }
-        // KTRACE (KTR_EXECENV): configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE (KTR_EXECENV): left out (the user, 2026-11-19).
     }
 
     const STACKALIGNBYTES: usize = <Machine as MachineParam>::STACKALIGNBYTES;
@@ -879,7 +879,7 @@ fn execve_common(
         pr.ps_flags
             .fetch_or(PS_SUGID | PS_SUGIDEXEC, Ordering::Relaxed);
 
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         cred = crcopy(cred);
         p.p_ucred.set(cred);
         if attr.va_mode & VSUID != 0 {

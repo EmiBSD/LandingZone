@@ -87,7 +87,7 @@
 //!   `VOP_PATHCONF`, `VISTTY` for `F_ISATTY`, `vref`/`vrele` of `fd_cdir`/`fd_rdir`) are
 //!   the vfs core's (`vfs_vops.rs`, `vfs_subr.rs`). `F_ISATTY` answers 0/`ENOTTY` for every
 //!   file that is not a vnode, as in C, so the console stand-in is not a tty to `isatty(3)`.
-//! - `KTRACE` is configured in GENERIC.MP, not ported yet (TD3). `KASSERTMSG` is `kassert!`.
+//! - `KTRACE` is left out (the user's decision of 2026-11-19). `KASSERTMSG` is `kassert!`.
 
 use core::ffi::c_void;
 use core::ptr::{self, NonNull};

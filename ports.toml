@@ -12244,8 +12244,8 @@ notes = "TD3: option PTRACE (GENERIC): sys_ptrace and process_* helpers"
 [[file]]
 c = "sys/kern/kern_ktrace.c"
 rust = "sys/kern/kern_ktrace.rs"
-status = "todo"
-notes = "TD3: option KTRACE (GENERIC): sys_ktrace, ktr* record writers, and the KTRACE blocks other ported files left out"
+status = "skipped"
+notes = "left out by the user's decision of 2026-11-19: ../Kernel makes its own traces, and ktrace(2)'s records are of no use to it. option KTRACE is in GENERIC.MP; the system call table takes the C's #else (ktrace, fktrace sys_nosys; utrace records nothing) and the ktr* calls of the other files are absent, each site saying so (docs/ARCHITECTURE.md, Deviations)"
 
 # ---------------------------------------------------------------------------
 # TD0: the inventory. Every .c of the pinned kernel tree outside the drivers (sys/ less the

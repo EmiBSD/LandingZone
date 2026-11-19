@@ -50,7 +50,7 @@
 //! - `pledge_fail` returns the `Errno` itself (it never succeeds); callers write
 //!   `Err(pledge_fail(..))`. `checkzoneinfopath` returns a `bool` (true for an acceptable
 //!   path) for the C's 0/-1.
-//! - `KTRACE` is configured in `GENERIC.MP` but not ported yet (TD3): `parsepledges` and
+//! - `KTRACE` is left out (the user's decision of 2026-11-19): `parsepledges` and
 //!   `pledge_fail` record nothing, where the C records.
 //! - Promise classes for devices this kernel does not configure are compiled out as the C's
 //!   `#if` does with a zero count: `NVIDEO`, `NDRM` (`pledge_ioctl_drm`), `NVMM`
@@ -516,7 +516,7 @@ static PLEDGE_SYSCALLS: [u64; SYS_MAXSYSCALL] = {
 pub fn parsepledges(_p: &Proc, _kname: &str, promises: usize) -> Result<u64, Errno> {
     let mut rbuf = [0u8; MAXPATHLEN];
     let rbuflen = copyinstr(promises, &mut rbuf)?;
-    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE: left out (the user, 2026-11-19).
     parsepledges_buf(&rbuf[..rbuflen.saturating_sub(1)])
 }
 
@@ -664,7 +664,7 @@ pub fn pledge_fail(p: &Proc, error: Errno, code: u64) -> Errno {
             .find(|&&(bits, _)| bits & code != 0)
             .map_or(b"", |&(_, name)| name)
     };
-    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE: left out (the user, 2026-11-19).
 
     if p.p_pledge.get() & PLEDGE_ERROR != 0 {
         return Errno::ENOSYS;

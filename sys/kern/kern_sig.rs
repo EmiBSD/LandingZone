@@ -80,9 +80,9 @@
 //!   `namei_pool` item, and `KERNELPATH` (`<sys/namei.h>`) is the boolean `incrash`; with no
 //!   file descriptor table there is no `fd_rdir` to release. `WCOREFLAG` is `<sys/wait.h>`'s
 //!   value, kept here until that header is ported.
-//! - `WITNESS`, `SMALL_KERNEL` and `PMAP_CHECK_COPYIN` are not configured. `KTRACE` and
-//!   dt(4)'s `TRACEPOINT` are configured in `GENERIC.MP` but not ported yet (KTRACE is
-//!   TD3). The kernel lock is taken where the C takes it (M11a; nothing without
+//! - `WITNESS`, `SMALL_KERNEL` and `PMAP_CHECK_COPYIN` are not configured. dt(4)'s
+//!   `TRACEPOINT` is configured in `GENERIC.MP` but not ported yet; `KTRACE` is left out
+//!   (the user's decision of 2026-11-19). The kernel lock is taken where the C takes it (M11a; nothing without
 //!   `MULTIPROCESSOR`).
 //! - `sys_sigreturn` lives in `machdep.c` (amd64) and `sig_machdep.c` (arm64); the system
 //!   call table finds `pub fn sys_*` only under `sys/kern` and `sys/uvm`, so the entry here
@@ -407,11 +407,11 @@ pub fn sys_sigaction(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Resu
         }
         sa.sa_mask &= !bit;
         copyout_obj(&sa, osa)?;
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
     }
     if nsa != 0 {
         let mut sa: Sigaction = copyin_obj(nsa)?;
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         setsigvec(p, signum, &mut sa);
     }
     Ok(())
@@ -851,7 +851,7 @@ pub fn trapsignal(p: &Proc, signum: i32, trapno: u64, code: i32, sigval: Sigval)
         && p.p_sigmask.get() & mask == 0
     {
         let si = initsiginfo(signum, trapno, code, sigval);
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         if sendsig(
             ctx.sig_action,
             signum,
@@ -1661,7 +1661,7 @@ pub fn postsig(p: &Proc, signum: i32, sctx: &Sigctx) {
     };
     let si = initsiginfo(signum, trapno, code, sigval);
 
-    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE: left out (the user, 2026-11-19).
     if sctx.sig_action == SIG_DFL {
         // Default action, where the default is to kill the process. (Other cases were
         // ignored above.)
@@ -1945,7 +1945,7 @@ pub fn sys___thrsigdivert(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> 
 
     if timeout != 0 {
         let ts: Timespec = copyin_obj(timeout)?;
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         if !ts.is_valid() {
             timeinvalid = true;
         } else {
@@ -1987,7 +1987,7 @@ pub fn sys___thrsigdivert(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> 
             let info = uap.info.get() as usize;
             if info != 0 {
                 copyout_obj(&si, info)?;
-                // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+                // KTRACE: left out (the user, 2026-11-19).
             }
             Ok(())
         }

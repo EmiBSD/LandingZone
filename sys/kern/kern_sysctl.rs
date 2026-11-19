@@ -2312,7 +2312,7 @@ pub fn fill_kproc(pr: &Process, ki: &mut KinfoProc, p: Option<&Proc>, show_point
     ki.p_iticks = tu.tu_ticks[TU_ITICKS].get();
     ki.p_cpticks = p.p_cpticks.get() as i32;
 
-    // p_tracep, p_traceflag: KTRACE is configured in GENERIC.MP, not ported yet (TD3).
+    // p_tracep, p_traceflag: KTRACE is left out (the user's decision of 2026-11-19).
 
     ki.p_siglist =
         (p.p_siglist.load(Ordering::Relaxed) | pr.ps_siglist.load(Ordering::Relaxed)) as i32;

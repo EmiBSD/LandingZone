@@ -63,8 +63,9 @@
 //!   anything else gets `SIGABRT` (`sigabort`). Its message goes to the console with
 //!   `printf` where the C's `uprintf` writes to the process's terminal: `smoke-boot`
 //!   expects the line on the serial console, from a process that has no terminal.
-//! - `KTRACE` and dt(4) are configured in `GENERIC.MP` but not ported yet (KTRACE is TD3): their
-//!   calls are missing, so the row is `wip`. `SYSCALL_DEBUG` is the feature `syscall_debug`.
+//! - dt(4) is configured in `GENERIC.MP` but not ported yet: its calls are missing, so the
+//!   row is `wip`. `KTRACE` is left out (the user's decision of 2026-11-19).
+//!   `SYSCALL_DEBUG` is the feature `syscall_debug`.
 //! - `SY_NOLOCK` (M11e): honoured as in C for the system calls whose bodies are audited for
 //!   `MULTIPROCESSOR`; a `NOLOCK` system call whose body is not audited yet is listed in
 //!   [`SY_NOLOCK_DEFERRED`] and still runs under the kernel lock, with the module (and agent
@@ -181,7 +182,7 @@ pub fn pin_check(p: &Proc, code: Register) -> Result<(), Errno> {
     };
 
     // die:
-    // KTRACE (KTR_PINSYSCALL): configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE (KTR_PINSYSCALL): left out (the user, 2026-11-19).
     kernel_lock(); // KERNEL_LOCK()
     let pinoff = pin
         .zip(usize::try_from(code).ok())
@@ -252,7 +253,7 @@ pub fn mi_syscall(
         crate::kern::kern_xxx::scdebug_call(p, code, argp);
         kernel_unlock(); // KERNEL_UNLOCK()
     }
-    // dt(4) and KTRACE: configured in GENERIC.MP, not ported yet (KTRACE is TD3).
+    // dt(4): configured in GENERIC.MP, not ported yet. KTRACE: left out (user, 2026-11-19).
 
     // SP must be within MAP_STACK space
     let mut ie = p.p_spinentry.get();
@@ -306,7 +307,7 @@ pub fn mi_syscall_return(
         kernel_unlock(); // KERNEL_UNLOCK()
     }
     let _ = (code, error, retval);
-    // dt(4) and KTRACE: configured in GENERIC.MP, not ported yet (KTRACE is TD3).
+    // dt(4): configured in GENERIC.MP, not ported yet. KTRACE: left out (user, 2026-11-19).
     userret(p);
 }
 
@@ -331,7 +332,7 @@ pub fn mi_child_return(p: &Proc) {
         crate::kern::kern_xxx::scdebug_ret(p, code as Register, 0, &child_retval);
         kernel_unlock(); // KERNEL_UNLOCK()
     }
-    // dt(4) and KTRACE: configured in GENERIC.MP, not ported yet (KTRACE is TD3).
+    // dt(4): configured in GENERIC.MP, not ported yet. KTRACE: left out (user, 2026-11-19).
 }
 
 /// `mi_ast`: do the specific processing necessary for an AST.

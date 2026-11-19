@@ -293,7 +293,7 @@ fn futex_wait(p: &Proc, uaddr: usize, val: u32, timeout: usize, flags: i32) -> R
 
     if timeout != 0 {
         let ts: Timespec = copyin_obj(timeout)?;
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         if ts.tv_sec < 0 || !ts.is_valid() {
             return Err(Errno::EINVAL);
         }

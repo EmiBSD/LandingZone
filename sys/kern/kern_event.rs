@@ -1397,7 +1397,7 @@ pub fn sys_kevent(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result<(
                 Ok(ts) => ts,
                 Err(error) => break 'done Err(error),
             };
-            // KTRACE (ktrreltimespec): configured in GENERIC.MP, not ported yet (TD3).
+            // KTRACE (ktrreltimespec): left out (the user, 2026-11-19).
             if ts.tv_sec < 0 || !ts.is_valid() {
                 break 'done Err(Errno::EINVAL);
             }
@@ -1412,7 +1412,7 @@ pub fn sys_kevent(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result<(
             if let Err(error) = kevents_copyin(changelist, &mut kev[..n]) {
                 break 'done Err(error);
             }
-            // KTRACE (ktrevent): configured in GENERIC.MP, not ported yet (TD3).
+            // KTRACE (ktrevent): left out (the user, 2026-11-19).
             for kevp in &mut kev[..n] {
                 kevp.flags &= !EV_SYSFLAGS;
                 let error = kqueue_register(kq, kevp, 0, Some(p));
@@ -1455,7 +1455,7 @@ pub fn sys_kevent(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result<(
                 break;
             }
             error = kevents_copyout(&kev[..ready], eventlist + total * size_of::<Kevent>());
-            // KTRACE (ktrevent): configured in GENERIC.MP, not ported yet (TD3).
+            // KTRACE (ktrevent): left out (the user, 2026-11-19).
             total += ready;
             if error.is_err() || ready < n {
                 break;

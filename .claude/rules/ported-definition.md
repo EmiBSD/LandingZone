@@ -66,9 +66,11 @@ Given while TD1 was under way; they hold with the order above.
    told.
 5. **A `#if` true on one architecture and false on the other** is not decided by the session:
    how `completeness.rs` treats it is reported and the rule is the user's.
-6. **`KTRACE` is in `GENERIC.MP`.** A "KTRACE is not configured" line is false and is
-   corrected. Moving the rows that omit `ktr*` calls (to `wip`, or kept as depending on TD3)
-   waits for the user's answer.
+6. **`KTRACE` is in `GENERIC.MP`, but it is left out** (the user's answer of the same day:
+   ../Kernel's redesign makes its own traces; ktrace(2)'s are of no use to it). A "KTRACE is
+   not configured" line is false; each site says KTRACE is left out by the user's decision.
+   `kern_ktrace.c` is `skipped`, ktrace and fktrace stay `sys_nosys`, and a row that lacks
+   only its `ktr*` calls stays `ported`. TD3 no longer holds ktrace.
 7. **The exceptions are not approved in bulk.** The candidates the tool calls `missing` are
    split into those a program can reach (system call table, ioctl, sysctl, devices) and
    internal ones; those it calls `not configured` and `in another file` are presented by name.

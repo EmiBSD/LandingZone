@@ -64,13 +64,12 @@
 //! `lim_write_begin`/`lim_write_commit`, `lim_read_enter`, `lim_cur_proc`), `rucheck`,
 //! `dosetrlimit`, `sys_setrlimit`, `sys_getrlimit`, `sys_getrusage` and `dogetrusage`, and
 //! with the credentials the priority syscalls (`sys_getpriority`, `sys_setpriority`,
-//! `donice`). The file is not complete: its KTRACE hooks are configured in `GENERIC.MP`
-//! and not ported yet (TD3).
+//! `donice`). Its KTRACE hooks are left out (the user's decision of 2026-11-19).
 //!
 //! ## Deviations
 //! - `tuagg_sumup` reads the source's fields one by one inside the `pc_cons` loop instead of
 //!   copying the struct: the fields are `Cell`s.
-//!   KTRACE is configured in GENERIC.MP, not ported yet (TD3).
+//!   KTRACE is left out (the user's decision of 2026-11-19).
 
 use core::ffi::c_void;
 use core::ptr::{self, NonNull};
@@ -461,7 +460,7 @@ pub fn sys_setrlimit(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Resu
     let mut buf = [0u8; size_of::<Rlimit>()];
     copyin(uap.rlp.get() as usize, &mut buf)?;
     let mut alim = rlimit_from_bytes(&buf);
-    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE: left out (the user, 2026-11-19).
     dosetrlimit(p, uap.which.get() as u32, &mut alim)
 }
 
@@ -559,7 +558,7 @@ pub fn sys_getrlimit(_p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Res
     let limit = lim_read_enter();
     let alimp = limit.pl_rlimit[which as usize].get();
     lim_read_leave(limit);
-    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE: left out (the user, 2026-11-19).
     copyout(&rlimit_to_bytes(&alimp), uap.rlp.get() as usize)
 }
 
@@ -588,7 +587,7 @@ pub fn sys_getrusage(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Resu
     let uap: &SysGetrusageArgs = sysargs(v);
     let ru = Rusage::default();
     dogetrusage(p, uap.who.get(), &ru)?;
-    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE: left out (the user, 2026-11-19).
     copyout(&ru.to_bytes(), uap.rusage.get() as usize)
 }
 

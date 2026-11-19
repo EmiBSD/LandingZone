@@ -69,7 +69,7 @@
 //!   `subr_pool.rs`): `ENOBUFS` for an mbuf, `ENOMEM` for an iovec array.
 //! - `sys_ypconnect`'s binding file name is built on the stack (`MAXPATHLEN`), where the C
 //!   takes a `namei_pool` buffer.
-//! - `KTRACE` is configured in `GENERIC.MP` but not ported yet (TD3): `ktrsockaddr`,
+//! - `KTRACE` is left out (the user's decision of 2026-11-19): `ktrsockaddr`,
 //!   `ktrmsghdr`, `ktriovec`, `ktrgenio`, `ktrfds` and `ktrcmsghdr` are not called.
 //!   `INET6` (`dns_portcheck`'s `AF_INET6`) is the `inet6` feature.
 
@@ -409,7 +409,7 @@ pub fn sys_bind(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Result<()
             Ok(nam) => nam,
             Err(e) => break 'out Err(e),
         };
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         solock_shared(so);
         let error = sobind(so, nam, p);
         sounlock_shared(so);
@@ -648,7 +648,7 @@ pub fn sys_connect(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Result
             Ok(nam) => nam,
             Err(e) => break 'out Err(e),
         };
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         solock_shared(so);
         let error: Result<(), Errno> = 'unlock: {
             if isdnssocket(so)
@@ -783,7 +783,7 @@ pub fn sys_socketpair(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Res
                     fdinsert(fdp, sv0, fdflags, f1);
                     fdinsert(fdp, sv1, fdflags, f2);
                     fdpunlock(fdp);
-                    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+                    // KTRACE: left out (the user, 2026-11-19).
                     let _ = frele(f1, p);
                     let _ = frele(f2, p);
                     return Ok(());
@@ -853,7 +853,7 @@ pub fn sys_sendmsg(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result<
     let mut aiov = [Iovec::new(); UIO_SMALLIOV];
 
     let mut msg = msghdr_copyin(uap.msg.get() as usize)?;
-    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE: left out (the user, 2026-11-19).
 
     let n = msg.msg_iovlen as usize;
     if n > IOV_MAX {
@@ -900,7 +900,7 @@ pub fn sys_sendmmsg(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result
             }
         };
 
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
 
         let n = mmsg.msg_hdr.msg_iovlen as usize;
         if n > IOV_MAX {
@@ -941,7 +941,7 @@ pub fn sys_sendmmsg(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result
             break;
         }
 
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
 
         mmsg.msg_hdr.msg_flags = 0;
 
@@ -1022,7 +1022,7 @@ pub fn sendit(
             {
                 break 'bad Err(e);
             }
-            // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+            // KTRACE: left out (the user, 2026-11-19).
         }
         let control = if !mp.msg_control.is_null() {
             if (mp.msg_controllen as usize) < cmsg_align(size_of::<Cmsghdr>()) {
@@ -1036,11 +1036,11 @@ pub fn sendit(
                 Ok(c) => Some(c),
                 Err(e) => break 'bad Err(e),
             }
-            // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+            // KTRACE: left out (the user, 2026-11-19).
         } else {
             None
         };
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         let len = auio.uio_resid;
         let mut error = sosend(so, to, Some(&mut auio), None, control, flags);
         if let Err(e) = error {
@@ -1060,7 +1060,7 @@ pub fn sendit(
             fp.f_wbytes.set(fp.f_wbytes.get() + *retsize as u64);
             mtx_leave(&fp.f_mtx);
         }
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         error
     };
     // bad:
@@ -1122,7 +1122,7 @@ pub fn sys_recvmsg(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result<
             break 'done Err(e);
         }
         recvit(p, uap.s.get(), &mut msg, iov, 0, &mut retval[0])?;
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         let mut b = [0u8; MSGHDR_SIZE];
         msghdr_to_bytes(&msg, &mut b);
         copyout(&b, uap.msg.get() as usize)
@@ -1145,7 +1145,7 @@ pub fn sys_recvmmsg(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result
     let timeout = uap.timeout.get() as usize;
     if timeout != 0 {
         ts = copyin_obj::<Timespec>(timeout)?;
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         if !ts.is_valid() {
             return Err(Errno::EINVAL);
         }
@@ -1227,7 +1227,7 @@ pub fn sys_recvmmsg(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Result
         }
 
         mmsg.msg_len = retrec as u32;
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
 
         if let Err(e) = mmsghdr_copyout(&mmsg, mmsgp + dgrams as usize * MMSGHDR_SIZE) {
             error = Err(e);
@@ -1302,7 +1302,7 @@ pub fn recvit(
             uio_rw: UioRw::UIO_READ,
             uio_procp: Some(p),
         };
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         let len = auio.uio_resid;
         if fp.flag() & FNONBLOCK != 0 {
             mp.msg_flags |= MSG_DONTWAIT;
@@ -1329,7 +1329,7 @@ pub fn recvit(
         {
             error = Ok(());
         }
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         if let Err(e) = error {
             break 'out Err(e);
         }
@@ -1343,7 +1343,7 @@ pub fn recvit(
                     if let Err(e) = copyout(&mbuf_bytes(f)[..n], mp.msg_name as usize) {
                         break 'out Err(e);
                     }
-                    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+                    // KTRACE: left out (the user, 2026-11-19).
                     alen
                 }
             };
@@ -1370,7 +1370,7 @@ pub fn recvit(
                             i = clen;
                         }
                         error = copyout(&mbuf_bytes(m)[..i], cp);
-                        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+                        // KTRACE: left out (the user, 2026-11-19).
                         if m.m_next().get().is_some() {
                             i = align(i);
                             if clen < i {
@@ -1670,7 +1670,7 @@ pub fn copyaddrout(
 
     // SHOULD COPY OUT A CHAIN HERE
     copyout(&mbuf_bytes(name)[..buflen.min(namelen) as usize], sa)?;
-    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE: left out (the user, 2026-11-19).
     copyout(&namelen.to_ne_bytes(), outlen)
 }
 
@@ -1849,7 +1849,7 @@ pub fn sys_ypconnect(p: &Proc, v: &SysArgs, retval: &mut [Register; 2]) -> Resul
         }
     };
 
-    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE: left out (the user, 2026-11-19).
     solock(so);
 
     // Secure YP maps require reserved ports

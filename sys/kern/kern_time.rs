@@ -212,7 +212,7 @@ pub fn sys_clock_gettime(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> 
     let ats = clock_gettime(p, uap.clock_id.get())?;
 
     copyout_obj(&ats, uap.tp.get() as usize)
-    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE: left out (the user, 2026-11-19).
 }
 
 /// `clock_settime(2)`: root only; only `CLOCK_REALTIME` can be set.
@@ -281,7 +281,7 @@ pub fn sys_clock_getres(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> R
     if error.is_ok() && tp != 0 {
         ts.tv_nsec = ts.tv_nsec.max(1);
         copyout_obj(&ts, tp)?;
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
     }
 
     error
@@ -295,7 +295,7 @@ pub fn sys_nanosleep(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Resu
 
     let rmtp = uap.rmtp.get() as usize;
     let mut request: Timespec = copyin_obj(uap.rqtp.get() as usize)?;
-    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE: left out (the user, 2026-11-19).
 
     if request.tv_sec < 0 || !request.is_valid() {
         return Err(Errno::EINVAL);
@@ -332,7 +332,7 @@ pub fn sys_nanosleep(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Resu
         if let Err(copyout_error) = copyout_obj(&remainder, rmtp) {
             error = Err(copyout_error);
         }
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
     }
 
     error
@@ -349,7 +349,7 @@ pub fn sys_gettimeofday(_p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> 
     if tp != 0 {
         let atv = microtime();
         copyout_obj(&atv, tp)?;
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
     }
     if tzp != 0 {
         copyout_obj(&zerotz, tzp)?;
@@ -371,7 +371,7 @@ pub fn sys_settimeofday(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> R
         let _atz: Timezone = copyin_obj(tzp)?;
     }
     if let Some(atv) = atv {
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         if !atv.is_valid() {
             return Err(Errno::EINVAL);
         }
@@ -434,7 +434,7 @@ pub fn sys_adjtime(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Result
     if delta != 0 {
         suser(p)?;
         let atv: Timeval = copyin_obj(delta)?;
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         if !atv.is_valid() {
             return Err(Errno::EINVAL);
         }
@@ -579,7 +579,7 @@ pub fn sys_getitimer(_p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Res
     setitimer(which, None, Some(&mut aitv));
 
     copyout_obj(&aitv, uap.itv.get() as usize)
-    // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+    // KTRACE: left out (the user, 2026-11-19).
 }
 
 /// `setitimer(2)`.
@@ -598,7 +598,7 @@ pub fn sys_setitimer(_p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Res
     let mut newitv = false;
     if uitv != 0 {
         aitv = copyin_obj(uitv)?;
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
         itimerfix(&mut aitv)?;
         newitv = true;
     }
@@ -614,7 +614,7 @@ pub fn sys_setitimer(_p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Res
 
     if uoitv != 0 {
         return copyout_obj(&olditv, uoitv);
-        // KTRACE: configured in GENERIC.MP, not ported yet (TD3).
+        // KTRACE: left out (the user, 2026-11-19).
     }
 
     Ok(())
