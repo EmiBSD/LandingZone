@@ -145,6 +145,13 @@
 //! - `headers` is `struct tcpiphdr` for IPv4 or `struct tcpipv6hdr` for IPv6; `td_ti6` is
 //!   filled for `PF_INET6` (`INET6` is configured, feature `inet6`: the `IPV6_VERSION`
 //!   case of the header sniffing and the `PF_INET6` copy).
+//! - The header sniffing of a record without a control block compares the version nibble
+//!   with `IPVERSION << 4` and records the IPv4 header. The C's `case IPVERSION:` compares
+//!   the masked byte (0x40 for IPv4) with 4, is never taken, and keeps no IPv4 header
+//!   (EXT-237).
+//! - The header is copied only when `headers` holds a whole `struct tcpiphdr` or
+//!   `struct tcpipv6hdr`; the C copies the structure without a length (its callers always
+//!   pass one).
 //! - The ring and `tcp_debx` are one `StaticCell` changed only with `tcp_debug_mtx` held.
 
 use core::mem::size_of;

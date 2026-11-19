@@ -75,6 +75,10 @@
 //! - `1 << (fls(nintrs) - 1)` (`libkern/fls.c`, not ported) is `1 << nintrs.ilog2()`;
 //!   `nintrs` is never 0 there.
 //! - `KASSERTMSG` is `kassert!` (the message is the C's comment at the site).
+//! - `intrmap_cpus_get` stores `ncpus` in `intrmap_ncpu` when it builds a set, so the set is
+//!   built again only when `ncpus` changes, as the C's comment says. The C never assigns
+//!   `intrmap_ncpu` (its only write is the initialiser), so it builds a new set on every
+//!   call and drops the global's reference to the old one (EXT-245).
 
 use core::mem::size_of;
 use core::ptr::{self, NonNull};

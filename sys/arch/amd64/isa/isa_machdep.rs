@@ -97,7 +97,8 @@
 //!
 //! ## Deviations
 //! - `_isa_dma_check_buffer` answers `EINVAL` (bounce) for a page `pmap_extract` does not
-//!   find, where the C goes on with the previous page's address; `_isa_bus_dmamap_destroy`
+//!   find, where the C goes on with the previous page's address (on the first page, an
+//!   uninitialised one; EXT-240); `_isa_bus_dmamap_destroy`
 //!   frees the cookie with the size it was allocated with (the C passes 0).
 //! - `ISA_DMA_STATS` is not defined, as in GENERIC: the statistics macros do nothing. The
 //!   `DEBUG` checks of `_isa_bus_dmamap_sync` are not configured; its `DIAGNOSTIC` one is

@@ -100,9 +100,10 @@
 //! - `wg_timers_expired_handshake_last_sent`, `wg_timers_check_handshake_last_sent` answer
 //!   `bool` (`ETIMEDOUT` is `true`); `wg_timers_get_persistent_keepalive`, the ioctls,
 //!   `wg_aip_*`, `wg_send`, `wg_bind` and the cloner return `Result`.
-//! - `wg_aip_add` refuses a negative `a_cidr` (`EINVAL`), which the C hands to
-//!   `art_node_init` as a huge unsigned length, and an `art_insert` that cannot allocate
-//!   (`ENOBUFS`), where the C would cast its NULL to a `wg_aip`.
+//! - `wg_aip_add` tests a negative `a_cidr` by name; the C refuses it too (`EINVAL`), since
+//!   `d->a_cidr > root->art_alen` converts the `int` to `unsigned int`, so the result is the
+//!   same. It refuses an `art_insert` that cannot allocate (`ENOBUFS`), where the C would
+//!   cast its NULL to a `wg_aip` (EXT-12).
 //! - `wg_index_drop` of an index that is not in the table panics, where the C dereferences the
 //!   NULL its search ends with.
 //! - `wg_last_underload` is a `StaticCell` guarded by a mutex the C does not have

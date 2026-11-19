@@ -274,6 +274,15 @@ means EmiBSD's code has it too ("Bugs the port reproduces").
 | EXT-234 | `sys/kern/kern_malloc.c:312` | the "Data modified on freelist" message of a bad freelist link prints `(int32_t *)&addr - (int32_t *)kbp`: the distance from the bucket to a local variable, not a word of the object | — (a `DIAGNOSTIC` kernel whose freelist was already overwritten) | cosmetic | read | prints the word of the block that holds the link | open |
 | EXT-236 | `sys/arch/arm64/arm64/pmap.c:511` | `pmap_vp_page_alloc` turns `PR_NOWAIT` into a try-lock of `kernel_map`: `pmap_enter` fails whenever another CPU holds that lock, and with no swap `uvm_fault` returns `ENOMEM` and the process is killed, with memory to spare | local (a threaded program on a machine without swap) | process killed | read; the port lost the race under QEMU | the pool's pages come through the direct map | open |
 | EXT-235 | `sys/kern/subr_pool.c:1220` | `pool_print1` reads its modifier one character in two and steps over the terminator when it sits at an odd offset (`show pool/p`): it goes on reading past the string | — (ddb's user) | cosmetic | read | the walk ends with the modifier | open |
+| EXT-237 | `sys/netinet/tcp_debug.c:161` | `tcp_trace` compares the masked version byte (0x40 for IPv4) with `IPVERSION` (4): a record without a control block never keeps its IPv4 header | remote (on an `SO_DEBUG` socket) | wrong result | read | compares with `IPVERSION << 4` | open |
+| EXT-238 | `sys/lib/libsa/arp.c:120` | when the cache is full, `arpwhohas` recycles `arp_num` but writes the new entry through the pointer its search left one past `arp_list[]` | — (a netboot that resolves more than seven addresses; the C's comment says three suffice) | memory corruption | read | the new entry is `arp_list[arp_num]` | open |
+| EXT-239 | `sys/ufs/ufs/ufs_quota.c:927` | `dqget`'s read-error path takes the dquot off its hash chain and frees it; its recycling does `LIST_REMOVE` again through the links the first one invalidated: a fault with `DIAGNOSTIC` (GENERIC), a write through stale links without | device (an I/O error on the quota file) | crash | read | `dq_hashed`: the recycling removes only a hashed dquot | open |
+| EXT-240 | `sys/arch/amd64/isa/isa_machdep.c:661` | `_isa_dma_check_buffer` ignores `pmap_extract`'s failure and tests an uninitialised (first page) or stale `pa` | — (a buffer with an unmapped page) | wrong result | read | `EINVAL` (bounce) for an unmapped page | open |
+| EXT-241 | `sys/dev/pci/auich.c:905` | `auich_freem` frees the buffer and leaves `sc_pdma`/`sc_rdma`/`sc_cdma` pointing at it; a later `auich_freem` compares through the freed pointer | — (latent: auich has no detach, so `audio_detach`'s two frees never run) | use after free (latent) | read | the pointer is cleared | open |
+| EXT-242 | `sys/dev/pci/auich.c:1368` | `auich_calibrate` indexes the 32-entry `pcmi.dmalist` with the whole CIV byte; the same function masks it with `AUICH_LVI_MASK` everywhere else | firmware/hardware (a controller that sets CIV's reserved bits) | memory corruption | read | indexes with `civ & AUICH_LVI_MASK` | open |
+| EXT-243 | `sys/net/if_wg.c:2709` | `wg_clone_create` counts the interface before its allocations and no failure path takes it back: after a failed create the task queues outlive the last interface | alloc-failure | leak | read | same fault | open |
+| EXT-244 | `sys/arch/amd64/stand/efiboot/efiboot.c:595` | `pio_comspeed`, `pio_com_getc`, `pio_com_putc` (and `comspeed` for `serios[]`, 746) index four-entry arrays with an unbounded unit: `stty com7 9600` reads past them and writes to the port it finds there | the boot prompt's user | wrong result (out-of-bounds read, I/O to an arbitrary port) | read | the unit masked by 3 (com7 drives com3) | open |
+| EXT-245 | `sys/kern/kern_intrmap.c:91` | `intrmap_ncpu` is never assigned, so `intrmap_cpus_get` builds a new CPU set on every call instead of when `ncpus` changes | — (every MSI-X multi-queue attach) | cosmetic (allocations) | read | `intrmap_ncpu` is stored with the set | open |
 
 ## Entries (EXT-1 to EXT-8, EXT-192 to EXT-197)
 
@@ -553,6 +562,8 @@ after M16 and are not fixed here.
   and this is not in its Deviations.
 - EXT-227 nd6: `sys/netinet6/nd6.rs:900` keeps `nd6_expire_timer_update`'s truncation to
   `int` before the clamp. That is faithful, so it is not a Deviation, and a test pins it.
+- EXT-243 wg: `sys/net/if_wg.rs` (`wg_clone_create`) counts the interface before its
+  allocations as the C does, so a failed create keeps the task queues alive.
 - Kept as in C, and said so in the Deviations:
   - EXT-42: `sys/miscfs/fuse/fuse_device.rs:59-60`.
   - EXT-44: `sys/miscfs/fuse/fuse_lookup.rs:46-47`.
@@ -951,6 +962,56 @@ Every C line in this and the following sections is at the pin 3ce1f3f79392, unde
   `diff = expire_time - getuptime(); secs = diff < 0 ? 0 : MIN(diff, INT_MAX);`.
   `nd6_timer`'s `secs = expire - uptime;` (`nd6.c:304`) has the same shape, but `expire` is
   at most `nd6_gctimer` ahead there, so it cannot overflow.
+
+### EXT-237: `tcp_trace` never recognises an IPv4 header by its version
+
+- Where: `sys/netinet/tcp_debug.c:155-163` at 3ce1f3f79392, `tcp_trace`.
+- What: with no control block (`tp` NULL), `pf` stays `PF_UNSPEC` and the family is read
+  from the header: `switch (ti6->ti6_i.ip6_vfc & IPV6_VERSION_MASK)` with `case
+  IPV6_VERSION:` (0x60, `netinet/ip6.h:93`) and `case IPVERSION:`. `IPVERSION` is 4
+  (`netinet/ip.h:42`), but the masked first byte of an IPv4 header is 0x40, so that case is
+  never taken: the `default:` sets `headers = NULL` and the record keeps no IPv4 header.
+- Reach: remote, on a socket a user put in `SO_DEBUG`. `tcp_input`'s `drop:` label traces
+  with `tp` NULL once `tcp_drop` has returned NULL (`tcp_input.c:1134-1136`, an RST with
+  ACK in SYN-SENT; the trace at 2131-2132). Only the trace ring that trpt(8) reads is wrong.
+- Verified: read.
+- Port's handling: `sys/netinet/tcp_debug.rs` (`tcp_trace`) compares with `IPVERSION << 4`
+  and records the header (a deviation listed in the file).
+- Severity: wrong result (a debugging record).
+- Fix: `case IPVERSION << 4:`.
+
+### EXT-243: a failed `wg_clone_create` keeps its count, and the task queues outlive the last `wg`
+
+- Where: `sys/net/if_wg.c:2709-2810` at 3ce1f3f79392, `wg_clone_create`.
+- What: `wg_counter++` (2709) comes before `malloc(..., M_NOWAIT)` (2711) and the other
+  allocations (`cookie_checker_init`, `art_alloc`, `hashinit`). Every failure label
+  (`ret_00` to `ret_05`, 2797-2810) frees what was made and returns `ENOBUFS`, but none
+  decrements `wg_counter`. `wg_clone_destroy` destroys `wg_handshake_taskq` and
+  `wg_crypt_taskq` when the count drops to 0 (2828-2835), so after one failed create the
+  count never reaches 0 again and the two task queues and their `ncpus + 2` threads stay
+  after the last interface is gone. Nothing uses a freed queue: the next create sees a
+  non-zero count and reuses them.
+- Reach: alloc-failure (`ifconfig wg create` while `M_NOWAIT` allocations fail).
+- Verified: read.
+- Port's handling: `sys/net/if_wg.rs` (`wg_clone_create`) has the same order: same fault.
+- Severity: leak.
+- Fix: increment `wg_counter` after the last allocation, or decrement it on every failure
+  path (and destroy the queues when it drops to 0 there too).
+
+### EXT-245: `intrmap_ncpu` is never assigned
+
+- Where: `sys/kern/kern_intrmap.c:69` and 91 at 3ce1f3f79392, `intrmap_cpus_get`.
+- What: `int intrmap_ncpu = 0;` (69) is the variable's only write; `if (intrmap_ncpu !=
+  ncpus)` (91) is its only read (`grep -rn intrmap_ncpu sys` finds no other line). The
+  comment says the set is rebuilt when there is "a new version" of the set of CPUs, but
+  since `intrmap_ncpu` stays 0, every `intrmap_create` allocates a new CPU set, makes it the
+  global and drops the global's reference to the old one (freed once no map holds it).
+- Reach: none from outside; every multi-queue driver's attach (`intrmap_create`).
+- Verified: read.
+- Port's handling: `sys/kern/kern_intrmap.rs` stores `ncpus` with the new set (a deviation
+  listed in the file): the same maps, one set while `ncpus` does not change.
+- Severity: cosmetic (allocations).
+- Fix: `intrmap_ncpu = ncpus;` beside `intrmap_cpus = ic;` (128).
 
 ## file systems
 
@@ -1513,6 +1574,26 @@ Every C line in this and the following sections is at the pin 3ce1f3f79392, unde
 - Port's handling: `sys/msdosfs/msdosfs_fat.rs:111` skips it.
 - Severity: crash.
 - Fix: `if (bp) brelse(bp);`, or reject zero clusters at mount.
+
+### EXT-239: a quota-file read error leaves a dquot that faults when it is recycled
+
+- Where: `sys/ufs/ufs/ufs_quota.c:926-931` and 885-888 at 3ce1f3f79392, `dqget`.
+- What: the new dquot is put on its hash chain (897) and read from the quota file (914).
+  On a read error, `LIST_REMOVE(dq, dq_hash)` (927) takes it off the chain and `dqrele`
+  (928) puts it on `dqfreelist` (966). GENERIC has `option DIAGNOSTIC` (`conf/GENERIC:12`),
+  so that `LIST_REMOVE` leaves both links at `_Q_INVALID`, `(void *)-1`
+  (`sys/queue.h:84-86, 233-234`). When the dquot is recycled (880-888, once `numdquot`
+  has reached `desireddquot`), `LIST_REMOVE(dq, dq_hash)` runs again: `le_next` is not
+  NULL, so the kernel writes through `(void *)-1` and faults. Without `DIAGNOSTIC` the
+  stale links write into whatever the old neighbours have become.
+- Reach: device: an I/O error while reading the quota file of a file system with quotas
+  on, then enough later `dqget`s to recycle that dquot.
+- Verified: read.
+- Port's handling: `sys/ufs/ufs/ufs_quota.rs` gives `Dquot` a `dq_hashed` flag and the
+  recycling removes only a hashed dquot (a deviation listed in the file).
+- Severity: crash (memory corruption without `DIAGNOSTIC`).
+- Fix: remove the dquot from the hash only when it is on it (a flag, as the port does), or
+  leave it on no list and skip the removal when it is recycled.
 
 ## USB, storage and network devices
 
@@ -3019,6 +3100,53 @@ Every C line in this and the following sections is at the pin 3ce1f3f79392, unde
 - Fix: in that block, also set `CPACR_FPEN_TRAP_EL0` (EL1 may use FP) before the write of
   `ZCR_EL1`, and restore the saved FPEN bits after it.
 
+### EXT-240: `_isa_dma_check_buffer` ignores `pmap_extract`'s failure
+
+- Where: `sys/arch/amd64/isa/isa_machdep.c:657-668` at 3ce1f3f79392.
+- What: `pmap_extract(pmap, vaddr, &pa);` (661) discards the result. For a page with no
+  mapping `pa` is not written: on the first page it is uninitialised, on a later one it is
+  the previous page's address, and the threshold, segment and boundary tests (667-685) are
+  made on it. `_isa_bus_dmamap_load` (454) then decides whether to bounce from that answer.
+- Reach: none from outside: the callers load mapped buffers (physio wires user pages).
+- Verified: read.
+- Port's handling: `sys/arch/amd64/isa/isa_machdep.rs` answers `EINVAL` (bounce) for a page
+  `pmap_extract` does not map (a deviation listed in the file).
+- Severity: wrong result (an uninitialised read).
+- Fix: `if (!pmap_extract(...)) return (EINVAL);`.
+
+### EXT-241: `auich_freem` leaves the softc's DMA pointers dangling
+
+- Where: `sys/dev/pci/auich.c:889-907` at 3ce1f3f79392.
+- What: `auich_freem` finds the `struct auich_dma` among `sc_pdma`, `sc_rdma` and `sc_cdma`
+  by comparing `->addr` with the buffer, frees it (905-906) and leaves the pointer it came
+  from set. A later `auich_freem` compares through that freed pointer first.
+- Reach: latent. The only `auich_freem` calls after the first are `audio_detach`'s
+  (`dev/audio.c:1428-1429`, play then record: the second reads the freed `sc_pdma`), and
+  auich has no detach (`auich_ca`, 254-256), so they never run. `auich_calibrate`'s free at
+  attach (1444, 1457) runs while `sc_pdma` and `sc_rdma` are still NULL.
+- Verified: read.
+- Port's handling: `sys/dev/pci/auich.rs` clears the pointer it frees (a deviation listed in
+  the file).
+- Severity: use after free (latent).
+- Fix: set the matching `sc_*dma` to NULL before the `free`.
+
+### EXT-242: `auich_calibrate` indexes the DMA list with the unmasked CIV byte
+
+- Where: `sys/dev/pci/auich.c:1367-1369` at 3ce1f3f79392.
+- What: `civ = bus_space_read_1(..., AUICH_PCMI + AUICH_CIV)` and then
+  `sc->pcmi.dmalist[civ]` is written (base and length). `dmalist` has
+  `AUICH_DMALIST_MAX` (32) entries (139, 159-161), and only CIV's low five bits are the
+  index; the same function masks it with `AUICH_LVI_MASK` (0x1f) when it writes LVI (1391)
+  and compares (1414). A CIV byte with any of bits 5-7 set writes up to 223 entries past
+  the list, over the next lists in `auich_cdata` and beyond.
+- Reach: firmware/hardware: a controller or an emulation that does not read the reserved
+  bits as 0.
+- Verified: read.
+- Port's handling: `sys/dev/pci/auich.rs` indexes with `civ & AUICH_LVI_MASK` (a deviation
+  listed in the file).
+- Severity: memory corruption.
+- Fix: `civ &= AUICH_LVI_MASK;` after the read.
+
 ## boot loaders
 
 ### EXT-175: a long TFTP path overflows the request buffer
@@ -3089,6 +3217,42 @@ Every C line in this and the following sections is at the pin 3ce1f3f79392, unde
 - Port's handling: `sys/lib/libsa/netudp.rs:73` drops it.
 - Severity: cosmetic (an out-of-bounds read whose result is discarded).
 - Fix: drop when `uh_ulen` exceeds what was received.
+
+### EXT-238: libsa's `arpwhohas` writes past `arp_list[]` when the cache is full
+
+- Where: `sys/lib/libsa/arp.c:92-120` and 139 at 3ce1f3f79392.
+- What: `arp_list[ARP_NUM]` has 8 entries (54, 59) and `arp_num` starts at 1 (entry 0 is
+  the broadcast address, 63). The cache search (92-94) leaves `al` at
+  `&arp_list[arp_num]`. With seven addresses cached, `arp_num` is 8 and `al` is
+  `&arp_list[8]`, one past the end; the recycling (97-100) sets `arp_num = 1` but does not
+  move `al`, so `al->addr = addr` (120) and `MACPY(ah->arp_sha, al->ea)` (139) write ten
+  bytes past the array, and `al->ea` is returned.
+- Reach: a network boot that resolves an eighth distinct address (the comment at 54 says
+  three suffice).
+- Verified: read.
+- Port's handling: `sys/lib/libsa/arp.rs` writes the new entry to `arp_list[arp_num]` after
+  the recycling (a deviation listed in the file).
+- Severity: memory corruption (the loader's data).
+- Fix: `al = &arp_list[arp_num];` after the recycling.
+
+### EXT-244: efiboot's port I/O console indexes `comports[4]` with any unit
+
+- Where: `sys/arch/amd64/stand/efiboot/efiboot.c:595, 649, 663` and 746 at 3ce1f3f79392.
+- What: `comports[4]` (589) is indexed with `minor(dev)` in `pio_comspeed`, `pio_com_getc`
+  and `pio_com_putc`, and `comspeed` reads `serios[minor(dev)]` (746, `serios[4]` at 588)
+  before `efi_valid_com` bounds the unit (752). `ttydev` accepts any number after the name
+  (`arch/amd64/stand/libsa/dev_i386.c:167-179`), and `stty` passes its device to `cnspeed`
+  (`stand/boot/cmd.c:408-416`), so `stty com7 9600` at the boot prompt reads `serios[7]`
+  and `comports[7]` past their arrays and programs the divisor of whatever I/O port the
+  word after `comports[]` holds (`com_addr` is -1 unless `comaddr` was set).
+- Reach: the boot prompt's user.
+- Verified: read.
+- Port's handling: `sys/arch/amd64/stand/efiboot/efiboot.rs` masks the unit with 3, so com7
+  drives com3 (0x2e8); `comspeed` reads `serios[]` after the bound (a deviation listed in
+  the file).
+- Severity: wrong result (out-of-bounds read, I/O to an arbitrary port).
+- Fix: refuse a unit past `nitems(comports)` in `cnspeed`/`comspeed` and in the getc/putc
+  paths.
 
 ## host tools
 

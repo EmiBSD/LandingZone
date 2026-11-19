@@ -69,6 +69,12 @@
 //!   is compiled with feature `softraid`, as the C's `SOFTRAID=yes` defines it; its only
 //!   caller is softraid's passphrase prompt.
 //! - `EFI_DEBUG` (the "Hit any key to reboot" wait in `_rtt`) is not defined, as in the C.
+//! - `pio_comspeed`, `pio_com_getc` and `pio_com_putc` index `comports[4]` with the unit
+//!   masked by 3, so `stty com7 9600` drives com3's UART (0x2e8). The C indexes with the
+//!   unit as it comes, reads past the array and writes to whatever port it finds there
+//!   (EXT-244). `comspeed` reads `serios[]` only after `efi_valid_com` has bounded the unit.
+//! - `getsecs` clamps the firmware's `Month` to 13 before it indexes `daytab`; the C indexes
+//!   with the firmware's value.
 
 #![allow(non_upper_case_globals)] // the UEFI specification's enumerator names, in patterns
 
