@@ -859,3 +859,62 @@ c = "sys/ntfs/ntfs_subr.c"
 function = "ntfs_runtocn"
 reason = "#if UNUSED_CODE: never defined, the code is not compiled"
 approved = "2026-11-19"
+
+# 2026-11-19: the user approved by name ("ok dale") the 9 functions the preprocessing of
+# f6d34f9e found not configured: crc32.c's make_crc_table, braid and the ARMCRC32 crc32_z,
+# zutil.c's zmemcpy, zmemcmp and zmemzero, inftrees.c's buildtables, siop.c's
+# siop_dump_script and softraid.c's sr_print_stats.
+
+[[exception]]
+c = "sys/lib/libz/crc32.c"
+function = "make_crc_table"
+reason = "not configured: `defined(DYNAMIC_CRC_TABLE)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/crc32.c"
+function = "braid"
+reason = "not configured: `defined(DYNAMIC_CRC_TABLE) && defined(W)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/crc32.c"
+function = "crc32_z"
+reason = "not configured: `defined(ARMCRC32)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/zutil.c"
+function = "zmemcpy"
+reason = "not configured: `!defined(HAVE_MEMCPY)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/zutil.c"
+function = "zmemcmp"
+reason = "not configured: `!defined(HAVE_MEMCPY)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/zutil.c"
+function = "zmemzero"
+reason = "not configured: `!defined(HAVE_MEMCPY)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/lib/libz/inftrees.c"
+function = "buildtables"
+reason = "not configured: `defined(BUILDFIXED)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/ic/siop.c"
+function = "siop_dump_script"
+reason = "not configured: `defined(DUMP_SCRIPT)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/dev/softraid.c"
+function = "sr_print_stats"
+reason = "not configured: `defined(SR_FANCY_STATS)` is false on amd64 and arm64 GENERIC.MP"
+approved = "2026-11-19"

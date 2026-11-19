@@ -277,10 +277,10 @@ notes = "license: zlib; an altered source version. ERR_MSG, ERR_RETURN, DEF_WBIT
 [[file]]
 c = "sys/lib/libz/zutil.c"
 rust = "sys/lib/libz/zutil.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "192d6f2d43da5aa2309d74bb13679e7a9f38b3d1"
-notes = "license: zlib; an altered source version. z_errmsg, zlibVersion, zlibCompileFlags (sizes from the Rust types: LP64, plus NO_GZIP), zError; z_error/z_verbose (ZLIB_DEBUG), zmemcpy/zmemcmp/zmemzero (HAVE_MEMCPY in the kernel too), the 16-bit and Windows CE sections and the userland zcalloc/zcfree (the kernel's MY_ZCALLOC is zopenbsd.c) have no counterpart; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 6 C function(s) not in its Rust file: z_error, zmemcpy, zmemcmp, zmemzero, zcalloc, zcfree"
+notes = "license: zlib; an altered source version. z_errmsg, zlibVersion, zlibCompileFlags (sizes from the Rust types: LP64, plus NO_GZIP), zError; z_error/z_verbose (ZLIB_DEBUG), zmemcpy/zmemcmp/zmemzero (HAVE_MEMCPY in the kernel too), the 16-bit and Windows CE sections and the userland zcalloc/zcfree (the kernel's MY_ZCALLOC is zopenbsd.c) have no counterpart; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 6 C function(s) not in its Rust file: z_error, zmemcpy, zmemcmp, zmemzero, zcalloc, zcfree; their exceptions were approved by the user by name on 2026-11-19, and ports check accepts the row as ported"
 
 [[file]]
 c = "sys/lib/libz/adler32.c"
@@ -353,11 +353,11 @@ notes = "license: zlib; an altered source version. code as Code, codetype as Cod
 [[file]]
 c = "sys/lib/libz/inftrees.c"
 rust = "sys/lib/libz/inftrees.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "0bf8dc4a1b30fdf0384e1292782b43dfabe71a4e"
 deps = ["sys/lib/libz/inftrees.h"]
-notes = "license: zlib; an altered source version. inflate_table over the code space as a slice plus an offset it advances (the C's code **table), the sub-table pointer an index, codes the length of lens; inflate_fixed (BUILDFIXED off: the inffixed.h statics); not configured: BUILDFIXED's buildtables and MAKEFIXED's makefixed (the tests rebuild lenfix and distfix with inflate_table, entry for entry); no inflate_copyright in OpenBSD's copy; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 2 C function(s) not in its Rust file: buildtables, main"
+notes = "license: zlib; an altered source version. inflate_table over the code space as a slice plus an offset it advances (the C's code **table), the sub-table pointer an index, codes the length of lens; inflate_fixed (BUILDFIXED off: the inffixed.h statics); not configured: BUILDFIXED's buildtables and MAKEFIXED's makefixed (the tests rebuild lenfix and distfix with inflate_table, entry for entry); no inflate_copyright in OpenBSD's copy; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 2 C function(s) not in its Rust file: buildtables, main; their exceptions were approved by the user by name on 2026-11-19, and ports check accepts the row as ported"
 
 [[file]]
 c = "sys/lib/libz/inffixed.h"
@@ -6511,11 +6511,11 @@ notes = "M13: the whole file, no stubs: siop_common_attach (Result; the script p
 [[file]]
 c = "sys/dev/ic/siop.c"
 rust = "sys/dev/ic/siop.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "f78ae70b13fd7f34e5d2590c21f4abe72b5f9df4"
 deps = ["sys/dev/ic/siop_common.c", "sys/dev/ic/siopvar.h", "sys/dev/microcode/siop/siop.out", "sys/scsi/scsi_base.c", "sys/scsi/scsiconf.c", "sys/kern/kern_timeout.c", "sys/kern/kern_malloc.c", "sys/kern/subr_autoconf.c"]
-notes = "M13: the whole driver, no stubs: SIOP_NCMDPB (10), SIOP_NSLOTS, siop_cd/siop_switch, siop_table_sync, siop_script_sync/read/write (on-board RAM through bus_space, else the host page volatile), siop_attach, siop_reset, CALL_SCRIPT (call_script), siop_intr (gotos as a labelled block yielding Reset/End; a DSA past the block's last xfer, or a command that never had a transfer, is no command; a reselect with lun/tag outside the tables is invalid; DIAGNOSTIC checks under feature diagnostic as siop_intr_diagnostic), siop_scsicmd_end, siop_handle_qtag_reject (bool), siop_handle_reset, siop_cmd_get/put (unsafe iopool fns), siop_scsiprobe (Result, ENOMEM), siop_scsicmd (SCSI_POLL polls siop_intr, the INQUIRY follow-ups), siop_start, siop_timeout, siop_morecbd, siop_get_lunsw, siop_add_reselsw, siop_update_scntl3, siop_add_dev (the C's size_t arithmetic kept), siop_scsifree, siop_dmamem_alloc/free. (struct siop_softc *) casts are siop_softc(), which checks the device is a siop (SIOP_CD). SIOP_DEBUG (DUMP_SCRIPT, siop_dump_script, the DEBUG printfs) and SIOP_STATS (INCSTAT, siop_printstats) are not defined by the file: not ported. Host tests: siop_reset's script copy and patches, lun switches, reselect entry, SCNTL3 restore, lun entries with and without a tag switch. QEMU (amd64, `just smoke-siop`): siop0 at pci0 dev 4 (lsi53c895a, irq 10, 8K of on-board RAM), scsibus1 at siop0: 16 targets, initiator 7, sd1 (scsi-hd) and cd0 (scsi-cd); fdisk/disklabel/newfs/mount/cmp/dd on sd1 and mount_cd9660 on cd0. QEMU ignores WDTR/SDTR, so the targets stay in TARST_WIDE_NEG, untagged and async, as OpenBSD on QEMU; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 2 C function(s) not in its Rust file: siop_dump_script, siop_printstats"
+notes = "M13: the whole driver, no stubs: SIOP_NCMDPB (10), SIOP_NSLOTS, siop_cd/siop_switch, siop_table_sync, siop_script_sync/read/write (on-board RAM through bus_space, else the host page volatile), siop_attach, siop_reset, CALL_SCRIPT (call_script), siop_intr (gotos as a labelled block yielding Reset/End; a DSA past the block's last xfer, or a command that never had a transfer, is no command; a reselect with lun/tag outside the tables is invalid; DIAGNOSTIC checks under feature diagnostic as siop_intr_diagnostic), siop_scsicmd_end, siop_handle_qtag_reject (bool), siop_handle_reset, siop_cmd_get/put (unsafe iopool fns), siop_scsiprobe (Result, ENOMEM), siop_scsicmd (SCSI_POLL polls siop_intr, the INQUIRY follow-ups), siop_start, siop_timeout, siop_morecbd, siop_get_lunsw, siop_add_reselsw, siop_update_scntl3, siop_add_dev (the C's size_t arithmetic kept), siop_scsifree, siop_dmamem_alloc/free. (struct siop_softc *) casts are siop_softc(), which checks the device is a siop (SIOP_CD). SIOP_DEBUG (DUMP_SCRIPT, siop_dump_script, the DEBUG printfs) and SIOP_STATS (INCSTAT, siop_printstats) are not defined by the file: not ported. Host tests: siop_reset's script copy and patches, lun switches, reselect entry, SCNTL3 restore, lun entries with and without a tag switch. QEMU (amd64, `just smoke-siop`): siop0 at pci0 dev 4 (lsi53c895a, irq 10, 8K of on-board RAM), scsibus1 at siop0: 16 targets, initiator 7, sd1 (scsi-hd) and cd0 (scsi-cd); fdisk/disklabel/newfs/mount/cmp/dd on sd1 and mount_cd9660 on cd0. QEMU ignores WDTR/SDTR, so the targets stay in TARST_WIDE_NEG, untagged and async, as OpenBSD on QEMU; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 2 C function(s) not in its Rust file: siop_dump_script, siop_printstats; their exceptions were approved by the user by name on 2026-11-19, and ports check accepts the row as ported"
 
 [[file]]
 c = "sys/dev/pci/siop_pci_common.h"
