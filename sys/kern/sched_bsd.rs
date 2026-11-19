@@ -57,18 +57,21 @@
 //!
 //! Upstream: sys/kern/sched_bsd.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M5 (part a) ports `roundrobin_period`, `sched_lock` with
+//! Status: `ported`. Milestone M5 (part a) ports `roundrobin_period`, `sched_lock` with
 //! `SCHED_LOCK_INIT` and `roundrobin`, the clock interrupt that `clockintr_cpu_init`
 //! schedules; part b2 adds the `SCHED_LOCK`/`SCHED_UNLOCK`/`SCHED_ASSERT_*` macros of
 //! `<sys/sched.h>`, the load average (`cexp`, `averunnable`, `update_loadavg`), `ccpu`,
 //! `schedcpu`, `decay_aftersleep`, `yield`, `preempt`, `mi_switch`, `setrunnable`,
-//! `setpriority`, `schedclock` and `scheduler_start`. The CPU throttling (`cpu_setperf`,
-//! `perflevel`, the `perfpolicy_*` knobs, `setperf_auto`, `sysctl_hwsetperf`,
-//! `sysctl_hwperfpolicy`) needs sysctl and the power sensors (M7). M11a: `mi_switch` calls
+//! `setpriority`, `schedclock` and `scheduler_start`; TD1 the CPU throttling (`perflevel`,
+//! the `perfpolicy_*` knobs, `setperf_auto`, `sysctl_hwsetperf`, `sysctl_hwperfpolicy`),
+//! and the file is whole. M11a: `mi_switch` calls
 //! `smr_idle` and, with `MULTIPROCESSOR`, drops every hold of the kernel lock around the
 //! switch (`__mp_release_all`/`__mp_acquire_count`).
 //!
 //! ## Deviations
+//! - `setperf_auto` keeps its per-CPU tick counts in two static arrays of `MAXCPUS` words
+//!   where the C allocates them with `mallocarray(ncpusfound, ...)` at its first run (and
+//!   gives up for good when that fails); `SMALL_KERNEL` is not configured.
 //! - `averunnable.ldavg` are atomics (`Averunnable`, written by the softclock thread, read
 //!   racily by `schedcpu` and sysctl as in C); `averunnable()` returns a `Loadavg` snapshot.
 //! - `cexp` and `ccpu` are compile-time constants, like the C's constant-folded doubles; no
@@ -77,7 +80,7 @@
 
 use core::ffi::c_void;
 use core::ptr;
-use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicI32, AtomicU32, AtomicU64, Ordering};
 
 use libkern::StaticCell;
 
@@ -88,29 +91,33 @@ use crate::kern::kern_clockintr::{clockintr_advance, clockintr_cancel, clockrequ
 use crate::kern::kern_lock::{
     __mp_acquire_count, __mp_release_all, _kernel_lock_held, KERNEL_LOCK,
 };
-use crate::kern::kern_lock::{mtx_enter, mtx_init, mtx_leave};
+use crate::kern::kern_lock::{mtx_enter, mtx_init, mtx_leave, pc_cons_enter, pc_cons_leave};
 use crate::kern::kern_proc::ALLPROC;
 use crate::kern::kern_resource::tuagg_add_runtime;
 use crate::kern::kern_sched::{
-    SCHED_ALL_CPUS, SCHED_IDLE_CPUS, cpuset_cardinality, cpuset_complement, remrunqueue,
-    sched_chooseproc, setrunqueue,
+    SCHED_ALL_CPUS, SCHED_IDLE_CPUS, cpu_is_online, cpuset_cardinality, cpuset_complement,
+    remrunqueue, sched_chooseproc, setrunqueue,
 };
 use crate::kern::kern_smr::smr_idle;
+use crate::kern::kern_sysctl::{
+    hw_power, sysctl_int_bounded, sysctl_rdint, sysctl_rdstring, sysctl_string,
+};
 use crate::kern::kern_tc::nanouptime;
-use crate::kern::kern_timeout::timeout_add_sec;
+use crate::kern::kern_timeout::{timeout_add_msec, timeout_add_sec};
 use crate::kern::subr_prf::panic;
 use crate::kern::subr_prof::profclock_period;
 use crate::kern::subr_xxx::assertwaitok;
 use crate::machine::Machine;
-use crate::machine::cpu::{Cpu, cpu_info_foreach, curcpu, curproc, need_resched};
+use crate::machine::cpu::{Cpu, MAXCPUS, cpu_info_foreach, curcpu, curproc, need_resched};
 use crate::machine::intr::{IPL_NONE, IPL_SCHED};
 use crate::sys::clockintr::Clockrequest;
+use crate::sys::errno::Errno;
 use crate::sys::mutex::{Mutex, mutex_assert_locked, mutex_assert_unlocked};
 use crate::sys::param::{FSCALE, FSHIFT, MAXPRI, NZERO, PUSER};
 use crate::sys::proc::{P_INSCHED, PS_ITIMER, PS_PROFIL, Proc, SONPROC, SRUN, SSLEEP, SSTOP};
 use crate::sys::resource::Loadavg;
 use crate::sys::sched::{
-    NICE_WEIGHT, SCHED_PPQ, SPCF_ITIMER, SPCF_PROFCLOCK, SPCF_SEENRR, SPCF_SHOULDYIELD,
+    CP_IDLE, NICE_WEIGHT, SCHED_PPQ, SPCF_ITIMER, SPCF_PROFCLOCK, SPCF_SEENRR, SPCF_SHOULDYIELD,
     SPCF_SWITCHCLEAR, estcpulim,
 };
 use crate::sys::timeout::Timeout;
@@ -125,7 +132,7 @@ pub static SCHED_LOCK: Mutex = Mutex::new(IPL_NONE);
 
 /// `cpu_setperf`: the machine's CPU performance setter, `None` until a driver installs one
 /// (acpicpu(4)'s `acpicpu_setperf`, M16e). Written while cold by the attaching driver;
-/// `hw.setperf` and the perfpolicy timeout that call it are not ported (see above).
+/// `hw.setperf`, `hw.perfpolicy` and `setperf_auto` call it.
 pub static CPU_SETPERF: StaticCell<Option<fn(i32)>> = StaticCell::new(None);
 
 /// `cexp[3]`: constants for averages over 1, 5, and 15 minutes when sampling at 5 second
@@ -608,15 +615,230 @@ pub fn schedclock(p: &Proc) {
     sched_unlock();
 }
 
-// perflevel, perfpolicy_on_ac, perfpolicy_on_battery, setperf_auto, sysctl_hwsetperf,
-// sysctl_hwperfpolicy: CPU throttling (sysctl and hw_power, M7).
+/// `PERFPOL_MANUAL`: the level is what `hw.setperf` says.
+const PERFPOL_MANUAL: i32 = 0;
+/// `PERFPOL_AUTO`: `setperf_auto` follows the load.
+const PERFPOL_AUTO: i32 = 1;
+/// `PERFPOL_HIGH`: full speed.
+const PERFPOL_HIGH: i32 = 2;
+
+/// `perflevel`: the CPU performance level in use, 0 to 100.
+pub static PERFLEVEL: AtomicI32 = AtomicI32::new(100);
+/// `perfpolicy_on_ac`.
+pub static PERFPOLICY_ON_AC: AtomicI32 = AtomicI32::new(PERFPOL_HIGH);
+/// `perfpolicy_on_battery`.
+pub static PERFPOLICY_ON_BATTERY: AtomicI32 = AtomicI32::new(PERFPOL_AUTO);
+/// `setperf_to`: `setperf_auto`'s timeout. The code below handles CPU throttling.
+static SETPERF_TO: Timeout = Timeout::new(setperf_auto, ptr::null_mut());
+/// `setperf_auto`'s `idleticks[]`: each CPU's idle ticks at the last look (see the module's
+/// deviations).
+static SETPERF_IDLETICKS: [AtomicU64; MAXCPUS as usize] =
+    [const { AtomicU64::new(0) }; MAXCPUS as usize];
+/// `setperf_auto`'s `totalticks[]`.
+static SETPERF_TOTALTICKS: [AtomicU64; MAXCPUS as usize] =
+    [const { AtomicU64::new(0) }; MAXCPUS as usize];
+/// `setperf_auto`'s `downbeats`: how many quiet looks before the level drops.
+static SETPERF_DOWNBEATS: AtomicI32 = AtomicI32::new(0);
+
+/// `cpu_setperf`, if a driver installed one.
+fn cpu_setperf() -> Option<fn(i32)> {
+    // SAFETY: written once, while cold, by the attaching driver.
+    unsafe { CPU_SETPERF.read() }
+}
+
+/// `perfpolicy_dynamic`: whether either policy lets the level follow the load.
+fn perfpolicy_dynamic() -> bool {
+    PERFPOLICY_ON_AC.load(Ordering::Relaxed) == PERFPOL_AUTO
+        || PERFPOLICY_ON_BATTERY.load(Ordering::Relaxed) == PERFPOL_AUTO
+}
+
+/// `current_perfpolicy`: the policy of the power source in use.
+fn current_perfpolicy() -> i32 {
+    if hw_power.load(Ordering::Relaxed) != 0 {
+        PERFPOLICY_ON_AC.load(Ordering::Relaxed)
+    } else {
+        PERFPOLICY_ON_BATTERY.load(Ordering::Relaxed)
+    }
+}
+
+/// `setperf_auto`: every 100 ms under an automatic policy, full speed when a CPU was idle
+/// for less than a third of the time, or all of them for less than half, since the last
+/// look; the lowest level after five quiet looks.
+pub fn setperf_auto(_v: *mut c_void) {
+    if !perfpolicy_dynamic() {
+        return;
+    }
+
+    let Some(setperf) = cpu_setperf() else {
+        return;
+    };
+
+    let high = current_perfpolicy() == PERFPOL_HIGH;
+    let mut speedup = high;
+    if !high {
+        let mut j = 0;
+        let (mut allidle, mut alltotal) = (0u64, 0u64);
+        cpu_info_foreach(&mut |ci| {
+            if !cpu_is_online(ci) || j >= MAXCPUS as usize {
+                return;
+            }
+
+            let spc = Machine::ci_schedstate(ci);
+            let (mut total, mut idle);
+            let mut generation = 0;
+            pc_cons_enter(&spc.spc_cp_time_lock, &mut generation);
+            loop {
+                total = 0u64;
+                for c in &spc.spc_cp_time {
+                    total = total.wrapping_add(c.load(Ordering::Relaxed));
+                }
+                idle = spc.spc_cp_time[CP_IDLE].load(Ordering::Relaxed);
+                if !pc_cons_leave(&spc.spc_cp_time_lock, &mut generation) {
+                    break;
+                }
+            }
+
+            total = total.wrapping_sub(SETPERF_TOTALTICKS[j].load(Ordering::Relaxed));
+            idle = idle.wrapping_sub(SETPERF_IDLETICKS[j].load(Ordering::Relaxed));
+            if idle < total / 3 {
+                speedup = true;
+            }
+            alltotal = alltotal.wrapping_add(total);
+            allidle = allidle.wrapping_add(idle);
+            SETPERF_IDLETICKS[j].fetch_add(idle, Ordering::Relaxed);
+            SETPERF_TOTALTICKS[j].fetch_add(total, Ordering::Relaxed);
+            j += 1;
+        });
+        if allidle < alltotal / 2 {
+            speedup = true;
+        }
+        if speedup && SETPERF_DOWNBEATS.load(Ordering::Relaxed) < 5 {
+            SETPERF_DOWNBEATS.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    let perflevel = PERFLEVEL.load(Ordering::Relaxed);
+    if high || (speedup && perflevel != 100) {
+        // faster:
+        PERFLEVEL.store(100, Ordering::Relaxed);
+        setperf(100);
+    } else if !speedup
+        && perflevel != 0
+        && SETPERF_DOWNBEATS.fetch_sub(1, Ordering::Relaxed) - 1 <= 0
+    {
+        PERFLEVEL.store(0, Ordering::Relaxed);
+        setperf(0);
+    }
+
+    timeout_add_msec(&SETPERF_TO, 100);
+}
+
+/// `sysctl_hwsetperf`: `hw.setperf`, the performance level; it can be set under the manual
+/// policy only.
+pub fn sysctl_hwsetperf(
+    oldp: usize,
+    oldlenp: &mut usize,
+    newp: usize,
+    newlen: usize,
+) -> Result<(), Errno> {
+    let Some(setperf) = cpu_setperf() else {
+        return Err(Errno::EOPNOTSUPP);
+    };
+
+    if PERFPOLICY_ON_AC.load(Ordering::Relaxed) != PERFPOL_MANUAL {
+        return sysctl_rdint(oldp, oldlenp, newp, PERFLEVEL.load(Ordering::Relaxed));
+    }
+
+    sysctl_int_bounded(oldp, oldlenp, newp, newlen, &PERFLEVEL, 0, 100)?;
+
+    if newp != 0 {
+        setperf(PERFLEVEL.load(Ordering::Relaxed));
+    }
+
+    Ok(())
+}
+
+/// `sysctl_hwperfpolicy`: `hw.perfpolicy`: "manual", "auto" or "high", or two of them
+/// separated by a comma for wall power and battery ("high,auto"; "manual" on neither side
+/// of a pair).
+pub fn sysctl_hwperfpolicy(
+    oldp: usize,
+    oldlenp: &mut usize,
+    newp: usize,
+    newlen: usize,
+) -> Result<(), Errno> {
+    let Some(setperf) = cpu_setperf() else {
+        return Err(Errno::EOPNOTSUPP);
+    };
+
+    let name: &[u8] = match current_perfpolicy() {
+        PERFPOL_MANUAL => b"manual",
+        PERFPOL_AUTO => b"auto",
+        PERFPOL_HIGH => b"high",
+        _ => b"unknown",
+    };
+    let mut policy = [0u8; 32];
+    policy[..name.len()].copy_from_slice(name);
+
+    if newp == 0 {
+        return sysctl_rdstring(oldp, oldlenp, newp, name);
+    }
+
+    sysctl_string(oldp, oldlenp, newp, newlen, &mut policy)?;
+
+    let len = policy.iter().position(|b| *b == 0).unwrap_or(policy.len());
+    let policy = &policy[..len];
+    let (policy, policy_on_battery) = match policy.iter().position(|b| *b == b',') {
+        Some(comma) => (&policy[..comma], Some(&policy[comma + 1..])),
+        None => (policy, None),
+    };
+
+    let perfpolicy = match policy {
+        b"manual" => PERFPOL_MANUAL,
+        b"auto" => PERFPOL_AUTO,
+        b"high" => PERFPOL_HIGH,
+        _ => return Err(Errno::EINVAL),
+    };
+
+    match policy_on_battery {
+        None => {
+            PERFPOLICY_ON_BATTERY.store(perfpolicy, Ordering::Relaxed);
+            PERFPOLICY_ON_AC.store(perfpolicy, Ordering::Relaxed);
+        }
+        Some(on_battery) => {
+            if on_battery == b"manual" || perfpolicy == PERFPOL_MANUAL {
+                // Not handled
+                return Err(Errno::EINVAL);
+            }
+            match on_battery {
+                b"auto" => PERFPOLICY_ON_BATTERY.store(PERFPOL_AUTO, Ordering::Relaxed),
+                b"high" => PERFPOLICY_ON_BATTERY.store(PERFPOL_HIGH, Ordering::Relaxed),
+                _ => return Err(Errno::EINVAL),
+            }
+            PERFPOLICY_ON_AC.store(perfpolicy, Ordering::Relaxed);
+        }
+    }
+
+    if current_perfpolicy() == PERFPOL_HIGH {
+        PERFLEVEL.store(100, Ordering::Relaxed);
+        setperf(100);
+    }
+
+    if perfpolicy_dynamic() {
+        timeout_add_msec(&SETPERF_TO, 200);
+    }
+
+    Ok(())
+}
 
 /// `scheduler_start`: start the scheduler's periodic timeouts.
 pub fn scheduler_start() {
     schedcpu(ptr::null_mut());
     update_loadavg(ptr::null_mut());
 
-    // perfpolicy_dynamic() -> timeout_add_msec(&setperf_to, 200): CPU throttling (M7).
+    if perfpolicy_dynamic() {
+        timeout_add_msec(&SETPERF_TO, 200);
+    }
 }
 /* </CODE> */
 
@@ -650,6 +872,163 @@ mod tests {
         assert_eq!(decay_aftersleep(200, 5 * loadfactor(FSCALE) + 1), 0);
         assert!(decay_aftersleep(200, 3) < 200);
         AVERUNNABLE.ldavg[0].store(0, Ordering::Relaxed);
+    }
+
+    use std::vec::Vec;
+
+    std::thread_local! {
+        /// The levels the fake `cpu_setperf` was called with.
+        static LEVELS: core::cell::RefCell<Vec<i32>> = const { core::cell::RefCell::new(Vec::new()) };
+    }
+
+    fn fake_setperf(level: i32) {
+        LEVELS.with(|l| l.borrow_mut().push(level));
+    }
+
+    fn levels() -> Vec<i32> {
+        LEVELS.with(|l| core::mem::take(&mut *l.borrow_mut()))
+    }
+
+    /// `sysctl -w hw.perfpolicy=<policy>`.
+    fn set_policy(policy: &[u8]) -> Result<(), Errno> {
+        let mut len = 0usize;
+        sysctl_hwperfpolicy(0, &mut len, policy.as_ptr() as usize, policy.len())
+    }
+
+    fn policies() -> (i32, i32) {
+        (
+            PERFPOLICY_ON_AC.load(Ordering::Relaxed),
+            PERFPOLICY_ON_BATTERY.load(Ordering::Relaxed),
+        )
+    }
+
+    /// One test, because the throttling is a set of globals.
+    #[test]
+    fn throttling_follows_the_policy_knobs() {
+        use crate::kern::kern_timeout::{timeout_del, timeout_startup};
+        use crate::sys::timeout::timeout_pending;
+
+        let _t = crate::kern::kern_timeout::tests::LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        timeout_startup();
+        let mut len = 0usize;
+        let fifty = 50i32;
+        let fifty_p = ptr::from_ref(&fifty) as usize;
+
+        // No driver gave a cpu_setperf: neither knob exists and the timeout does nothing.
+        // SAFETY: the test's own hook, under the lock above; put back at the end.
+        unsafe { CPU_SETPERF.write(None) };
+        assert_eq!(sysctl_hwsetperf(0, &mut len, 0, 0), Err(Errno::EOPNOTSUPP));
+        assert_eq!(set_policy(b"high"), Err(Errno::EOPNOTSUPP));
+        setperf_auto(ptr::null_mut());
+        assert!(!timeout_pending(&SETPERF_TO));
+
+        // SAFETY: as above.
+        unsafe { CPU_SETPERF.write(Some(fake_setperf)) };
+        hw_power.store(1, Ordering::Relaxed);
+        PERFPOLICY_ON_AC.store(PERFPOL_HIGH, Ordering::Relaxed);
+        PERFPOLICY_ON_BATTERY.store(PERFPOL_AUTO, Ordering::Relaxed);
+        PERFLEVEL.store(100, Ordering::Relaxed);
+        SETPERF_DOWNBEATS.store(0, Ordering::Relaxed);
+
+        // The policy of the power source in use is what is read.
+        let mut out = [0xffu8; 8];
+        let mut len = out.len();
+        assert_eq!(
+            sysctl_hwperfpolicy(out.as_mut_ptr() as usize, &mut len, 0, 0),
+            Ok(())
+        );
+        assert_eq!((len, &out[..5]), (5, &b"high\0"[..]));
+        hw_power.store(0, Ordering::Relaxed);
+        let mut len = out.len();
+        assert_eq!(
+            sysctl_hwperfpolicy(out.as_mut_ptr() as usize, &mut len, 0, 0),
+            Ok(())
+        );
+        assert_eq!((len, &out[..5]), (5, &b"auto\0"[..]));
+        hw_power.store(1, Ordering::Relaxed);
+
+        // hw.setperf is read-only unless the policy is manual.
+        assert_eq!(sysctl_hwsetperf(0, &mut len, fifty_p, 4), Err(Errno::EPERM));
+        assert_eq!(set_policy(b"manual"), Ok(()));
+        assert_eq!(policies(), (PERFPOL_MANUAL, PERFPOL_MANUAL));
+        assert!(levels().is_empty());
+        assert!(!timeout_pending(&SETPERF_TO));
+        assert_eq!(sysctl_hwsetperf(0, &mut len, fifty_p, 4), Ok(()));
+        assert_eq!(PERFLEVEL.load(Ordering::Relaxed), 50);
+        assert_eq!(levels(), [50]);
+        let over = 101i32;
+        assert_eq!(
+            sysctl_hwsetperf(0, &mut len, ptr::from_ref(&over) as usize, 4),
+            Err(Errno::EINVAL)
+        );
+        assert_eq!(PERFLEVEL.load(Ordering::Relaxed), 50);
+        // A read calls nothing.
+        let mut level = 0i32;
+        let mut len = 4usize;
+        assert_eq!(
+            sysctl_hwsetperf(ptr::from_mut(&mut level) as usize, &mut len, 0, 0),
+            Ok(())
+        );
+        assert_eq!(level, 50);
+        assert!(levels().is_empty());
+
+        // What the policy cannot be: an unknown word, or "manual" on either side of a pair.
+        for bad in [
+            &b"bogus"[..],
+            b"manual,auto",
+            b"high,manual",
+            b"high,bogus",
+            b"",
+        ] {
+            assert_eq!(set_policy(bad), Err(Errno::EINVAL), "{bad:?}");
+        }
+        assert_eq!(policies(), (PERFPOL_MANUAL, PERFPOL_MANUAL));
+        assert!(levels().is_empty());
+
+        // "auto": setperf_auto runs every 100 ms and picks one end or the other. From a
+        // level in between, a busy look goes up and a quiet one, with no beats left, down.
+        assert_eq!(set_policy(b"auto"), Ok(()));
+        assert_eq!(policies(), (PERFPOL_AUTO, PERFPOL_AUTO));
+        assert!(levels().is_empty());
+        assert!(timeout_pending(&SETPERF_TO));
+        timeout_del(&SETPERF_TO);
+        setperf_auto(ptr::null_mut());
+        let level = PERFLEVEL.load(Ordering::Relaxed);
+        assert!(level == 0 || level == 100, "{level}");
+        assert_eq!(levels(), [level]);
+        assert!(timeout_pending(&SETPERF_TO));
+
+        // A pair: wall power first. Full speed is set at once.
+        PERFLEVEL.store(0, Ordering::Relaxed);
+        assert_eq!(set_policy(b"high,auto"), Ok(()));
+        assert_eq!(policies(), (PERFPOL_HIGH, PERFPOL_AUTO));
+        assert_eq!(PERFLEVEL.load(Ordering::Relaxed), 100);
+        assert_eq!(levels(), [100]);
+        // The battery's policy is automatic, so the timeout still runs, and on wall power
+        // it sets full speed without looking at the load.
+        timeout_del(&SETPERF_TO);
+        setperf_auto(ptr::null_mut());
+        assert_eq!(levels(), [100]);
+        assert!(timeout_pending(&SETPERF_TO));
+
+        // "high" on both: nothing left to follow, the timeout does not re-arm.
+        assert_eq!(set_policy(b"high"), Ok(()));
+        assert_eq!(policies(), (PERFPOL_HIGH, PERFPOL_HIGH));
+        assert_eq!(levels(), [100]);
+        timeout_del(&SETPERF_TO);
+        setperf_auto(ptr::null_mut());
+        assert!(levels().is_empty());
+        assert!(!timeout_pending(&SETPERF_TO));
+
+        // As at boot.
+        // SAFETY: as above.
+        unsafe { CPU_SETPERF.write(None) };
+        PERFPOLICY_ON_AC.store(PERFPOL_HIGH, Ordering::Relaxed);
+        PERFPOLICY_ON_BATTERY.store(PERFPOL_AUTO, Ordering::Relaxed);
+        PERFLEVEL.store(100, Ordering::Relaxed);
+        SETPERF_DOWNBEATS.store(0, Ordering::Relaxed);
     }
 }
 /* </TESTS> */

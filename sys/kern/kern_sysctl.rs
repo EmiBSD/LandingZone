@@ -85,9 +85,9 @@
 //!   atomic's; a C local passed by address is an `AtomicI32` read back with `into_inner`.
 //! - Every node whose subsystem is not ported reports itself with `unported!` and fails with
 //!   `ENOSYS`: `proc_vmmap` after its checks
-//!   (`fill_vmmap`); `hw.model` (`cpu_model`, `identcpu.c`/arm64 `cpu.c`),
-//!   `setperf`/`perfpolicy` (`sched_bsd.c`). The top-level `machdep` tree is the machine's
-//!   `cpu_sysctl` (`machine::cpu::cpu_sysctl`). `kern.proc_cwd` of a process
+//!   (`fill_vmmap`); `hw.model` (`cpu_model`, `identcpu.c`/arm64 `cpu.c`). The top-level
+//!   `machdep` tree is the machine's `cpu_sysctl` (`machine::cpu::cpu_sysctl`).
+//!   `kern.proc_cwd` of a process
 //!   without a current directory (none has one before a root file system is mounted) is
 //!   `ENOENT`.
 //! - Options this kernel does not configure are compiled out as in C: `DEBUG_SYSCTL`
@@ -1027,10 +1027,8 @@ fn hw_sysctl_locked(
             cpu_cpuspeed(&mut cpuspeed)?;
             sysctl_rdint(oldp, oldlenp, newp, cpuspeed)
         }
-        HW_SETPERF => Err(unported!("hw.setperf: sysctl_hwsetperf (sched_bsd.c)")),
-        HW_PERFPOLICY => Err(unported!(
-            "hw.perfpolicy: sysctl_hwperfpolicy (sched_bsd.c)"
-        )),
+        HW_SETPERF => sched_bsd::sysctl_hwsetperf(oldp, oldlenp, newp, newlen),
+        HW_PERFPOLICY => sched_bsd::sysctl_hwperfpolicy(oldp, oldlenp, newp, newlen),
         HW_ALLOWPOWERDOWN => sysctl_securelevel_int(oldp, oldlenp, newp, newlen, &ALLOWPOWERDOWN),
         HW_UCOMNAMES => {
             let names = sysctl_ucominit();

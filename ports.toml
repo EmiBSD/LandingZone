@@ -2163,11 +2163,11 @@ notes = "M5-a: stathz/profhz/profprocs/ticks/jiffies and the period globals, ini
 [[file]]
 c = "sys/kern/sched_bsd.c"
 rust = "sys/kern/sched_bsd.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "ddd1132e7faaadf84e11b45c125398f48acf6479"
 deps = ["sys/sys/sched.h", "sys/kern/kern_clockintr.c"]
-notes = "M5-a: roundrobin_period, sched_lock with SCHED_LOCK_INIT, roundrobin; the load average, schedcpu, decay_aftersleep, yield, mi_switch, setrunnable, schedclock and the rest arrive with struct proc (M5-b); M5-b2: SCHED_LOCK/UNLOCK/ASSERT_*, cexp/averunnable/update_loadavg (atomics), ccpu/schedcpu, decay_aftersleep, yield (r#yield), preempt, mi_switch (smr_idle and the kernel lock not here), setrunnable, setpriority, schedclock, scheduler_start; the CPU throttling (cpu_setperf, perflevel, setperf_auto, sysctl_hw*) is M7; M11a: mi_switch calls smr_idle and, with MULTIPROCESSOR, drops every kernel lock hold around cpu_switchto (__mp_release_all/__mp_acquire_count); M16e: cpu_setperf (a StaticCell, installed by acpicpu; its callers hw.setperf and perfpolicy are not ported)"
+notes = "M5-a: roundrobin_period, sched_lock with SCHED_LOCK_INIT, roundrobin; the load average, schedcpu, decay_aftersleep, yield, mi_switch, setrunnable, schedclock and the rest arrive with struct proc (M5-b); M5-b2: SCHED_LOCK/UNLOCK/ASSERT_*, cexp/averunnable/update_loadavg (atomics), ccpu/schedcpu, decay_aftersleep, yield (r#yield), preempt, mi_switch (smr_idle and the kernel lock not here), setrunnable, setpriority, schedclock, scheduler_start; the CPU throttling (cpu_setperf, perflevel, setperf_auto, sysctl_hw*) is M7; M11a: mi_switch calls smr_idle and, with MULTIPROCESSOR, drops every kernel lock hold around cpu_switchto (__mp_release_all/__mp_acquire_count); M16e: cpu_setperf (a StaticCell, installed by acpicpu; its callers hw.setperf and perfpolicy are not ported); TD1: the CPU throttling: perflevel, perfpolicy_on_ac/on_battery, perfpolicy_dynamic, current_perfpolicy, setperf_auto (its per-CPU tick counts in static arrays of MAXCPUS, where the C mallocs them), sysctl_hwsetperf, sysctl_hwperfpolicy, and scheduler_start arms the timeout; hw.setperf and hw.perfpolicy are no longer reported; every function of the C file has its port (read again whole)"
 
 [[file]]
 c = "sys/kern/kern_sched.c"
