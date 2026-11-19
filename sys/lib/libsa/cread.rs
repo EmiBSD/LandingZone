@@ -213,7 +213,8 @@ fn get_byte(s: &mut Sd) -> i32 {
 }
 
 /// `getLong(s)`: a 32-bit little-endian number from the input.
-fn get_long(s: &mut Sd) -> u32 {
+#[allow(non_snake_case)] // the C name
+fn getLong(s: &mut Sd) -> u32 {
     let mut x = get_byte(s) as u32;
     x = x.wrapping_add((get_byte(s) as u32) << 8);
     x = x.wrapping_add((get_byte(s) as u32) << 16);
@@ -415,10 +416,10 @@ pub fn read(fd: usize, buf: &mut [u8]) -> Result<usize, Errno> {
             s.crc = crc32(s.crc, &buf[start..out]);
             start = out;
 
-            if get_long(s) != s.crc {
+            if getLong(s) != s.crc {
                 s.z_err = Z_DATA_ERROR;
             } else {
-                let _ = get_long(s);
+                let _ = getLong(s);
 
                 // The uncompressed length returned by above getlong() may be different from
                 // s->stream.total_out in case of concatenated .gz files. Check for such files:
