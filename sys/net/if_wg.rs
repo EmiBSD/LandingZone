@@ -134,6 +134,7 @@ use crate::kern::kern_prot::suser;
 use crate::kern::kern_rwlock::{
     rw_assert_wrlock, rw_enter_read, rw_enter_write, rw_exit_read, rw_exit_write, rw_init,
 };
+use crate::kern::kern_smr::{smr_read_enter, smr_read_leave};
 use crate::kern::kern_subr::{hashfree, hashinit};
 use crate::kern::kern_synch::{NOWAKE, tsleep_nsec};
 use crate::kern::kern_task::{task_add, task_set, taskq_barrier, taskq_create, taskq_destroy};
@@ -1466,8 +1467,9 @@ pub fn wg_aip_add(sc: &WgSoftc, peer: &'static WgPeer, d: &WgAipIo) -> Result<()
 
 /// `wg_aip_lookup`: the peer whose allowed IPs best match `addr`.
 pub fn wg_aip_lookup(root: &Art, addr: &[u8]) -> Option<&'static WgPeer> {
-    // smr_read_enter()/smr_read_leave(): SMR is not ported (`net/art.rs`).
+    smr_read_enter();
     let node = art_match(root, addr);
+    smr_read_leave();
 
     node.and_then(|node| WgAip::of_node(node).a_peer.get())
 }
@@ -1481,13 +1483,13 @@ pub fn wg_aip_remove(sc: &WgSoftc, peer: &WgPeer, d: &WgAipIo) -> Result<(), Err
         AF_INET6 => sc.aip6(),
         _ => return Err(Errno::EAFNOSUPPORT),
     };
-    if d.a_cidr < 0 || d.a_cidr as u32 > root.art_alen.get() {
-        return Err(Errno::ENOENT);
-    }
+    // `d` is an allowed IP `wg_aip_add` stored, so its prefix length was checked there.
     let plen = d.a_cidr as u32;
 
     rw_enter_write(&sc.sc_aip_lock);
+    smr_read_enter();
     let node = art_lookup(root, &d.a_addr.addr_bytes, plen);
+    smr_read_leave();
     let ret = match node {
         None => Err(Errno::ENOENT),
         Some(node)
