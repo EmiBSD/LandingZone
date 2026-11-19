@@ -9442,7 +9442,7 @@ rust = "sys/lib/libsa/ufs2.rs"
 status = "wip"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "f36d2d155d2070500bd92c8f6fcd2c1097f3e745"
-notes = "M14 A1, libsa as efiboot builds it (__INTERNAL_LIBSA_CREAD): the Ufs2Dinode instance of ufs.rs's reader; tested on a makefs FFS2 image (its super-block copied to SBLOCK_UFS2: makefs writes it at SBLOCK_UFS1); TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 7 C function(s) not in its Rust file: read_inode, chmod_inode, block_map, buf_read_file, search_directory, ufs2_close_internal, ffs_oldfscompat"
+notes = "M14 A1, libsa as efiboot builds it (__INTERNAL_LIBSA_CREAD): the Ufs2Dinode instance of ufs.rs's reader; tested on a makefs FFS2 image (its super-block copied to SBLOCK_UFS2: makefs writes it at SBLOCK_UFS1); TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 7 C function(s) not in its Rust file: read_inode, chmod_inode, block_map, buf_read_file, search_directory, ufs2_close_internal, ffs_oldfscompat 2026-11-19 (the user's decision): read_inode, chmod_inode, block_map, buf_read_file and search_directory are here by name, in impl Dinode for Ufs2Dinode, which the reader calls for FFS2; each calls ufs.rs's body (the C copies differ only in types)."
 
 [[file]]
 c = "sys/lib/libsa/ufs2.h"

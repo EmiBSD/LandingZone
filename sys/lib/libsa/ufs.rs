@@ -177,6 +177,17 @@ pub trait Dinode: Copy + Default + Send + 'static {
     fn fsbtodb(fs: &Fs, b: Daddr) -> Daddr;
     /// Entry `i` of an indirect block.
     fn indirect(buf: &[u8], i: usize) -> Daddr;
+    /// This flavour's `read_inode` (`ufs.c`'s or `ufs2.c`'s static function).
+    fn read_inode(inumber: Ufsino, io: DevIo, fp: &mut UfsFile<Self>) -> Result<(), Errno>;
+    /// This flavour's `chmod_inode`.
+    fn chmod_inode(inumber: Ufsino, io: DevIo, fp: &UfsFile<Self>, mode: Mode)
+    -> Result<(), Errno>;
+    /// This flavour's `block_map`.
+    fn block_map(io: DevIo, fp: &mut UfsFile<Self>, file_block: Daddr) -> Result<Daddr, Errno>;
+    /// This flavour's `buf_read_file`.
+    fn buf_read_file(io: DevIo, fp: &mut UfsFile<Self>) -> Result<(usize, usize), Errno>;
+    /// This flavour's `search_directory`.
+    fn search_directory(name: &[u8], io: DevIo, fp: &mut UfsFile<Self>) -> Result<Ufsino, Errno>;
 }
 
 impl Dinode for Ufs1Dinode {
@@ -229,6 +240,36 @@ impl Dinode for Ufs1Dinode {
         let b = &buf[4 * i..4 * i + 4];
         Daddr::from(i32::from_ne_bytes([b[0], b[1], b[2], b[3]]))
     }
+
+    /// `ufs.c`'s `read_inode`: [`Ufs::read_inode`] for this inode.
+    fn read_inode(inumber: Ufsino, io: DevIo, fp: &mut UfsFile<Self>) -> Result<(), Errno> {
+        Ufs::<Self>::read_inode(inumber, io, fp)
+    }
+
+    /// `ufs.c`'s `chmod_inode`: [`Ufs::chmod_inode`] for this inode.
+    fn chmod_inode(
+        inumber: Ufsino,
+        io: DevIo,
+        fp: &UfsFile<Self>,
+        mode: Mode,
+    ) -> Result<(), Errno> {
+        Ufs::<Self>::chmod_inode(inumber, io, fp, mode)
+    }
+
+    /// `ufs.c`'s `block_map`: [`Ufs::block_map`] for this inode.
+    fn block_map(io: DevIo, fp: &mut UfsFile<Self>, file_block: Daddr) -> Result<Daddr, Errno> {
+        Ufs::<Self>::block_map(io, fp, file_block)
+    }
+
+    /// `ufs.c`'s `buf_read_file`: [`Ufs::buf_read_file`] for this inode.
+    fn buf_read_file(io: DevIo, fp: &mut UfsFile<Self>) -> Result<(usize, usize), Errno> {
+        Ufs::<Self>::buf_read_file(io, fp)
+    }
+
+    /// `ufs.c`'s `search_directory`: [`Ufs::search_directory`] for this inode.
+    fn search_directory(name: &[u8], io: DevIo, fp: &mut UfsFile<Self>) -> Result<Ufsino, Errno> {
+        Ufs::<Self>::search_directory(name, io, fp)
+    }
 }
 
 /// `struct file`: the in-core open file.
@@ -262,7 +303,7 @@ pub struct Ufs<D: Dinode>(PhantomData<D>);
 
 impl<D: Dinode> Ufs<D> {
     /// `read_inode(inumber, f)`: read a new inode into a file structure.
-    fn read_inode(inumber: Ufsino, io: DevIo, fp: &mut UfsFile<D>) -> Result<(), Errno> {
+    pub(crate) fn read_inode(inumber: Ufsino, io: DevIo, fp: &mut UfsFile<D>) -> Result<(), Errno> {
         let fs = &*fp.f_fs;
         let bsize = fs.fs_bsize as usize;
         let mut buf = vec![0u8; bsize];
@@ -288,7 +329,12 @@ impl<D: Dinode> Ufs<D> {
     }
 
     /// `chmod_inode(inumber, f, mode)`: set an inode's mode on the disk.
-    fn chmod_inode(inumber: Ufsino, io: DevIo, fp: &UfsFile<D>, mode: Mode) -> Result<(), Errno> {
+    pub(crate) fn chmod_inode(
+        inumber: Ufsino,
+        io: DevIo,
+        fp: &UfsFile<D>,
+        mode: Mode,
+    ) -> Result<(), Errno> {
         let fs = &*fp.f_fs;
         let bsize = fs.fs_bsize as usize;
         let mut buf = vec![0u8; bsize];
@@ -309,7 +355,11 @@ impl<D: Dinode> Ufs<D> {
 
     /// `block_map(f, file_block, &disk_block)`: the disk block that holds logical block
     /// `file_block` of the file (0 for a hole).
-    fn block_map(io: DevIo, fp: &mut UfsFile<D>, file_block: Daddr) -> Result<Daddr, Errno> {
+    pub(crate) fn block_map(
+        io: DevIo,
+        fp: &mut UfsFile<D>,
+        file_block: Daddr,
+    ) -> Result<Daddr, Errno> {
         // di_db[0..NDADDR-1] map blocks 0..NDADDR-1 directly; di_ib[0] is the single
         // indirect block (NINDIR blocks), di_ib[1] the double indirect block (NINDIR**2),
         // di_ib[2] the triple indirect block (NINDIR**3).
@@ -379,13 +429,13 @@ impl<D: Dinode> Ufs<D> {
     /// `buf_read_file(f, &buf, &size)`: read the block at the seek pointer into the data
     /// buffer; the offset of the seek pointer in it and the bytes that follow, up to the end
     /// of the file.
-    fn buf_read_file(io: DevIo, fp: &mut UfsFile<D>) -> Result<(usize, usize), Errno> {
+    pub(crate) fn buf_read_file(io: DevIo, fp: &mut UfsFile<D>) -> Result<(usize, usize), Errno> {
         let off = blkoff(&fp.f_fs, fp.f_seekp) as usize;
         let file_block = lblkno(&fp.f_fs, fp.f_seekp);
         let block_size = dblksize(&fp.f_fs, fp.f_di.size(), file_block as u64) as usize;
 
         if file_block != fp.f_buf_blkno {
-            let disk_block = Self::block_map(io, fp, file_block)?;
+            let disk_block = D::block_map(io, fp, file_block)?;
             let bsize = fp.f_fs.fs_bsize as usize;
             let blk = D::fsbtodb(&fp.f_fs, disk_block);
             let buf = fp.f_buf.get_or_insert_with(|| vec![0u8; bsize]);
@@ -424,10 +474,14 @@ impl<D: Dinode> Ufs<D> {
 
     /// `search_directory(name, f, &inumber)`: the inode of `name` in the directory open in
     /// `fp`.
-    fn search_directory(name: &[u8], io: DevIo, fp: &mut UfsFile<D>) -> Result<Ufsino, Errno> {
+    pub(crate) fn search_directory(
+        name: &[u8],
+        io: DevIo,
+        fp: &mut UfsFile<D>,
+    ) -> Result<Ufsino, Errno> {
         fp.f_seekp = 0;
         while (fp.f_seekp as u64) < fp.f_di.size() {
-            let (off, size) = Self::buf_read_file(io, fp)?;
+            let (off, size) = D::buf_read_file(io, fp)?;
             let buf = fp.f_buf.as_deref().ok_or(Errno::EIO)?;
             let block = &buf[off..off + size];
             let mut pos = 0;
@@ -498,7 +552,7 @@ impl<D: Dinode> Ufs<D> {
         });
 
         let mut inumber = ROOTINO;
-        Self::read_inode(inumber, io, &mut fp)?;
+        D::read_inode(inumber, io, &mut fp)?;
 
         // The path, NUL-terminated, in the buffer symbolic links are spliced into.
         let plen = path.iter().position(|&c| c == 0).unwrap_or(path.len());
@@ -537,10 +591,10 @@ impl<D: Dinode> Ufs<D> {
             // find a symbolic link.
             let parent_inumber = inumber;
             let component = namebuf[ncp..cp].to_vec();
-            inumber = Self::search_directory(&component, io, &mut fp)?;
+            inumber = D::search_directory(&component, io, &mut fp)?;
 
             // Open next component.
-            Self::read_inode(inumber, io, &mut fp)?;
+            D::read_inode(inumber, io, &mut fp)?;
 
             // Check for symbolic link.
             if (fp.f_di.mode() & IFMT) == IFLNK {
@@ -560,7 +614,7 @@ impl<D: Dinode> Ufs<D> {
                     namebuf[..link_len].copy_from_slice(&short[..link_len]);
                 } else {
                     // Read file for symbolic link
-                    let disk_block = Self::block_map(io, &mut fp, 0)?;
+                    let disk_block = D::block_map(io, &mut fp, 0)?;
                     let bsize = fp.f_fs.fs_bsize as usize;
                     let mut buf = vec![0u8; bsize];
                     let mut rsize = 0;
@@ -584,7 +638,7 @@ impl<D: Dinode> Ufs<D> {
                 } else {
                     ROOTINO
                 };
-                Self::read_inode(inumber, io, &mut fp)?;
+                D::read_inode(inumber, io, &mut fp)?;
             }
         }
 
@@ -611,7 +665,7 @@ impl<D: Dinode> Ufs<D> {
             if fp.f_seekp as u64 >= fp.f_di.size() {
                 break;
             }
-            let (off, buf_size) = match Self::buf_read_file(io, fp) {
+            let (off, buf_size) = match D::buf_read_file(io, fp) {
                 Ok(r) => r,
                 Err(e) => {
                     rc = Err(e);
@@ -662,7 +716,7 @@ impl<D: Dinode> Ufs<D> {
     pub fn fchmod(f: &mut OpenFile, mode: Mode) -> Result<(), Errno> {
         let io = f.io();
         let fp = f.fsdata::<UfsFile<D>>().ok_or(Errno::EBADF)?;
-        Self::chmod_inode(fp.f_ino, io, fp, mode)
+        D::chmod_inode(fp.f_ino, io, fp, mode)
     }
 
     /// `ufs_readdir(f, name)`: the next name in the directory (NUL-terminated), the end being
@@ -684,7 +738,7 @@ impl<D: Dinode> Ufs<D> {
                 return Err(Errno(-1));
             }
 
-            let (off, buf_size) = Self::buf_read_file(io, fp)?;
+            let (off, buf_size) = D::buf_read_file(io, fp)?;
             let buf = fp.f_buf.as_deref().ok_or(Errno::EIO)?;
             let block = &buf[off..off + buf_size];
             let mut pos = 0;

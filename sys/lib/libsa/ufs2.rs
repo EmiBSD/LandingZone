@@ -118,6 +118,13 @@
 //! super-block at `SBLOCK_UFS2` and `FS_UFS2_MAGIC`; here it is `ufs.rs`'s reader
 //! ([`Ufs`]) instantiated for [`Ufs2Dinode`], with the `ufs2_*` entry points.
 //!
+//! `ufs2.c`'s static functions `read_inode`, `chmod_inode`, `block_map`, `buf_read_file`
+//! and `search_directory` are here by name, in `impl Dinode for Ufs2Dinode`, and the reader
+//! calls them for an FFS2 file system. Each calls `ufs.rs`'s body, since the C's two copies
+//! differ only in types: `daddr_t` for `daddr32_t`, `struct ufs2_dinode` for `struct
+//! ufs1_dinode`, and no `(daddr32_t)` cast of `ino_to_fsba` (the user's decision of
+//! 2026-11-19: each C function by its name in its own file).
+//!
 //! ## Deviations
 //! - As `ufs.rs`'s.
 
@@ -125,10 +132,10 @@ use crate::hdr::dinode::{NDADDR, NIADDR, Ufs2Dinode};
 use crate::hdr::fs::{FS_UFS2_MAGIC, Fs, SBLOCK_UFS2};
 use crate::hdr::param::DEV_BSIZE;
 use crate::hdr::stat::Stat;
-use crate::hdr::types::{Daddr, Mode, Off};
+use crate::hdr::types::{Daddr, Mode, Off, Ufsino};
 use crate::saerrno::Errno;
-use crate::stand::OpenFile;
-use crate::ufs::{Dinode, Ufs};
+use crate::stand::{DevIo, OpenFile};
+use crate::ufs::{Dinode, Ufs, UfsFile};
 
 impl Dinode for Ufs2Dinode {
     const SBLOCK: Daddr = SBLOCK_UFS2 / DEV_BSIZE as Daddr;
@@ -178,6 +185,36 @@ impl Dinode for Ufs2Dinode {
     fn indirect(buf: &[u8], i: usize) -> Daddr {
         let b = &buf[8 * i..8 * i + 8];
         Daddr::from_ne_bytes([b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]])
+    }
+
+    /// `ufs2.c`'s `read_inode`: [`Ufs::read_inode`] for this inode.
+    fn read_inode(inumber: Ufsino, io: DevIo, fp: &mut UfsFile<Self>) -> Result<(), Errno> {
+        Ufs::<Self>::read_inode(inumber, io, fp)
+    }
+
+    /// `ufs2.c`'s `chmod_inode`: [`Ufs::chmod_inode`] for this inode.
+    fn chmod_inode(
+        inumber: Ufsino,
+        io: DevIo,
+        fp: &UfsFile<Self>,
+        mode: Mode,
+    ) -> Result<(), Errno> {
+        Ufs::<Self>::chmod_inode(inumber, io, fp, mode)
+    }
+
+    /// `ufs2.c`'s `block_map`: [`Ufs::block_map`] for this inode.
+    fn block_map(io: DevIo, fp: &mut UfsFile<Self>, file_block: Daddr) -> Result<Daddr, Errno> {
+        Ufs::<Self>::block_map(io, fp, file_block)
+    }
+
+    /// `ufs2.c`'s `buf_read_file`: [`Ufs::buf_read_file`] for this inode.
+    fn buf_read_file(io: DevIo, fp: &mut UfsFile<Self>) -> Result<(usize, usize), Errno> {
+        Ufs::<Self>::buf_read_file(io, fp)
+    }
+
+    /// `ufs2.c`'s `search_directory`: [`Ufs::search_directory`] for this inode.
+    fn search_directory(name: &[u8], io: DevIo, fp: &mut UfsFile<Self>) -> Result<Ufsino, Errno> {
+        Ufs::<Self>::search_directory(name, io, fp)
     }
 }
 
