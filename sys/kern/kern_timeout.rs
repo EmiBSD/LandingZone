@@ -68,7 +68,8 @@
 //! with `TIMEOUT_PROC`).
 //!
 //! ## Deviations
-//! - `WITNESS` and `kcov` are not configured: `timeout_sync_*` are no-ops and `to_process`
+//! - `WITNESS` and `kcov` are not configured: the `timeout_sync_*` functions are there and
+//!   called, but their `WITNESS_*` bodies are nothing, and `to_process`
 //!   is only recorded.
 //! - `timeout_level_width` is a `const` (the C fills it once at startup).
 //! - `db_show_timeout` prints the function through `db_printsym` where the C looks its name
@@ -347,7 +348,7 @@ fn circq_empty(elem: &Circq) -> bool {
     ptr::eq(circq_first(elem), elem)
 }
 
-// WITNESS: timeout_sleeplock_obj, timeout_spinlock_obj, timeout_sync_order/enter/leave.
+// WITNESS: timeout_sleeplock_obj and timeout_spinlock_obj.
 
 /// `timeout_from_circq`: the first thing in a struct timeout is its struct circq, so we can
 /// get back from a pointer to the latter to a pointer to the whole timeout with just a cast.
@@ -360,6 +361,22 @@ unsafe fn timeout_from_circq<'a>(p: *const Circq) -> &'a Timeout {
     // SAFETY: `to_list` is at offset 0 of `#[repr(C)] Timeout` (asserted in `sys/timeout.rs`),
     // and the caller vouches for the pointer.
     unsafe { &*p.cast::<Timeout>() }
+}
+
+/// `timeout_sync_order(needsproc)`: WITNESS's lock order check for running a timeout; WITNESS
+/// is not configured, so `WITNESS_CHECKORDER` is nothing.
+fn timeout_sync_order(needsproc: bool) {
+    let _ = needsproc;
+}
+
+/// `timeout_sync_enter(needsproc)`: [`timeout_sync_order`], then `WITNESS_LOCK` (nothing).
+fn timeout_sync_enter(needsproc: bool) {
+    timeout_sync_order(needsproc);
+}
+
+/// `timeout_sync_leave(needsproc)`: `WITNESS_UNLOCK` (nothing).
+fn timeout_sync_leave(needsproc: bool) {
+    let _ = needsproc;
 }
 
 /*
@@ -603,7 +620,7 @@ pub fn timeout_del(to: &Timeout) -> bool {
 
 /// `timeout_del_barrier`.
 pub fn timeout_del_barrier(to: &Timeout) -> bool {
-    // timeout_sync_order: WITNESS.
+    timeout_sync_order(to.to_flags.get() & TIMEOUT_PROC != 0);
 
     let removed = timeout_del(to);
     timeout_barrier(to);
@@ -615,7 +632,7 @@ pub fn timeout_del_barrier(to: &Timeout) -> bool {
 pub fn timeout_barrier(to: &Timeout) {
     let c = Cond::new();
     let flags = to.to_flags.get() & (TIMEOUT_PROC | TIMEOUT_MPSAFE);
-    // timeout_sync_order: WITNESS.
+    timeout_sync_order(flags & TIMEOUT_PROC != 0);
 
     let barrier = Timeout::new_flags(
         cond_signal_handler,
@@ -781,16 +798,16 @@ fn timeout_run(tctx: &TimeoutCtx, to: &Timeout) {
 
     let func = to.to_func.get();
     let arg = to.to_arg.get();
-    // needsproc = ISSET(to->to_flags, TIMEOUT_PROC): WITNESS only.
+    let needsproc = to.to_flags.get() & TIMEOUT_PROC != 0;
     // NKCOV > 0: kcov_process.
 
     tctx.tctx_running.set(to);
     mtx_leave(&TIMEOUT_MUTEX);
-    // timeout_sync_enter(needsproc): WITNESS.
+    timeout_sync_enter(needsproc);
     if let Some(func) = func {
         func(arg);
     }
-    // timeout_sync_leave(needsproc): WITNESS.
+    timeout_sync_leave(needsproc);
     mtx_enter(&TIMEOUT_MUTEX);
     tctx.tctx_running.set(ptr::null());
 }

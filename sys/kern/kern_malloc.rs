@@ -140,7 +140,8 @@ use crate::sys::mman::PROT_WRITE;
 
 /// `BUCKETINDX(sz)`: the bucket of a size. Note that this relies upon `MINALLOCSIZE` being
 /// `1 << MINBUCKET`.
-pub fn bucketindx(sz: usize) -> usize {
+#[allow(non_snake_case)] // the C name
+pub fn BUCKETINDX(sz: usize) -> usize {
     let mut b = 7 + MINBUCKET as i64;
     let mut d = 4i64;
     while d != 0 {
@@ -356,7 +357,7 @@ pub fn malloc(size: usize, type_: i32, flags: i32) -> Option<NonNull<u8>> {
         }
     }
 
-    let indx = bucketindx(size);
+    let indx = BUCKETINDX(size);
     let allocsize = if size > MAXALLOCSAVE {
         round_page(size)
     } else {
@@ -659,7 +660,7 @@ pub fn free(addr: NonNull<u8>, type_: i32, freedsize: usize) {
         }
         // Check for returns of data that do not point to the beginning of the allocation.
         let alloc = if size > PAGE_SIZE {
-            ADDRMASK[bucketindx(PAGE_SIZE)]
+            ADDRMASK[BUCKETINDX(PAGE_SIZE)]
         } else {
             ADDRMASK[indx]
         };
@@ -956,7 +957,7 @@ pub fn sysctl_malloc(
             let sz = usize::try_from(name[1]).unwrap_or(0);
             // The freelist head is left out (zeroed).
             mtx_enter(&MALLOC_MTX);
-            let kb = BUCKET[bucketindx(sz)].to_bytes();
+            let kb = BUCKET[BUCKETINDX(sz)].to_bytes();
             mtx_leave(&MALLOC_MTX);
             sysctl_rdstruct(oldp, oldlenp, newp, &kb)
         }
@@ -1112,14 +1113,14 @@ mod tests {
 
     #[test]
     fn bucketindx_follows_the_c_formula() {
-        assert_eq!(bucketindx(1), 4);
-        assert_eq!(bucketindx(16), 4);
-        assert_eq!(bucketindx(17), 5);
-        assert_eq!(bucketindx(100), 7);
-        assert_eq!(bucketindx(4096), 12);
-        assert_eq!(bucketindx(4097), 13);
-        assert_eq!(bucketindx(8192), 13);
-        assert_eq!(bucketindx(65536), 16);
+        assert_eq!(BUCKETINDX(1), 4);
+        assert_eq!(BUCKETINDX(16), 4);
+        assert_eq!(BUCKETINDX(17), 5);
+        assert_eq!(BUCKETINDX(100), 7);
+        assert_eq!(BUCKETINDX(4096), 12);
+        assert_eq!(BUCKETINDX(4097), 13);
+        assert_eq!(BUCKETINDX(8192), 13);
+        assert_eq!(BUCKETINDX(65536), 16);
     }
 
     #[test]

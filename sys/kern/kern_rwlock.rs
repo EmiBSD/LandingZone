@@ -227,7 +227,7 @@ pub fn rw_exit_write(rwl: &Rwlock) {
 }
 
 /// `_rw_init_flags_witness`: the initialisation shared by plain and recursive locks.
-fn rw_init_flags_witness(rwl: &Rwlock, name: &'static str, _lo_flags: i32, trace: i32) {
+fn _rw_init_flags_witness(rwl: &Rwlock, name: &'static str, _lo_flags: i32, trace: i32) {
     rwl.rwl_owner.store(0, Ordering::Relaxed);
     rwl.rwl_waiters.store(0, Ordering::Relaxed);
     rwl.rwl_readers.store(0, Ordering::Relaxed);
@@ -237,20 +237,25 @@ fn rw_init_flags_witness(rwl: &Rwlock, name: &'static str, _lo_flags: i32, trace
     // WITNESS: rwl_lock_obj.lo_flags/lo_name/lo_type and WITNESS_INIT: not configured.
 }
 
-/// `rw_init_flags_trace(rwl, name, flags, trace)` (`_rw_init_flags` without the `lock_type`).
-pub fn rw_init_flags_trace(rwl: &Rwlock, name: &'static str, flags: i32, trace: i32) {
+/// `_rw_init_flags(rwl, name, flags, type, trace)`, without the `lock_type` (WITNESS).
+pub fn _rw_init_flags(rwl: &Rwlock, name: &'static str, flags: i32, trace: i32) {
     // RWLOCK_LO_FLAGS(flags) only feeds WITNESS.
-    rw_init_flags_witness(rwl, name, flags, trace);
+    _rw_init_flags_witness(rwl, name, flags, trace);
 }
 
-/// `rw_init_flags(rwl, name, flags)`.
+/// `rw_init_flags_trace(rwl, name, flags, trace)` (`<sys/rwlock.h>`'s macro).
+pub fn rw_init_flags_trace(rwl: &Rwlock, name: &'static str, flags: i32, trace: i32) {
+    _rw_init_flags(rwl, name, flags, trace);
+}
+
+/// `rw_init_flags(rwl, name, flags)` (`<sys/rwlock.h>`'s macro).
 pub fn rw_init_flags(rwl: &Rwlock, name: &'static str, flags: i32) {
-    rw_init_flags_trace(rwl, name, flags, 0);
+    _rw_init_flags(rwl, name, flags, 0);
 }
 
-/// `rw_init(rwl, name)`.
+/// `rw_init(rwl, name)` (`<sys/rwlock.h>`'s macro).
 pub fn rw_init(rwl: &Rwlock, name: &'static str) {
-    rw_init_flags_trace(rwl, name, 0, 0);
+    _rw_init_flags(rwl, name, 0, 0);
 }
 
 /// `rw_enter`: takes the lock as `flags` says (`RW_WRITE`, `RW_READ`, `RW_DOWNGRADE`,
@@ -626,15 +631,23 @@ pub fn rw_assert_unlocked(rwl: &Rwlock) {
     let _ = rwl;
 }
 
-/// `rrw_init_flags(rrwl, name, flags)` (`_rrw_init_flags` without the `lock_type`).
-pub fn rrw_init_flags(rrwl: &Rrwlock, name: &'static str, flags: i32) {
+/// `_rrw_init_flags(rrwl, name, flags, type)`, without the `lock_type` (WITNESS).
+pub fn _rrw_init_flags(rrwl: &Rrwlock, name: &'static str, flags: i32) {
+    // memset(rrwl, 0, sizeof(struct rrwlock)): the count here, the lock below.
     rrwl.rrwl_wcnt.set(0);
-    rw_init_flags_witness(&rrwl.rrwl_lock, name, flags, 0);
+    // RRWLOCK_LO_FLAGS(flags) only feeds WITNESS.
+    _rw_init_flags_witness(&rrwl.rrwl_lock, name, flags, 0);
 }
 
-/// `rrw_init(rrwl, name)`.
+/// `rrw_init_flags(rrwl, name, flags)` (`<sys/rwlock.h>`'s macro without WITNESS, which
+/// passes 0 for the flags: they only feed WITNESS).
+pub fn rrw_init_flags(rrwl: &Rrwlock, name: &'static str, _flags: i32) {
+    _rrw_init_flags(rrwl, name, 0);
+}
+
+/// `rrw_init(rrwl, name)` (`<sys/rwlock.h>`'s macro).
 pub fn rrw_init(rrwl: &Rrwlock, name: &'static str) {
-    rrw_init_flags(rrwl, name, 0);
+    _rrw_init_flags(rrwl, name, 0);
 }
 
 /// `rrw_enter`: `rw_enter` that lets the writer take the lock again.
@@ -704,8 +717,9 @@ pub fn rw_obj_init() {
     );
 }
 
-/// `rw_obj_alloc_flags(lock, name, flags)`: allocate a single lock object.
-pub fn rw_obj_alloc_flags(name: &'static str, flags: i32) -> &'static Rwlock {
+/// `_rw_obj_alloc_flags(lock, name, flags, type)`: allocate a single lock object (without
+/// the `lock_type`, WITNESS's).
+pub fn _rw_obj_alloc_flags(name: &'static str, flags: i32) -> &'static Rwlock {
     let Some(mem) = pool_get(&RWLOCK_OBJ_POOL, PR_WAITOK) else {
         panic(format_args!("rw_obj_alloc: rwlock_obj_pool is empty"));
     };
@@ -720,12 +734,17 @@ pub fn rw_obj_alloc_flags(name: &'static str, flags: i32) -> &'static Rwlock {
         });
         mo.as_ref()
     };
-    rw_init_flags_trace(&mo.ro_lock, name, flags, 0);
+    _rw_init_flags(&mo.ro_lock, name, flags, 0);
 
     &mo.ro_lock
 }
 
-/// `rw_obj_alloc(lock, name)`.
+/// `rw_obj_alloc_flags(lock, name, flags)` (`<sys/rwlock.h>`'s macro).
+pub fn rw_obj_alloc_flags(name: &'static str, flags: i32) -> &'static Rwlock {
+    _rw_obj_alloc_flags(name, flags)
+}
+
+/// `rw_obj_alloc(lock, name)` (`<sys/rwlock.h>`'s macro).
 pub fn rw_obj_alloc(name: &'static str) -> &'static Rwlock {
     rw_obj_alloc_flags(name, 0)
 }
