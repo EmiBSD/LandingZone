@@ -862,3 +862,18 @@ c = "sys/dev/usb/uaudio.c"
 function = "uaudio_conf_print"
 reason = "not configured: `defined(UAUDIO_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
 approved = "2026-11-19"
+
+# 2026-11-19: the user approved by name the two functions under `#if UNUSED_CODE` ("nada
+# un_used"); the tool does not decide that macro, which nothing in the tree defines.
+
+[[exception]]
+c = "sys/ntfs/ntfs_subr.c"
+function = "ntfs_parserun"
+reason = "#if UNUSED_CODE: never defined, the code is not compiled"
+approved = "2026-11-19"
+
+[[exception]]
+c = "sys/ntfs/ntfs_subr.c"
+function = "ntfs_runtocn"
+reason = "#if UNUSED_CODE: never defined, the code is not compiled"
+approved = "2026-11-19"
