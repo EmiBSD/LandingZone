@@ -273,6 +273,7 @@ means EmiBSD's code has it too ("Bugs the port reproduces").
 | EXT-233 | `sys/sys/socket.h:322` | `CTL_NET_NAMES` has 36 entries while `NET_MAXID` (`AF_MAX`) is 37: `AF_FRAME` (36) was added without a name | — (sysctl(8) only; the kernel does not read the table) | cosmetic | read | the table has the header's 36 entries | open |
 | EXT-234 | `sys/kern/kern_malloc.c:312` | the "Data modified on freelist" message of a bad freelist link prints `(int32_t *)&addr - (int32_t *)kbp`: the distance from the bucket to a local variable, not a word of the object | — (a `DIAGNOSTIC` kernel whose freelist was already overwritten) | cosmetic | read | prints the word of the block that holds the link | open |
 | EXT-236 | `sys/arch/arm64/arm64/pmap.c:511` | `pmap_vp_page_alloc` turns `PR_NOWAIT` into a try-lock of `kernel_map`: `pmap_enter` fails whenever another CPU holds that lock, and with no swap `uvm_fault` returns `ENOMEM` and the process is killed, with memory to spare | local (a threaded program on a machine without swap) | process killed | read; the port lost the race under QEMU | the pool's pages come through the direct map | open |
+| EXT-235 | `sys/kern/subr_pool.c:1220` | `pool_print1` reads its modifier one character in two and steps over the terminator when it sits at an odd offset (`show pool/p`): it goes on reading past the string | — (ddb's user) | cosmetic | read | the walk ends with the modifier | open |
 
 ## Entries (EXT-1 to EXT-8, EXT-192 to EXT-197)
 
@@ -879,6 +880,25 @@ Every C line in this and the following sections is at the pin 3ce1f3f79392, unde
 - Severity: a process killed without cause; no memory unsafety.
 - Fix: call `pmap_populate` before the `uvm_swapisfull` test (it can sleep for the tables),
   or let the allocator fall back to an interrupt-safe allocation when the try-lock fails.
+### EXT-235: `pool_print1` walks past the end of its modifier
+
+- Where: `sys/kern/subr_pool.c:1220-1224` at 3ce1f3f79392 (`pool_print1`, under `DDB`).
+- What: the loop that looks for the `p` modifier is
+  `while ((c = *modif++) != '\0') { if (c == 'p') print_pagelist = 1; modif++; }`: it
+  advances the pointer twice for every character it reads. It looks at the characters at
+  even offsets only, and a terminator at an odd offset is stepped over. `show pool/p addr`
+  gives it the string "p": it reads `modif[0]`, steps over the terminator at `modif[1]`,
+  and reads `modif[2]`, `modif[4]`, ... until a zero byte happens to sit at an even offset.
+- Reach: ddb's user. The bytes read are those after the modifier in `db_command`'s
+  `modif[TOK_STRING_SIZE]` buffer on the stack, and what follows it if none of them at an
+  even offset is zero; a stray `p` among them changes nothing (the flag is already set), so
+  the visible effect is nil. `show pool/xp` does not print the page lists.
+- Verified: read.
+- Port's handling: `sys/kern/subr_pool.rs`, `pool_print1` steps the same way but over a
+  slice, so the walk ends with the modifier (a deviation listed in the file; the host test
+  `pool_printit_prints_the_numbers_and_with_p_the_pages` shows both behaviours).
+- Severity: cosmetic.
+- Fix: drop the second `modif++`.
 
 ### EXT-234: malloc's "invalid addr" message prints the address of a local variable
 

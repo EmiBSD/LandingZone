@@ -58,7 +58,7 @@
 //! The memory for building the page list is either taken from the allocated pages themselves
 //! (for small pool items) or taken from an internal pool of page headers (`phpool`).
 //!
-//! Status: `wip`. Milestone M3 ports `pool_init`, `pool_destroy`, `pool_get`/`pool_put`
+//! Status: `ported`. Milestone M3 ports `pool_init`, `pool_destroy`, `pool_get`/`pool_put`
 //! with `pool_do_get`/`pool_do_put`, the page management (`pool_p_alloc`/`free`/`insert`/
 //! `remove`, `pool_update_curpage`, `pr_find_pagehead`), the request queue (`pool_request`,
 //! `pool_runqueue`, `pool_get_done`, `pool_wakeup`), `pool_prime`, the watermarks and
@@ -69,8 +69,9 @@
 //! does), takes `pr_refcnt` in `sysctl_dopool`, and ports the `MULTIPROCESSOR` per-CPU caches
 //! (`pool_cache_init`, `pool_cache_get`/`put`, the list functions, `pool_cache_destroy`,
 //! `pool_cache_gc`, the `pool_cache_*info` sysctls) and the garbage collector
-//! (`pool_gc_sched`, `pool_gc_pages`). The ddb printers (`pool_printit`,
-//! `db_show_all_pools`) and `pool_chk` are not here.
+//! (`pool_gc_sched`, `pool_gc_pages`). TD1 adds the ddb printers (`pool_printit`,
+//! `pool_print1`, `pool_print_pagelist`, `db_show_all_pools`) and the consistency checks
+//! (`pool_chk`, `pool_chk_page`), and the file is whole.
 //!
 //! ## Deviations
 //! - `pl_init` has no `lock_type` argument (`WITNESS` is not configured).
@@ -80,7 +81,10 @@
 //!   queues a request and sleeps for `pool_runqueue` as in C.
 //! - `DIAGNOSTIC` is feature `diagnostic`: the double-put check and the poisoning of free
 //!   items (`subr_poison.rs`), in the page lists and in the per-CPU caches, are the C's.
-//! - `splassert(pp->pr_ipl)` in `pool_do_get`/`pool_do_put` is not checked.
+//! - `pool_print1` reads its modifier a character at a time, stepping over the next as the
+//!   C does, and stops at the modifier's end; the C's loop steps past a terminator that sits
+//!   at an odd offset, as in `show pool/p` (EXTERNAL_BUGS EXT-235). `show pool` with no
+//!   address prints nothing, where the C dereferences address 0.
 //! - `arc4random` (page magics, freelist order, the `XSIMPLEQ` cookies, the cache magics) is
 //!   `dev/rnd.rs`'s stream.
 //! - Fields the C reads without the lock as a guess (`pr_nidle` in `pool_gc_pages`, the
@@ -96,6 +100,7 @@ use core::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 #[cfg(feature = "multiprocessor")]
 use core::sync::atomic::{AtomicU64, fence};
 
+use crate::ddb::db_command::DbResult;
 use crate::dev::rnd::{arc4random, arc4random_buf};
 use crate::kern::kern_lock::{mtx_enter, mtx_enter_try, mtx_init_flags, mtx_leave};
 use crate::kern::kern_rwlock::{
@@ -112,8 +117,10 @@ use crate::kern::kern_tc::getnsecuptime;
 use crate::kern::kern_timeout::timeout_add_sec;
 #[cfg(feature = "diagnostic")]
 use crate::kern::subr_poison::{poison_check, poison_mem};
+use crate::kern::subr_prf::db_printf;
 use crate::kern::subr_xxx::assertwaitok;
-use crate::machine::intr::{IPL_HIGH, splvm, splx};
+use crate::machine::db_machdep::DbExpr;
+use crate::machine::intr::{IPL_HIGH, splassert, splvm, splx};
 use crate::sys::errno::Errno;
 use crate::sys::mutex::{mutex_assert_locked, mutex_assert_unlocked};
 use crate::sys::param::{PAGE_SIZE, PSWP, align, roundup};
@@ -131,7 +138,7 @@ use crate::sys::timeout::Timeout;
 use crate::sys::tree::RbtEntry;
 use crate::uvm::uvm_extern::{KMEM_DYN_INITIALIZER, KmemPaMode, KmemVaMode};
 use crate::uvm::uvm_km::{KP_DIRTY, KV_ANY, KV_INTRSAFE, KV_PAGE, km_alloc, km_free};
-use crate::{kassert, queue_adapter, tree_adapter};
+use crate::{kassert, kprintf, queue_adapter, tree_adapter};
 #[cfg(feature = "multiprocessor")]
 use crate::{
     kern::kern_malloc::{free, mallocarray},
@@ -979,7 +986,7 @@ pub fn pool_runqueue(pp: &Pool, flags: i32) {
 pub fn pool_do_get(pp: &Pool, flags: i32, slowdown: &mut i32) -> Option<NonNull<u8>> {
     pl_assert_locked(pp, &pp.pr_lock);
 
-    // splassert(pp->pr_ipl): M4.
+    splassert(pp.pr_ipl.get(), "pool_do_get");
 
     // Account for this item now to avoid races if we need to give up pr_lock to allocate a
     // page.
@@ -1130,7 +1137,7 @@ pub fn pool_wakeup(pp: &Pool) {
 pub fn pool_do_put(pp: &Pool, v: NonNull<u8>) {
     let pi = v.as_ptr().cast::<PoolItem>();
 
-    // splassert(pp->pr_ipl): M4.
+    splassert(pp.pr_ipl.get(), "pool_do_put");
 
     let ph = pr_find_pagehead(pp, v.as_ptr());
 
@@ -1534,6 +1541,337 @@ pub fn pool_reclaim_all() {
 /// `pool_count`: how many pools exist.
 pub fn pool_count() -> u32 {
     POOL_COUNT.load(Ordering::Relaxed)
+}
+
+/// `pool_printit(pp, modif, pr)` (`DDB`): `show pool addr`: the pool's numbers, and with the
+/// `p` modifier its page lists.
+pub fn pool_printit(pp: &Pool, modif: &[u8], pr: PoolWalkPr) {
+    pool_print1(pp, modif, pr);
+}
+
+/// `pool_print_pagelist(pl, pr)`: every page of a list, and those of its free items whose
+/// magic is not theirs.
+pub fn pool_print_pagelist(pl: &TailqHead<PhEntry>, pr: PoolWalkPr) {
+    for ph in pl.iter() {
+        pr(format_args!(
+            "\t\tpage {:p}, color {:p}, nmissing {}\n",
+            ph.ph_page.get(),
+            ph.ph_colored.get(),
+            ph.ph_nmissing.get()
+        ));
+        for pi in ph.ph_items.iter() {
+            if pi.pi_magic.get() != pool_imagic(ph, pi) {
+                pr(format_args!(
+                    "\t\t\titem {:p}, magic {:#x}\n",
+                    pi,
+                    pi.pi_magic.get()
+                ));
+            }
+        }
+    }
+}
+
+/// `pool_print1(pp, modif, pr)`: what `pool_printit` prints.
+pub fn pool_print1(pp: &Pool, modif: &[u8], pr: PoolWalkPr) {
+    // The C reads one character of the modifier and steps over the next; the walk ends with
+    // the modifier here (see the module's deviations).
+    let print_pagelist = modif
+        .iter()
+        .step_by(2)
+        .take_while(|c| **c != 0)
+        .any(|c| *c == b'p');
+
+    pr(format_args!(
+        "POOL {}: size {} maxcolors {}\n",
+        pp.pr_wchan.get(),
+        pp.pr_size.get(),
+        pp.pr_maxcolors.get()
+    ));
+    pr(format_args!(
+        "\talloc {:p}\n",
+        pp.pr_alloc.get().map_or(ptr::null(), ptr::from_ref)
+    ));
+    pr(format_args!(
+        "\tminitems {}, minpages {}, maxpages {}, npages {}\n",
+        pp.pr_minitems.get(),
+        pp.pr_minpages.get(),
+        pp.pr_maxpages.get(),
+        pp.pr_npages.get()
+    ));
+    pr(format_args!(
+        "\titemsperpage {}, nitems {}, nout {}, hardlimit {}\n",
+        pp.pr_itemsperpage.get(),
+        pp.pr_nitems.get(),
+        pp.pr_nout.get(),
+        pp.pr_hardlimit.get()
+    ));
+
+    pr(format_args!(
+        "\n\tnget {}, nfail {}, nput {}\n",
+        pp.pr_nget.get(),
+        pp.pr_nfail.get(),
+        pp.pr_nput.get()
+    ));
+    pr(format_args!(
+        "\tnpagealloc {}, npagefree {}, hiwat {}, nidle {}\n",
+        pp.pr_npagealloc.get(),
+        pp.pr_npagefree.get(),
+        pp.pr_hiwat.get(),
+        pp.pr_nidle.get()
+    ));
+
+    if !print_pagelist {
+        return;
+    }
+
+    if pp.pr_emptypages.first().is_some() {
+        pr(format_args!("\n\tempty page list:\n"));
+    }
+    pool_print_pagelist(&pp.pr_emptypages, pr);
+    if pp.pr_fullpages.first().is_some() {
+        pr(format_args!("\n\tfull page list:\n"));
+    }
+    pool_print_pagelist(&pp.pr_fullpages, pr);
+    if pp.pr_partpages.first().is_some() {
+        pr(format_args!("\n\tpartial-page list:\n"));
+    }
+    pool_print_pagelist(&pp.pr_partpages, pr);
+
+    // SAFETY: `pr_curpage`, when it is not null, names a page the pool holds.
+    match unsafe { pp.pr_curpage.get().as_ref() } {
+        None => pr(format_args!("\tno current page\n")),
+        Some(ph) => pr(format_args!("\tcurpage {:p}\n", ph.ph_page.get())),
+    };
+}
+
+/// `PRWORD(ovflw, fmt, width, fixed, val)`: one column of `show all pools`. `print` gets the
+/// width left for the value, which is the column's `width` less the `fixed` characters of
+/// its format and less what the columns before it overflowed, and returns what it printed.
+fn prword(ovflw: &mut i32, width: i32, fixed: i32, print: impl FnOnce(usize) -> usize) {
+    let w = (width - fixed - *ovflw).max(0) as usize;
+    *ovflw += print(w) as i32 - width;
+    if *ovflw < 0 {
+        *ovflw = 0;
+    }
+}
+
+/// `db_show_all_pools(expr, haddr, count, modif)` (`DDB`): `show all pools[/a]`: a line of
+/// numbers for every pool that was ever used, or with `/a` the address and the allocator of
+/// every pool.
+pub fn db_show_all_pools(_expr: DbExpr, _haddr: bool, _count: DbExpr, modif: &[u8]) -> DbResult {
+    let mode = modif.first().copied().unwrap_or(0);
+    if mode != 0 && mode != b'a' {
+        db_printf(format_args!("usage: show all pools [/a]\n"));
+        return Ok(());
+    }
+
+    if mode == 0 {
+        db_printf(format_args!(
+            "{:<10}{:>4}{:>9}{:>5}{:>9}{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}{:>5}\n",
+            "Name",
+            "Size",
+            "Requests",
+            "Fail",
+            "Releases",
+            "Pgreq",
+            "Pgrel",
+            "Npage",
+            "Hiwat",
+            "Minpg",
+            "Maxpg",
+            "Idle"
+        ));
+    } else {
+        db_printf(format_args!(
+            "{:<12} {:>18} {:>18}\n",
+            "Name", "Address", "Allocator"
+        ));
+    }
+
+    for pp in POOL_HEAD.0.iter() {
+        if mode == b'a' {
+            db_printf(format_args!(
+                "{:<12} {:>18p} {:>18p}\n",
+                pp.pr_wchan.get(),
+                pp,
+                pp.pr_alloc.get().map_or(ptr::null(), ptr::from_ref)
+            ));
+            continue;
+        }
+
+        if pp.pr_nget.get() == 0 {
+            continue;
+        }
+
+        let mut ovflw = 0;
+        prword(&mut ovflw, 10, 0, |w| {
+            db_printf(format_args!("{:<w$}", pp.pr_wchan.get()))
+        });
+        prword(&mut ovflw, 4, 1, |w| {
+            db_printf(format_args!(" {:>w$}", pp.pr_size.get()))
+        });
+        prword(&mut ovflw, 9, 1, |w| {
+            db_printf(format_args!(" {:>w$}", pp.pr_nget.get()))
+        });
+        prword(&mut ovflw, 5, 1, |w| {
+            db_printf(format_args!(" {:>w$}", pp.pr_nfail.get()))
+        });
+        prword(&mut ovflw, 9, 1, |w| {
+            db_printf(format_args!(" {:>w$}", pp.pr_nput.get()))
+        });
+        prword(&mut ovflw, 6, 1, |w| {
+            db_printf(format_args!(" {:>w$}", pp.pr_npagealloc.get()))
+        });
+        prword(&mut ovflw, 6, 1, |w| {
+            db_printf(format_args!(" {:>w$}", pp.pr_npagefree.get()))
+        });
+        // The three below are `%d` of unsigned members in the C.
+        prword(&mut ovflw, 6, 1, |w| {
+            db_printf(format_args!(" {:>w$}", pp.pr_npages.get() as i32))
+        });
+        prword(&mut ovflw, 6, 1, |w| {
+            db_printf(format_args!(" {:>w$}", pp.pr_hiwat.get() as i32))
+        });
+        prword(&mut ovflw, 6, 1, |w| {
+            db_printf(format_args!(" {:>w$}", pp.pr_minpages.get() as i32))
+        });
+        // maxp: "inf" for no limit.
+        prword(&mut ovflw, 6, 1, |w| {
+            if pp.pr_maxpages.get() == u32::MAX {
+                db_printf(format_args!(" {:>w$}", "inf"))
+            } else {
+                db_printf(format_args!(" {:>w$}", pp.pr_maxpages.get()))
+            }
+        });
+        prword(&mut ovflw, 5, 1, |w| {
+            db_printf(format_args!(" {:>w$}\n", pp.pr_nidle.get()))
+        });
+
+        pool_chk(pp);
+    }
+    Ok(())
+}
+
+/// `pool_chk_page(pp, ph, expected)` (`POOL_DEBUG` or `DDB`): checks a page's free list:
+/// every item inside the page with its magic (and under `DIAGNOSTIC` its poison), and as
+/// many of them as the page's count of missing ones leaves, `expected` of them when that is
+/// not negative. Says what is wrong and returns 1, or returns 0.
+pub fn pool_chk_page(pp: &Pool, ph: &PoolPageHeader, expected: i32) -> i32 {
+    let label = pp.pr_wchan.get();
+
+    let page = (ptr::from_ref(ph) as usize & pp.pr_pgmask.get()) as *mut u8;
+    if page != ph.ph_page.get() && pool_inpghdr(pp) {
+        kprintf!("{}: ", label);
+        kprintf!(
+            "pool({:p}:{}): page inconsistency: page {:p}; at page head addr {:p} (p {:p})\n",
+            pp,
+            pp.pr_wchan.get(),
+            ph.ph_page.get(),
+            ph,
+            page
+        );
+        return 1;
+    }
+
+    let start = ph.ph_page.get() as usize;
+    let mut n = 0i32;
+    for pi in ph.ph_items.iter() {
+        // Only the address is used before the range check: a link somebody wrote over may
+        // point anywhere.
+        let addr = ptr::from_ref(pi) as usize;
+        if addr < start || addr >= start + pp.pr_pgsize.get() as usize {
+            kprintf!("{}: ", label);
+            kprintf!(
+                "pool({:p}:{}): page inconsistency: page {:p}; item ordinal {}; addr {:p}\n",
+                pp,
+                pp.pr_wchan.get(),
+                ph.ph_page.get(),
+                n,
+                pi
+            );
+            return 1;
+        }
+
+        if pi.pi_magic.get() != pool_imagic(ph, pi) {
+            kprintf!("{}: ", label);
+            kprintf!(
+                "pool({:p}:{}): free list modified: page {:p}; item ordinal {}; addr {:p} (p {:p}); offset 0x0={:#x}\n",
+                pp,
+                pp.pr_wchan.get(),
+                ph.ph_page.get(),
+                n,
+                pi,
+                page,
+                pi.pi_magic.get()
+            );
+        }
+
+        #[cfg(feature = "diagnostic")]
+        if pool_phpoison(ph) {
+            let (body, len) = pool_item_body(pp, pi);
+            // SAFETY: a free item inside its page (checked above): `pr_size` bytes of the
+            // pool's memory, word aligned.
+            if let Some((pidx, _pval)) = unsafe { poison_check(body, len) } {
+                // SAFETY: `poison_check` read this word of the item.
+                let found = unsafe { body.cast::<i32>().add(pidx).read() };
+                kprintf!(
+                    "pool({}): free list modified: page {:p}; item ordinal {}; addr {:p} (p {:p}); offset {:#x}={:#x}\n",
+                    pp.pr_wchan.get(),
+                    ph.ph_page.get(),
+                    n,
+                    pi,
+                    page,
+                    pidx * size_of::<i32>(),
+                    found
+                );
+            }
+        }
+
+        n += 1;
+    }
+    if n + ph.ph_nmissing.get() as i32 != pp.pr_itemsperpage.get() as i32 {
+        kprintf!(
+            "pool({:p}:{}): page inconsistency: page {:p}; {} on list, {} missing, {} items per page\n",
+            pp,
+            pp.pr_wchan.get(),
+            ph.ph_page.get(),
+            n,
+            ph.ph_nmissing.get(),
+            pp.pr_itemsperpage.get()
+        );
+        return 1;
+    }
+    if expected >= 0 && n != expected {
+        kprintf!(
+            "pool({:p}:{}): page inconsistency: page {:p}; {} on list, {} missing, {} expected\n",
+            pp,
+            pp.pr_wchan.get(),
+            ph.ph_page.get(),
+            n,
+            ph.ph_nmissing.get(),
+            expected
+        );
+        return 1;
+    }
+    0
+}
+
+/// `pool_chk(pp)`: `pool_chk_page` over the empty, the full and the partial pages; how many
+/// are inconsistent.
+pub fn pool_chk(pp: &Pool) -> i32 {
+    let mut r = 0;
+
+    for ph in pp.pr_emptypages.iter() {
+        r += pool_chk_page(pp, ph, pp.pr_itemsperpage.get() as i32);
+    }
+    for ph in pp.pr_fullpages.iter() {
+        r += pool_chk_page(pp, ph, 0);
+    }
+    for ph in pp.pr_partpages.iter() {
+        r += pool_chk_page(pp, ph, -1);
+    }
+
+    r
 }
 
 /// The printer `pool_walk` hands its `func` (`db_printf`'s type).
@@ -2736,6 +3074,118 @@ pub(crate) mod tests {
 
     fn walk_pr(_args: core::fmt::Arguments<'_>) -> usize {
         0
+    }
+
+    std::thread_local! {
+        /// What `pool_printit` printed through `print_collect`.
+        static PRINTED: core::cell::RefCell<std::string::String> =
+            const { core::cell::RefCell::new(std::string::String::new()) };
+    }
+
+    fn print_collect(args: core::fmt::Arguments<'_>) -> usize {
+        use std::fmt::Write;
+        PRINTED.with(|p| {
+            let mut p = p.borrow_mut();
+            let before = p.len();
+            let _ = p.write_fmt(args);
+            p.len() - before
+        })
+    }
+
+    #[test]
+    fn pool_printit_prints_the_numbers_and_with_p_the_pages() {
+        let _g = setup_real_memory();
+        static P: Pool = Pool::new();
+        pool_init(&P, 1000, 0, IPL_HIGH, 0, "testprint", None);
+        let a = pool_get(&P, PR_NOWAIT).expect("an item");
+        let b = pool_get(&P, PR_NOWAIT).expect("an item");
+
+        let printed = |modif: &[u8]| {
+            PRINTED.with(|p| p.borrow_mut().clear());
+            pool_printit(&P, modif, print_collect);
+            PRINTED.with(|p| p.borrow().clone())
+        };
+
+        let out = printed(b"");
+        assert!(out.starts_with("POOL testprint: size 1000 maxcolors "));
+        assert!(out.contains("\n\tnget 2, nfail 0, nput 0\n"));
+        assert!(out.contains(", nout 2, hardlimit "));
+        assert!(!out.contains("page list"));
+        assert!(!out.contains("curpage"));
+
+        // `p` asks for the page lists; a `p` in an odd place is stepped over, as in the C.
+        let pages = printed(b"p");
+        assert!(pages.starts_with(&out));
+        assert!(pages.contains("\n\tpartial-page list:\n\t\tpage "));
+        assert!(pages.contains(", nmissing 2\n"));
+        assert!(pages.contains("\tcurpage "));
+        assert_eq!(printed(b"xp"), out);
+        assert_eq!(printed(b"xxp"), pages);
+
+        pool_put(&P, a);
+        pool_put(&P, b);
+        pool_destroy(&P);
+    }
+
+    #[test]
+    fn pool_chk_counts_the_inconsistent_pages() {
+        let _g = setup_real_memory();
+        static P: Pool = Pool::new();
+        pool_init(&P, 1000, 0, IPL_HIGH, 0, "testchk", None);
+        let per_page = P.pr_itemsperpage.get() as usize;
+        // A full page and a partial one.
+        let items: Vec<NonNull<u8>> = (0..per_page + 1)
+            .map(|_| pool_get(&P, PR_NOWAIT).expect("an item"))
+            .collect();
+        assert_eq!(pool_chk(&P), 0);
+
+        // A page that says one more item is out than its free list shows is caught, and a
+        // free item whose magic was written over is reported without failing the page.
+        let ph = P.pr_partpages.first().expect("a partial page");
+        ph.ph_nmissing.set(ph.ph_nmissing.get() + 1);
+        assert_eq!(pool_chk(&P), 1);
+        assert_eq!(pool_chk_page(&P, ph, -1), 1);
+        ph.ph_nmissing.set(ph.ph_nmissing.get() - 1);
+        assert_eq!(pool_chk_page(&P, ph, per_page as i32), 1);
+        let pi = ph.ph_items.first().expect("a free item");
+        let magic = pi.pi_magic.get();
+        pi.pi_magic.set(!magic);
+        assert_eq!(pool_chk(&P), 0);
+        pi.pi_magic.set(magic);
+
+        for p in items {
+            pool_put(&P, p);
+        }
+        assert_eq!(pool_chk(&P), 0);
+        pool_destroy(&P);
+    }
+
+    #[test]
+    fn prword_narrows_the_columns_after_an_overflow() {
+        // A value wider than its column makes the next columns narrower until the line is
+        // back in step: the C's PRWORD.
+        let mut line = std::string::String::new();
+        let mut ovflw = 0;
+        let mut put = |ovflw: &mut i32, width, fixed, s: &str, left: bool| {
+            prword(ovflw, width, fixed, |w| {
+                let piece = if left {
+                    std::format!("{s:<w$}")
+                } else {
+                    std::format!(" {s:>w$}")
+                };
+                line.push_str(&piece);
+                piece.len()
+            });
+        };
+        put(&mut ovflw, 10, 0, "averylongname", true);
+        assert_eq!(ovflw, 3);
+        put(&mut ovflw, 4, 1, "64", false);
+        assert_eq!(ovflw, 2);
+        put(&mut ovflw, 9, 1, "7", false);
+        assert_eq!(ovflw, 0);
+        put(&mut ovflw, 5, 1, "0", false);
+        assert_eq!(line, "averylongname 64      7    0");
+        assert_eq!(line.len(), 10 + 4 + 9 + 5);
     }
 
     #[test]

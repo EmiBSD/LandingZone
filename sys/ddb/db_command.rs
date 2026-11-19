@@ -99,12 +99,12 @@
 //!   `examine`, `search`), breakpoints and watchpoints (`db_break.c`, `db_watch.c`),
 //!   `pprint` and `show struct` (`db_ctf.c`), `hangman` (`db_hangman.c`), `kill`, `stop`,
 //!   `ps`/`show all procs` and `proc_printit` (`kern_proc.c`), `callout` (`kern_timeout.c`),
-//!   `show all clockintr` (`kern_clockintr.c`), `show all pools`/`show pool`
-//!   (`subr_pool.c`), the `vfs_subr.c` printers (`show buf`, `vnode`, `mount`,
+//!   `show all clockintr` (`kern_clockintr.c`), the `vfs_subr.c` printers (`show buf`,
+//!   `vnode`, `mount`,
 //!   `all mounts`, `all vnodes`, `all bufs`), the `uvm` ones (`map`, `object`, `page`,
 //!   `swap`), `extents`, `bcstats`. `show mbuf`, `socket`, `route`, `all routes`, `tdb`,
-//!   `all tdbs`, `uvmexp`, `malloc`, `nfsreq`, `nfsnode`, `all nfsreqs` and `all nfsnodes`
-//!   call the ported printers. `WITNESS` is not configured: its commands are
+//!   `all tdbs`, `uvmexp`, `malloc`, `pool`, `all pools`, `nfsreq`, `nfsnode`, `all nfsreqs`
+//!   and `all nfsnodes` call the ported printers. `WITNESS` is not configured: its commands are
 //!   left out, as the C's `#ifdef` does.
 //! - `db_access.c`, `db_sym.c` and `db_examine.c` are not ported: [`db_get_value`],
 //!   [`db_put_value`], [`db_printsym`] and [`db_print_loc_and_inst`] are visible stand-ins
@@ -138,7 +138,7 @@ use crate::kern::kern_malloc::malloc_printit;
 use crate::kern::kern_proc::tfind;
 use crate::kern::kern_xxx::reboot;
 use crate::kern::subr_log::msgbufp;
-use crate::kern::subr_pool::{PoolWalkPr, pool_walk};
+use crate::kern::subr_pool::{PoolWalkPr, db_show_all_pools, pool_printit, pool_walk};
 use crate::kern::subr_prf::{Str, db_printf, panicstr_message};
 use crate::kern::uipc_mbuf::{m_print, m_print_chain, m_print_packet};
 use crate::kern::uipc_socket::so_print;
@@ -156,6 +156,7 @@ use crate::nfs::nfs_debug::{
 };
 use crate::sys::mbuf::Mbuf;
 use crate::sys::msgbuf::MSG_MAGIC;
+use crate::sys::pool::Pool;
 use crate::sys::reboot::{
     RB_AUTOBOOT, RB_DUMP, RB_HALT, RB_NOSYNC, RB_POWERDOWN, RB_RESET, RB_TIMEBAD, RB_USERREQ,
 };
@@ -613,8 +614,13 @@ fn db_extent_print_cmd(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]
 }
 
 /// `db_pool_print_cmd`: `show pool[/clp] addr`.
-fn db_pool_print_cmd(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
-    db_stub!("pool_printit (subr_pool.c)")
+fn db_pool_print_cmd(addr: DbExpr, _have: bool, _count: DbExpr, modif: &[u8]) -> DbResult {
+    // SAFETY: the user named a pool (db_addr_as).
+    let pp: Option<&Pool> = unsafe { db_addr_as(addr) };
+    if let Some(pp) = pp {
+        pool_printit(pp, modif, db_printf);
+    }
+    Ok(())
 }
 
 /// `db_proc_print_cmd`: `show proc[/t] [addr]`: the current thread, the one at `addr`, or
@@ -670,11 +676,6 @@ fn db_show_callout(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) ->
 /// `db_show_all_clockintr` (`kern_clockintr.c`): `show all clockintr`.
 fn db_show_all_clockintr(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
     db_stub!("db_show_all_clockintr (kern_clockintr.c)")
-}
-
-/// `db_show_all_pools` (`subr_pool.c`): `show all pools`.
-fn db_show_all_pools(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
-    db_stub!("db_show_all_pools (subr_pool.c)")
 }
 
 /// `db_listbreak_cmd` (`db_break.c`): `show breaks`.
