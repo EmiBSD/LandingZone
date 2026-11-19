@@ -336,11 +336,11 @@ notes = "license: zlib; an altered source version. The whole file: _tr_init, _tr
 [[file]]
 c = "sys/lib/libz/compress.c"
 rust = "sys/lib/libz/compress.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "8297fb38b40913ac18ca9618e4c9c685d4f9fa55"
 deps = ["sys/lib/libz/deflate.c"]
-notes = "license: zlib; an altered source version. compress, compress2, compressBound and compressBound_z over slices: the output slice's length is the space available (the C's *destLen on entry) and destLen receives the compressed size; the _z variants are merged in; compiled by OpenBSD's kernel, called by nothing; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 2 C function(s) not in its Rust file: compress2_z, compress_z"
+notes = "license: zlib; an altered source version. compress, compress2, compressBound and compressBound_z over slices: the output slice's length is the space available (the C's *destLen on entry) and destLen receives the compressed size; the _z variants are merged in; compiled by OpenBSD's kernel, called by nothing; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 2 C function(s) not in its Rust file: compress2_z, compress_z; each now has its own fn with its C name, calling as the C does, and ports check accepts the row as ported"
 
 [[file]]
 c = "sys/lib/libz/inftrees.h"

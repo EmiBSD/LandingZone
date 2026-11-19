@@ -64,11 +64,11 @@
 //! OpenBSD's kernel compiles `compress.c` (`sys/conf/files`), though no kernel code calls it.
 //!
 //! ## Deviations
-//! - `compress2` is the C's `compress2_z` and `compress` its `compress_z`: the output buffer is
-//!   a slice whose length is the space available (the C's `*destLen` on entry), and
-//!   `destLen` only receives the compressed length. The `uLong` versions, which only differ
-//!   from the `z_size_t` ones on platforms where the two have different widths, are the same
-//!   functions on LP64. The `NULL` checks have no counterpart (slices are never null).
+//! - The output buffer is a slice whose length is the space available (the C's `*destLen` on
+//!   entry), and `destLen` only receives the compressed length. `compress2_z` holds the body;
+//!   `compress2` and `compress_z` call it and `compress` calls `compress2`, as in the C (the
+//!   `uLong` and `z_size_t` lengths have one width on LP64). The `NULL` checks have no
+//!   counterpart (slices are never null).
 //! - `compressBound` and `compressBound_z` are both kept, for a `u64` and a `usize` length.
 
 #![allow(non_snake_case)] // zlib's names (compressBound, destLen)
@@ -78,12 +78,12 @@ use crate::zlib::{
     Z_DEFAULT_COMPRESSION, Z_FINISH, Z_NO_FLUSH, Z_OK, Z_STREAM_END, ZStream, deflateInit,
 };
 
-/// `compress2` (`compress2_z`): compresses `source` into `dest` at `level` (as in
-/// `deflateInit`) and sets `destLen` to the size of the compressed data. `dest` should be at
-/// least [`compressBound`] bytes long. Returns `Z_OK` if success, `Z_MEM_ERROR` if there was
-/// not enough memory, `Z_BUF_ERROR` if there was not enough room in the output buffer,
+/// `compress2_z`: compresses `source` into `dest` at `level` (as in `deflateInit`) and sets
+/// `destLen` to the size of the compressed data. `dest` should be at least
+/// [`compressBound`] bytes long. Returns `Z_OK` if success, `Z_MEM_ERROR` if there was not
+/// enough memory, `Z_BUF_ERROR` if there was not enough room in the output buffer,
 /// `Z_STREAM_ERROR` if the level parameter is invalid.
-pub fn compress2(dest: &mut [u8], destLen: &mut usize, source: &[u8], level: i32) -> i32 {
+pub fn compress2_z(dest: &mut [u8], destLen: &mut usize, source: &[u8], level: i32) -> i32 {
     let max = u32::MAX as usize; // (uInt)-1: what one call takes at most
     let dest_size = dest.len();
     let mut left = dest_size;
@@ -130,7 +130,20 @@ pub fn compress2(dest: &mut [u8], destLen: &mut usize, source: &[u8], level: i32
     if err == Z_STREAM_END { Z_OK } else { err }
 }
 
-/// `compress` (`compress_z`): [`compress2`] at `Z_DEFAULT_COMPRESSION`.
+/// `compress2`: [`compress2_z`] with the `uLong` lengths, the same width on LP64.
+pub fn compress2(dest: &mut [u8], destLen: &mut usize, source: &[u8], level: i32) -> i32 {
+    let mut got = *destLen;
+    let ret = compress2_z(dest, &mut got, source, level);
+    *destLen = got;
+    ret
+}
+
+/// `compress_z`: [`compress2_z`] at `Z_DEFAULT_COMPRESSION`.
+pub fn compress_z(dest: &mut [u8], destLen: &mut usize, source: &[u8]) -> i32 {
+    compress2_z(dest, destLen, source, Z_DEFAULT_COMPRESSION)
+}
+
+/// `compress`: [`compress2`] at `Z_DEFAULT_COMPRESSION`.
 pub fn compress(dest: &mut [u8], destLen: &mut usize, source: &[u8]) -> i32 {
     compress2(dest, destLen, source, Z_DEFAULT_COMPRESSION)
 }
