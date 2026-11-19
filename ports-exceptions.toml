@@ -878,12 +878,6 @@ reason = "not configured: `defined(DYNAMIC_CRC_TABLE) && defined(W)` is false on
 approved = "2026-11-19"
 
 [[exception]]
-c = "sys/lib/libz/crc32.c"
-function = "crc32_z"
-reason = "not configured: `defined(ARMCRC32)` is false on amd64 and arm64 GENERIC.MP"
-approved = "2026-11-19"
-
-[[exception]]
 c = "sys/lib/libz/zutil.c"
 function = "zmemcpy"
 reason = "not configured: `!defined(HAVE_MEMCPY)` is false on amd64 and arm64 GENERIC.MP"
