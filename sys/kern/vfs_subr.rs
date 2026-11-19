@@ -96,8 +96,9 @@
 //!   leaves the allocation; an address shorter than two bytes (no family byte) is `EINVAL`.
 //!   A failed `malloc(M_WAITOK)` panics, as `vfs_mount_alloc`'s does.
 //! - `vprint` is compiled under feature `diagnostic` or `debug`, `printlockedvnodes` under
-//!   `debug`, as in C. The DDB printers (`vfs_buf_print`, `vfs_vnode_print`,
-//!   `vfs_mount_print`) wait for the ddb command loop (`db_command.c`).
+//!   `debug`, as in C. The DDB printers `vfs_buf_print`, `vfs_vnode_print` and
+//!   `vfs_mount_print` take a `PrFn` (ddb's `db_printf`) where the C takes a `printf`-like
+//!   pointer; `vfs_vnode_print`'s "typedata" is whatever `v_un` holds.
 
 use core::ptr::{self, NonNull};
 use core::sync::atomic::{AtomicI32, AtomicI64, AtomicU32, Ordering};
@@ -2262,7 +2263,181 @@ pub fn reassignbuf(bp: &'static Buf) {
     unsafe { bufinsvn(bp, listheadp) };
 }
 
-// DDB: vfs_buf_print, vfs_vnode_print, vfs_mount_print wait for the ddb command loop.
+/// `vfs_buf_print(b, full, pr)` (`DDB`): what a buffer is and holds.
+pub fn vfs_buf_print(bp: &Buf, _full: bool, pr: crate::machine::db_machdep::PrFn) {
+    use crate::kern::subr_prf::Bitmask;
+    use crate::sys::buf::B_BITS;
+
+    pr(format_args!(
+        "  vp {:p} lblkno 0x{:x} blkno 0x{:x} dev 0x{:x}\n  proc {:p} error {} flags {}\n",
+        bp.b_vp.get().map_or(ptr::null(), ptr::from_ref),
+        bp.b_lblkno.get(),
+        bp.b_blkno.get(),
+        bp.b_dev.get(),
+        bp.b_proc.get(),
+        bp.b_error.get().map_or(0, Errno::as_i32),
+        Bitmask(bp.b_flags.get() as u64, B_BITS)
+    ));
+
+    pr(format_args!(
+        "  bufsize 0x{:x} bcount 0x{:x} resid 0x{:x}\n  data {:p} saveaddr {:p} iodone {:p}\n",
+        bp.b_bufsize.get(),
+        bp.b_bcount.get(),
+        bp.b_resid.get(),
+        bp.b_data.get(),
+        bp.b_saveaddr.get(),
+        bp.b_iodone.get().map_or(ptr::null(), |f| f as *const ())
+    ));
+
+    pr(format_args!(
+        "  dirty {{off 0x{:x} end 0x{:x}}} valid {{off 0x{:x} end 0x{:x}}}\n",
+        bp.b_dirtyoff.get(),
+        bp.b_dirtyend.get(),
+        bp.b_validoff.get(),
+        bp.b_validend.get()
+    ));
+}
+
+/// `vfs_vnode_print(v, full, pr)` (`DDB`): what a vnode is, and with `full` its buffers.
+pub fn vfs_vnode_print(vp: &Vnode, full: bool, pr: crate::machine::db_machdep::PrFn) {
+    use crate::sys::vnode::{VTAG_NAMES, VTYPE_NAMES, VnodeUn};
+
+    let tag = vp.v_tag.get() as usize;
+    let vtype = vp.v_type.get() as usize;
+    let mountedhere = match vp.v_un.get() {
+        VnodeUn::Mountedhere(mp) => ptr::from_ref(mp).cast::<()>(),
+        VnodeUn::Socket(so) => ptr::from_ref(so).cast::<()>(),
+        VnodeUn::Specinfo(si) => ptr::from_ref(si).cast::<()>(),
+        VnodeUn::Fifoinfo(fi) => fi.cast_const().cast::<()>(),
+        VnodeUn::None => ptr::null(),
+    };
+    pr(format_args!(
+        "tag {}({}) type {}({}) mount {:p} typedata {:p}\n",
+        VTAG_NAMES.get(tag).copied().unwrap_or("<unk>"),
+        tag,
+        VTYPE_NAMES.get(vtype).copied().unwrap_or("<unk>"),
+        vtype,
+        vp.v_mount.get().map_or(ptr::null(), ptr::from_ref),
+        mountedhere
+    ));
+
+    pr(format_args!(
+        "data {:p} usecount {} writecount {} holdcnt {} numoutput {}\n",
+        vp.v_data.get(),
+        vp.v_usecount.get(),
+        vp.v_writecount.get(),
+        vp.v_holdcnt.get(),
+        vp.v_numoutput.get()
+    ));
+
+    // uvm_object_printit(&vp->v_uobj, full, pr); (commented out in the C)
+
+    if full {
+        pr(format_args!("clean bufs:\n"));
+        for bp in vp.v_cleanblkhd.iter() {
+            pr(format_args!(" bp {:p}\n", bp));
+            vfs_buf_print(bp, full, pr);
+        }
+
+        pr(format_args!("dirty bufs:\n"));
+        for bp in vp.v_dirtyblkhd.iter() {
+            pr(format_args!(" bp {:p}\n", bp));
+            vfs_buf_print(bp, full, pr);
+        }
+    }
+}
+
+/// `vfs_mount_print(mp, full, pr)` (`DDB`): what a mount is, its locked vnodes, and with
+/// `full` all of them.
+pub fn vfs_mount_print(mp: &'static Mount, full: bool, pr: crate::machine::db_machdep::PrFn) {
+    use crate::kern::subr_prf::{Bitmask, Str};
+    use crate::sys::mount::MNT_BITS;
+
+    pr(format_args!(
+        "flags {}\nvnodecovered {:p} syncer {:p} data {:p}\n",
+        Bitmask(mp.mnt_flag.get() as u32 as u64, MNT_BITS),
+        mp.mnt_vnodecovered.get().map_or(ptr::null(), ptr::from_ref),
+        mp.mnt_syncer.get().map_or(ptr::null(), ptr::from_ref),
+        mp.mnt_data.get()
+    ));
+
+    if let Some(vfc) = mp.mnt_vfc.get() {
+        pr(format_args!(
+            "vfsconf: ops {:p} name \"{}\" num {} ref {} flags 0x{:x}\n",
+            ptr::from_ref(vfc.vfc_vfsops),
+            Str(&vfc.vfc_name),
+            vfc.vfc_typenum,
+            vfc.vfc_refcount.load(Ordering::Relaxed),
+            vfc.vfc_flags
+        ));
+    }
+
+    let st = mp.mnt_stat.get();
+    pr(format_args!(
+        "statvfs cache: bsize {:x} iosize {:x}\nblocks {} free {} avail {}\n",
+        st.f_bsize, st.f_iosize, st.f_blocks, st.f_bfree, st.f_bavail
+    ));
+
+    pr(format_args!(
+        "  files {} ffiles {} favail {}\n",
+        st.f_files, st.f_ffree, st.f_favail
+    ));
+
+    pr(format_args!(
+        "  f_fsidx {{0x{:x}, 0x{:x}}} owner {} ctime 0x{:x}\n",
+        st.f_fsid.val[0], st.f_fsid.val[1], st.f_owner, st.f_ctime
+    ));
+
+    pr(format_args!(
+        "  syncwrites {} asyncwrites = {}\n",
+        st.f_syncwrites, st.f_asyncwrites
+    ));
+
+    pr(format_args!(
+        "  syncreads {} asyncreads = {}\n",
+        st.f_syncreads, st.f_asyncreads
+    ));
+
+    pr(format_args!(
+        "  fstype \"{}\" mnton \"{}\" mntfrom \"{}\" mntspec \"{}\"\n",
+        Str(&st.f_fstypename),
+        Str(&st.f_mntonname),
+        Str(&st.f_mntfromname),
+        Str(&st.f_mntfromspec)
+    ));
+
+    // Three per line: 72 / (sizeof(void *) * 2 + 4).
+    const PER_LINE: usize = 72 / (core::mem::size_of::<*const ()>() * 2 + 4);
+    let list = |vp: &Vnode, cnt: usize| {
+        if cnt == 0 {
+            pr(format_args!("\n  {:p}", vp));
+        } else if cnt.is_multiple_of(PER_LINE) {
+            pr(format_args!(",\n  {:p}", vp));
+        } else {
+            pr(format_args!(", {:p}", vp));
+        }
+    };
+
+    pr(format_args!("locked vnodes:"));
+    // XXX would take mountlist lock, except ddb has no context
+    let mut cnt = 0;
+    for vp in mp.mnt_vnodelist.iter() {
+        if VOP_ISLOCKED(vp) != 0 {
+            list(vp, cnt);
+            cnt += 1;
+        }
+    }
+    pr(format_args!("\n"));
+
+    if full {
+        pr(format_args!("all vnodes:"));
+        // XXX would take mountlist lock, except ddb has no context
+        for (cnt, vp) in mp.mnt_vnodelist.iter().enumerate() {
+            list(vp, cnt);
+        }
+        pr(format_args!("\n"));
+    }
+}
 
 /// `copy_statfs_info(sbp, mp)`: fills the mount-wide members of a file system's `statfs`
 /// answer from the mount.

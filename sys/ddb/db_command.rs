@@ -144,6 +144,10 @@ use crate::kern::subr_pool::{PoolWalkPr, db_show_all_pools, pool_printit, pool_w
 use crate::kern::subr_prf::{Str, db_printf, panicstr_message};
 use crate::kern::uipc_mbuf::{m_print, m_print_chain, m_print_packet};
 use crate::kern::uipc_socket::so_print;
+use crate::kern::vfs_bio::BUFPOOL;
+use crate::kern::vfs_subr::{
+    MOUNTLIST, VNODE_POOL, vfs_buf_print, vfs_mount_print, vfs_vnode_print,
+};
 use crate::machine::Machine;
 use crate::machine::cpu::{Cpu, boot, curcpu, curproc};
 use crate::machine::db_machdep::{
@@ -156,7 +160,9 @@ use crate::netinet::ip_ipsp::{TDB_POOL, Tdb, tdb_printit};
 use crate::nfs::nfs_debug::{
     db_show_all_nfsnodes, db_show_all_nfsreqs, nfs_node_print, nfs_request_print,
 };
+use crate::sys::buf::Buf;
 use crate::sys::mbuf::Mbuf;
+use crate::sys::mount::Mount;
 use crate::sys::msgbuf::MSG_MAGIC;
 use crate::sys::pool::Pool;
 use crate::sys::proc::Proc;
@@ -165,6 +171,7 @@ use crate::sys::reboot::{
 };
 use crate::sys::socket::{AF_INET, AF_INET6};
 use crate::sys::socketvar::Socket;
+use crate::sys::vnode::Vnode;
 use crate::unported;
 use crate::uvm::uvm_meter::uvmexp_print;
 
@@ -442,8 +449,14 @@ unsafe fn db_addr_as<'a, T>(addr: DbExpr) -> Option<&'a T> {
 }
 
 /// `db_buf_print_cmd`: `show buf[/f] addr`.
-fn db_buf_print_cmd(_addr: DbExpr, _have_addr: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
-    db_stub!("vfs_buf_print (vfs_subr.c)")
+fn db_buf_print_cmd(addr: DbExpr, _have_addr: bool, _count: DbExpr, modif: &[u8]) -> DbResult {
+    let full = modif.first() == Some(&b'f');
+
+    // SAFETY: the user named a buffer (db_addr_as).
+    if let Some(bp) = unsafe { db_addr_as::<Buf>(addr) } {
+        vfs_buf_print(bp, full, db_pr);
+    }
+    Ok(())
 }
 
 /// `db_map_print_cmd`: `show map[/f] addr`.
@@ -485,23 +498,55 @@ fn db_socket_print_cmd(addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8])
 }
 
 /// `db_mount_print_cmd`: `show mount[/f] addr`.
-fn db_mount_print_cmd(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
-    db_stub!("vfs_mount_print (vfs_subr.c)")
+fn db_mount_print_cmd(addr: DbExpr, _have: bool, _count: DbExpr, modif: &[u8]) -> DbResult {
+    let full = modif.first() == Some(&b'f');
+
+    // SAFETY: the user named a mount (db_addr_as).
+    if let Some(mp) = unsafe { db_addr_as::<Mount>(addr) } {
+        vfs_mount_print(mp, full, db_pr);
+    }
+    Ok(())
 }
 
 /// `db_show_all_mounts`: `show all mounts[/f]`.
-fn db_show_all_mounts(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
-    db_stub!("vfs_mount_print (vfs_subr.c)")
+fn db_show_all_mounts(_addr: DbExpr, _have: bool, _count: DbExpr, modif: &[u8]) -> DbResult {
+    let full = modif.first() == Some(&b'f');
+
+    for mp in MOUNTLIST.0.iter() {
+        db_printf(format_args!("mountpoint {:p}\n", mp));
+        vfs_mount_print(mp, full, db_pr);
+    }
+    Ok(())
 }
 
 /// `db_show_all_vnodes`: `show all vnodes[/f]`.
-fn db_show_all_vnodes(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
-    db_stub!("vfs_vnode_print (vfs_subr.c)")
+fn db_show_all_vnodes(_addr: DbExpr, _have: bool, _count: DbExpr, modif: &[u8]) -> DbResult {
+    let full = modif.first() == Some(&b'f');
+
+    pool_walk(&VNODE_POOL, full, db_printf, db_vnode_walk);
+    Ok(())
+}
+
+/// `pool_walk`'s printer for `show all vnodes`: `vfs_vnode_print` on an item of `vnode_pool`.
+fn db_vnode_walk(v: *const u8, full: bool, _pr: PoolWalkPr) {
+    // SAFETY: pool_walk hands over the items of vnode_pool that are in use: whole vnodes.
+    let vp = unsafe { &*v.cast::<Vnode>() };
+    vfs_vnode_print(vp, full, db_pr);
 }
 
 /// `db_show_all_bufs`: `show all bufs[/f]`.
-fn db_show_all_bufs(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
-    db_stub!("vfs_buf_print (vfs_subr.c)")
+fn db_show_all_bufs(_addr: DbExpr, _have: bool, _count: DbExpr, modif: &[u8]) -> DbResult {
+    let full = modif.first() == Some(&b'f');
+
+    pool_walk(&BUFPOOL, full, db_printf, db_buf_walk);
+    Ok(())
+}
+
+/// `pool_walk`'s printer for `show all bufs`: `vfs_buf_print` on an item of `bufpool`.
+fn db_buf_walk(v: *const u8, full: bool, _pr: PoolWalkPr) {
+    // SAFETY: pool_walk hands over the items of bufpool that are in use: whole buffers.
+    let bp = unsafe { &*v.cast::<Buf>() };
+    vfs_buf_print(bp, full, db_pr);
 }
 
 /// `pool_walk`'s printer for `show all tdbs`: `tdb_printit` on an item of `tdb_pool`.
@@ -562,8 +607,14 @@ fn db_page_print_cmd(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) 
 }
 
 /// `db_vnode_print_cmd`: `show vnode[/f] addr`.
-fn db_vnode_print_cmd(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
-    db_stub!("vfs_vnode_print (vfs_subr.c)")
+fn db_vnode_print_cmd(addr: DbExpr, _have: bool, _count: DbExpr, modif: &[u8]) -> DbResult {
+    let full = modif.first() == Some(&b'f');
+
+    // SAFETY: the user named a vnode (db_addr_as).
+    if let Some(vp) = unsafe { db_addr_as::<Vnode>(addr) } {
+        vfs_vnode_print(vp, full, db_pr);
+    }
+    Ok(())
 }
 
 /// `db_nfsreq_print_cmd`: `show nfsreq[/f] addr`.
