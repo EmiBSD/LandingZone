@@ -89,7 +89,7 @@ use crate::machine::conf::iszerodev;
 use crate::machine::copy::{copyin, kcopy};
 use crate::machine::cpu::Cpu;
 use crate::machine::exec::MachineExec;
-use crate::machine::pmap::pmap_wired_count;
+use crate::machine::pmap::{pmap_check_copyin, pmap_wired_count};
 use crate::machine::{Machine, VmParam};
 use crate::sys::errno::Errno;
 use crate::sys::fcntl::{FREAD, FWRITE};
@@ -130,10 +130,10 @@ use crate::uvm::uvm_extern::{
 use crate::uvm::uvm_init::UVMEXP;
 use crate::uvm::uvm_km::kernel_map;
 use crate::uvm::uvm_map::{
-    UVM_EXTRACT_FIXPROT, UvmMapDeadq, VmMap, uvm_map, uvm_map_advice, uvm_map_checkprot,
-    uvm_map_clean, uvm_map_extract, uvm_map_hint, uvm_map_immutable, uvm_map_inherit,
-    uvm_map_mquery, uvm_map_pageable, uvm_map_pageable_all, uvm_map_protect, uvm_mapanon,
-    uvm_unmap, uvm_unmap_detach, uvm_unmap_remove, vm_map_lock, vm_map_unlock,
+    UVM_EXTRACT_FIXPROT, UvmMapDeadq, VmMap, uvm_map, uvm_map_advice, uvm_map_check_copyin_add,
+    uvm_map_checkprot, uvm_map_clean, uvm_map_extract, uvm_map_hint, uvm_map_immutable,
+    uvm_map_inherit, uvm_map_mquery, uvm_map_pageable, uvm_map_pageable_all, uvm_map_protect,
+    uvm_mapanon, uvm_unmap, uvm_unmap_detach, uvm_unmap_remove, vm_map_lock, vm_map_unlock,
 };
 use crate::uvm::uvm_map::{VM_MAP_PINSYSCALL_ONCE, VM_MAP_WIREFUTURE};
 use crate::uvm::uvm_pager::{PGO_CLEANIT, PGO_DEACTIVATE, PGO_FREE, PGO_SYNCIO};
@@ -693,7 +693,10 @@ pub fn sys_pinsyscalls(p: &Proc, v: &SysArgs, _retval: &mut [Register; 2]) -> Re
     pr.ps_libcpin.pn_pins.set(mem.cast::<u32>().as_ptr());
     pr.ps_libcpin.pn_npins.set(npins);
 
-    // PMAP_CHECK_COPYIN: not configured.
+    // Assume (and insist) on libc.so text being execute-only
+    if pmap_check_copyin() {
+        let _ = uvm_map_check_copyin_add(map, base, base + len);
+    }
     Ok(())
 }
 

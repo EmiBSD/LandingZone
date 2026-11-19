@@ -774,6 +774,10 @@ impl Pmap for Machine {
         false
     }
 
+    fn pmap_check_copyin() -> bool {
+        false
+    }
+
     fn pmap_update(_pmap: &HostPmap) {}
 
     /// The host's page tables never run out.

@@ -525,7 +525,7 @@ pub fn main() -> ! {
         let _ = tsleep_nsec(ptr::from_ref(&CONFIG_PENDING), PWAIT, "cfpend", INFSLP);
     }
 
-    let _ = unported!("dostartuphooks");
+    crate::kern::kern_subr::dostartuphooks();
 
     // NVSCSI: not configured.
     // NSOFTRAID > 0

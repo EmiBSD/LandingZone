@@ -79,6 +79,8 @@
 //! - `sy_call_t` returns `Result<(), Errno>` with the two return registers as an out
 //!   parameter; `SCARG(uap, k)` is `sysargs::<T>(v).k.get()` (`sys/syscallargs.rs`).
 
+use core::cell::Cell;
+use core::ffi::c_void;
 use core::ptr;
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize};
 
@@ -88,6 +90,7 @@ use crate::kern::kern_rwlock::{
 use crate::net::if_::NETLOCK;
 use crate::sys::errno::Errno;
 use crate::sys::proc::Proc;
+use crate::sys::queue::{TailqEntry, TailqHead};
 use crate::sys::types::Register;
 
 /// `physmem`: physical memory, in pages (an `int` in C).
@@ -148,6 +151,45 @@ impl Sysent {
 
 /// `SY_NOLOCK`: the syscall does not take the kernel lock.
 pub const SY_NOLOCK: i32 = 0x01;
+
+/// `HOOK_REMOVE`: `dohooks` takes each hook off the list before it runs it.
+pub const HOOK_REMOVE: i32 = 0x01;
+/// `HOOK_FREE`: with `HOOK_REMOVE`, `dohooks` frees each hook after it ran.
+pub const HOOK_FREE: i32 = 0x02;
+
+/// `struct hook_desc`: startup hooks functions.
+pub struct HookDesc {
+    /// `hd_list`: the list the hook is on.
+    pub hd_list: TailqEntry<HookDesc>,
+    /// `hd_fn`: the function.
+    pub hd_fn: Cell<Option<fn(*mut c_void)>>,
+    /// `hd_arg`: its argument.
+    pub hd_arg: Cell<*mut c_void>,
+}
+
+crate::queue_adapter!(
+    /// `TAILQ_HEAD(hook_desc_head, hook_desc)`.
+    pub HdList: HookDesc, hd_list => TailqEntry<HookDesc>
+);
+
+/// `struct hook_desc_head`: a list of hooks.
+pub struct HookDescHead(pub TailqHead<HdList>);
+
+// SAFETY: hooks are established by autoconf and run by `main`, both under the kernel lock.
+unsafe impl Sync for HookDescHead {}
+
+impl HookDescHead {
+    /// `TAILQ_HEAD_INITIALIZER`: no hooks.
+    pub const fn new() -> Self {
+        Self(TailqHead::new())
+    }
+}
+
+impl Default for HookDescHead {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// `SCARG`'s view of a system call's argument block as its `struct sys_*_args`: `T` is one
 /// of `sys/syscallargs.rs`'s structs, register-wide `Syscallarg` slots in a row that any bit

@@ -79,6 +79,7 @@ use crate::kern::kern_malloc::{free, malloc};
 use crate::kern::sched_bsd::r#yield;
 use crate::kern::vfs_vnops::vn_rdwr;
 use crate::machine::copy::copyout;
+use crate::machine::pmap::pmap_check_copyin;
 use crate::machine::{Machine, VmParam};
 use crate::sys::errno::Errno;
 use crate::sys::exec::{
@@ -100,7 +101,7 @@ use crate::uvm::uvm_extern::{
     PROT_MASK, UVM_FLAG_COPYONW, UVM_FLAG_FIXED, UVM_FLAG_OVERLAY, UVM_FLAG_STACK,
     UVM_UNKNOWN_OFFSET, uvm_mapflag,
 };
-use crate::uvm::uvm_map::{uvm_map, uvm_map_immutable, uvm_map_protect};
+use crate::uvm::uvm_map::{uvm_map, uvm_map_check_copyin_add, uvm_map_immutable, uvm_map_protect};
 use crate::uvm::uvm_param::{round_page, trunc_page};
 use crate::uvm::uvm_vnode::uvn_attach;
 
@@ -240,7 +241,9 @@ pub fn vmcmd_map_pagedvn(p: &Proc, cmd: &mut ExecVmcmd<'_>) -> Result<(), Errno>
     if cmd.ev_flags & VMCMD_IMMUTABLE != 0 {
         let _ = uvm_map_immutable(map, cmd.ev_addr, round_page(cmd.ev_addr + cmd.ev_len), true);
     }
-    // PMAP_CHECK_COPYIN: not configured.
+    if pmap_check_copyin() && cmd.ev_flags & VMCMD_IMMUTABLE != 0 && cmd.ev_prot & PROT_EXEC != 0 {
+        let _ = uvm_map_check_copyin_add(map, cmd.ev_addr, round_page(cmd.ev_addr + cmd.ev_len));
+    }
 
     Ok(())
 }

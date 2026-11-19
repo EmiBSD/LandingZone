@@ -206,6 +206,11 @@ pub trait Pmap {
     /// vmm(4) on amd64); false on a machine that does not define it.
     fn pmap_nested(pmap: &Self::Pmap) -> bool;
 
+    /// `PMAP_CHECK_COPYIN`: whether copyin(9) and copyinstr(9) must refuse the regions a map
+    /// lists as execute-only, because this CPU's MMU cannot make a page executable and not
+    /// readable (amd64 without PKU). False on a machine that does not define it.
+    fn pmap_check_copyin() -> bool;
+
     /// `pmap_growkernel`: grows the kernel page tables to cover `maxkvaddr`; returns how far
     /// they now reach.
     fn pmap_growkernel(maxkvaddr: Vaddr) -> Vaddr;
@@ -393,6 +398,11 @@ pub fn pmap_populate(pmap: &MachinePmap, va: Vaddr) {
 /// `pmap_nested` on the selected machine.
 pub fn pmap_nested(pmap: &MachinePmap) -> bool {
     Machine::pmap_nested(pmap)
+}
+
+/// `PMAP_CHECK_COPYIN` on the selected machine.
+pub fn pmap_check_copyin() -> bool {
+    Machine::pmap_check_copyin()
 }
 
 /// `pmap_update` on the selected machine.

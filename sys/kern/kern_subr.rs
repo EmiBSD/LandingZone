@@ -57,34 +57,66 @@
 //!
 //! Upstream: sys/kern/kern_subr.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M5 ports `hashinit` and `hashfree`; M7b (`kern_descrip.c`) adds
-//! `uiomove` and `ureadc`. The hook lists (`hook_establish`, `hook_disestablish`, `dohooks`)
-//! arrive with their first user.
+//! Status: `ported`. Milestone M5 ports `hashinit` and `hashfree`; M7b (`kern_descrip.c`) adds
+//! `uiomove` and `ureadc`; TD1 the hook lists (`hook_establish`, `hook_disestablish`,
+//! `dohooks`, with `<sys/systm.h>`'s `startuphook_*` and `dostartuphooks`).
 //!
 //! ## Deviations
 //! - `hashinit` returns the table as a slice (its length is `hashmask + 1`) instead of a
 //!   pointer plus an out-parameter mask; callers mask with `len() - 1`.
 //! - `uiomove(cp, n, uio)` takes the kernel buffer as a slice whose length is `n`.
-//! - `PMAP_CHECK_COPYIN` (the `check_copyin` wrappers of `copyin`/`copyinstr`) is not
-//!   configured: the pinned-syscall regions it checks arrive with `pinsyscalls`.
+//! - Under `PMAP_CHECK_COPYIN` the C defines `copyin` and `copyinstr` here, over the
+//!   machine's `_copyin` and `_copyinstr`. `check_copyin` is here; the two wrappers are the
+//!   entry points every caller already uses, `machine::copy::copyin` and `copyinstr`
+//!   (`sys/machine/copy.rs`), which make the check when the machine's
+//!   `pmap_check_copyin()` says so.
 
+use core::cell::Cell;
+use core::ffi::c_void;
 use core::ptr::{self, NonNull};
+use core::sync::atomic::Ordering;
 
 use crate::kassert;
-use crate::kern::kern_malloc::{free, mallocarray};
+use crate::kern::kern_malloc::{free, malloc, mallocarray};
 use crate::kern::sched_bsd::preempt;
 use crate::kern::subr_prf::panic;
 use crate::machine::copy::{copyin, copyout, kcopy};
 use crate::sys::errno::Errno;
-use crate::sys::queue::{ListAdapter, ListHead};
+use crate::sys::malloc::{M_DEVBUF, M_NOWAIT};
+use crate::sys::proc::Proc;
+use crate::sys::queue::{ListAdapter, ListHead, TailqEntry, TailqHead};
 use crate::sys::sched::sched_pause;
+use crate::sys::systm::{HOOK_FREE, HOOK_REMOVE, HdList, HookDesc, HookDescHead};
 use crate::sys::types::Off;
 use crate::sys::uio::{Uio, UioRw, UioSeg};
+
+/// `startuphook_list`: "startup hook" types, functions, and variables.
+pub static STARTUPHOOK_LIST: HookDescHead = HookDescHead::new();
 
 /// `uio->uio_iov++; uio->uio_iovcnt--`: steps past the first iovec.
 fn uio_next_iov(uio: &mut Uio<'_>) {
     let iov = core::mem::take(&mut uio.uio_iov);
     uio.uio_iov = &mut iov[1..];
+}
+
+/// `check_copyin(p, vstart, len)`: `EFAULT` if the range overlaps one of the regions the
+/// process's map lists for copyin(9) (its execute-only text, under `PMAP_CHECK_COPYIN`).
+pub fn check_copyin(p: &Proc, vstart: usize, len: usize) -> Result<(), Errno> {
+    let map = &p.vmspace().vm_map;
+    let start = vstart;
+    let end = start.wrapping_add(len);
+
+    // XXX if the array was sorted, we could shortcut
+    // membar_consumer(): an entry is written before the count shows it.
+    let max = map.check_copyin_count.load(Ordering::Acquire);
+    for region in map.check_copyin.iter().take(max as usize) {
+        let s = region.start.get();
+        let e = region.end.get();
+        if (start >= s && start < e) || (end > s && end < e) {
+            return Err(Errno::EFAULT);
+        }
+    }
+    Ok(())
 }
 
 /// `uiomove(cp, n, uio)`: moves `cp.len()` bytes (at most `uio_resid`) between the kernel
@@ -246,6 +278,106 @@ pub unsafe fn hashfree<A: ListAdapter>(hash: &'static [ListHead<A>], elements: i
     };
     free(p, type_, hashsize * size_of::<ListHead<A>>());
 }
+
+/// `hook_establish(head, tail, fn, arg)`: adds a hook to a list, at its tail or its head, and
+/// returns it for `hook_disestablish`; `None` without memory.
+pub fn hook_establish(
+    head: &HookDescHead,
+    tail: bool,
+    func: fn(*mut c_void),
+    arg: *mut c_void,
+) -> Option<NonNull<HookDesc>> {
+    let hdp = malloc(size_of::<HookDesc>(), M_DEVBUF, M_NOWAIT)?.cast::<HookDesc>();
+    // SAFETY: a fresh malloc(9) block of the descriptor's size and alignment, written whole
+    // before anything reads it; it lives until `hook_disestablish` or `dohooks` frees it.
+    let hd = unsafe {
+        hdp.as_ptr().write(HookDesc {
+            hd_list: TailqEntry::new(),
+            hd_fn: Cell::new(Some(func)),
+            hd_arg: Cell::new(arg),
+        });
+        hdp.as_ref()
+    };
+    // SAFETY: the descriptor is on no list yet.
+    unsafe {
+        if tail {
+            head.0.insert_tail(hd);
+        } else {
+            head.0.insert_head(hd);
+        }
+    }
+    Some(hdp)
+}
+
+/// `hook_disestablish(head, vhook)`: takes a hook off its list and frees it. Under
+/// `DIAGNOSTIC` a hook that is not on the list is left alone.
+///
+/// # Safety
+///
+/// `vhook` came from `hook_establish` on `head` and has not been freed, by this function or
+/// by a `dohooks` with `HOOK_FREE`.
+pub unsafe fn hook_disestablish(head: &HookDescHead, vhook: NonNull<HookDesc>) {
+    #[cfg(feature = "diagnostic")]
+    if !head.0.iter().any(|hdp| ptr::eq(hdp, vhook.as_ptr())) {
+        return;
+    }
+    // SAFETY: the caller's guarantee: a live descriptor on this list.
+    unsafe {
+        head.0.remove(vhook.as_ref());
+    }
+    free(vhook.cast::<u8>(), M_DEVBUF, size_of::<HookDesc>());
+}
+
+/// `dohooks(head, flags)`: run hooks. Startup hooks are invoked right after scheduler_start
+/// but before root is mounted. With `HOOK_REMOVE` each hook is taken off the list first, and
+/// with `HOOK_FREE` too it is freed after it ran.
+pub fn dohooks(head: &HookDescHead, flags: i32) {
+    if flags & HOOK_REMOVE == 0 {
+        // TAILQ_FOREACH_SAFE: a hook may take itself off the list.
+        let mut hdp = head.0.first();
+        while let Some(hd) = hdp {
+            hdp = TailqHead::<HdList>::next(hd);
+            if let Some(func) = hd.hd_fn.get() {
+                func(hd.hd_arg.get());
+            }
+        }
+    } else {
+        while let Some(hd) = head.0.first() {
+            // SAFETY: `hd` is the first element of the list.
+            unsafe { head.0.remove(hd) };
+            if let Some(func) = hd.hd_fn.get() {
+                func(hd.hd_arg.get());
+            }
+            if flags & HOOK_FREE != 0 {
+                free(
+                    NonNull::from(hd).cast::<u8>(),
+                    M_DEVBUF,
+                    size_of::<HookDesc>(),
+                );
+            }
+        }
+    }
+}
+
+/// `startuphook_establish(fn, arg)`: a hook `main` runs before it mounts root.
+pub fn startuphook_establish(func: fn(*mut c_void), arg: *mut c_void) -> Option<NonNull<HookDesc>> {
+    hook_establish(&STARTUPHOOK_LIST, true, func, arg)
+}
+
+/// `startuphook_disestablish(vhook)`.
+///
+/// # Safety
+///
+/// As [`hook_disestablish`], for a hook of `startuphook_establish`.
+pub unsafe fn startuphook_disestablish(vhook: NonNull<HookDesc>) {
+    // SAFETY: the caller's guarantee.
+    unsafe { hook_disestablish(&STARTUPHOOK_LIST, vhook) }
+}
+
+/// `dostartuphooks()`: runs every startup hook once and frees it.
+pub fn dostartuphooks() {
+    dohooks(&STARTUPHOOK_LIST, HOOK_REMOVE | HOOK_FREE);
+}
 /* </CODE> */
 
 /* <TESTS> */
@@ -353,6 +485,44 @@ mod tests {
             assert!(b == *b"xy");
             b = [0; 2];
         }
+    }
+    std::thread_local! {
+        /// The arguments the hooks of the test below were run with, in order.
+        static RAN: core::cell::RefCell<std::vec::Vec<usize>> =
+            const { core::cell::RefCell::new(std::vec::Vec::new()) };
+    }
+
+    fn note(arg: *mut c_void) {
+        RAN.with(|r| r.borrow_mut().push(arg as usize));
+    }
+
+    #[test]
+    fn hooks_run_in_order_and_are_removed_and_freed() {
+        let _g = crate::kern::subr_pool::tests::setup_real_memory();
+        static HEAD: HookDescHead = HookDescHead::new();
+        HEAD.0.init();
+        let ran = || RAN.with(|r| core::mem::take(&mut *r.borrow_mut()));
+
+        // Tail, tail, head: 3 runs first.
+        let h1 = hook_establish(&HEAD, true, note, ptr::without_provenance_mut(1)).expect("a hook");
+        hook_establish(&HEAD, true, note, ptr::without_provenance_mut(2)).expect("a hook");
+        hook_establish(&HEAD, false, note, ptr::without_provenance_mut(3)).expect("a hook");
+
+        // Without HOOK_REMOVE the hooks stay and run again.
+        dohooks(&HEAD, 0);
+        assert_eq!(ran(), [3, 1, 2]);
+        // One disestablished hook does not run any more.
+        // SAFETY: `h1` is a hook of this list, established above and not freed.
+        unsafe { hook_disestablish(&HEAD, h1) };
+        dohooks(&HEAD, 0);
+        assert_eq!(ran(), [3, 2]);
+
+        // With HOOK_REMOVE | HOOK_FREE they run once more and the list is empty.
+        dohooks(&HEAD, HOOK_REMOVE | HOOK_FREE);
+        assert_eq!(ran(), [3, 2]);
+        assert!(HEAD.0.first().is_none());
+        dohooks(&HEAD, HOOK_REMOVE | HOOK_FREE);
+        assert_eq!(ran(), std::vec::Vec::<usize>::new());
     }
 }
 /* </TESTS> */

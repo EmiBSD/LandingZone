@@ -28,7 +28,10 @@
 use core::mem::MaybeUninit;
 use core::slice;
 
+use crate::kern::kern_subr::check_copyin;
 use crate::machine::Machine;
+use crate::machine::cpu::curproc;
+use crate::machine::pmap::pmap_check_copyin;
 use crate::sys::errno::Errno;
 
 /// The copy routines between user and kernel space.
@@ -101,8 +104,14 @@ pub fn copyout_obj<T: AbiPod>(obj: &T, uaddr: usize) -> Result<(), Errno> {
     copyout(buf, uaddr)
 }
 
-/// `copyin` on the selected machine.
+/// `copyin`: the machine's `_copyin`, after `kern_subr.c`'s check of the regions the
+/// process may execute and not read, on a machine that needs it (`PMAP_CHECK_COPYIN`).
 pub fn copyin(uaddr: usize, kbuf: &mut [u8]) -> Result<(), Errno> {
+    if pmap_check_copyin()
+        && let Some(p) = curproc()
+    {
+        check_copyin(p, uaddr, kbuf.len())?;
+    }
     Machine::copyin(uaddr, kbuf)
 }
 
@@ -111,9 +120,17 @@ pub fn copyout(kbuf: &[u8], uaddr: usize) -> Result<(), Errno> {
     Machine::copyout(kbuf, uaddr)
 }
 
-/// `copyinstr` on the selected machine.
+/// `copyinstr`: the machine's `_copyinstr`, then the same check over the bytes the string
+/// took: the copyin checks must come after figuring out the string length, since the
+/// buffer size may cross into another ELF segment.
 pub fn copyinstr(uaddr: usize, kbuf: &mut [u8]) -> Result<usize, Errno> {
-    Machine::copyinstr(uaddr, kbuf)
+    let alen = Machine::copyinstr(uaddr, kbuf)?;
+    if pmap_check_copyin()
+        && let Some(p) = curproc()
+    {
+        check_copyin(p, uaddr, alen)?;
+    }
+    Ok(alen)
 }
 
 /// `copyin32` on the selected machine.

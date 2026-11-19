@@ -511,6 +511,11 @@ impl Pmap for Machine {
         pmap.pmap_nested()
     }
 
+    fn pmap_check_copyin() -> bool {
+        // #define PMAP_CHECK_COPYIN (pg_xo == 0)
+        amd64::pmap::PG_XO_BITS.load(core::sync::atomic::Ordering::Relaxed) == 0
+    }
+
     fn pmap_update(_pmap: &Self::Pmap) {}
 
     fn pmap_growkernel(maxkvaddr: Vaddr) -> Vaddr {

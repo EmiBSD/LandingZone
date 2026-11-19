@@ -516,6 +516,10 @@ impl Pmap for Machine {
         false
     }
 
+    fn pmap_check_copyin() -> bool {
+        false
+    }
+
     fn pmap_update(_pmap: &Self::Pmap) {}
 
     fn pmap_growkernel(maxkvaddr: Vaddr) -> Vaddr {

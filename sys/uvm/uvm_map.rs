@@ -115,7 +115,8 @@
 //! - `uvm_map_splitentry` takes the pager reference under `KERNEL_LOCK`, as the C (M11a).
 //! - `uvm_map_fill_vmmap` (`kinfo_vmentry`, sysctl) and the `ddb` printers
 //!   (`uvm_map_printit`, `uvm_object_printit`, `uvm_page_printit`) wait for their
-//!   subsystems; `PMAP_CHECK_COPYIN`, `SYSVSHM` and `DEADBEEF0` are not configured;
+//!   subsystems; `SYSVSHM` and `DEADBEEF0` are not configured; `PMAP_CHECK_COPYIN` is the
+//!   machine's `pmap_check_copyin()` (amd64 without PKU), read where the C has the `#ifdef`;
 //!   `TRACEPOINT` (dt) is not configured.
 //! - `UVM_MAP_CLIP_START`/`END` are [`uvm_map_clip_start_at`]/[`uvm_map_clip_end_at`].
 //! - `uvm_map_fix_space` reuses a free-only entry that already starts at the address where
@@ -153,8 +154,9 @@ use crate::machine::cpu::{Cpu, curproc};
 use crate::machine::intr::splassert;
 use crate::machine::intr::{IPL_NONE, IPL_VM};
 use crate::machine::pmap::{
-    MachinePmap, pmap_activate, pmap_create, pmap_deactivate, pmap_destroy, pmap_kernel,
-    pmap_protect, pmap_reference, pmap_remove, pmap_remove_holes, pmap_update, pmap_wired_count,
+    MachinePmap, pmap_activate, pmap_check_copyin, pmap_create, pmap_deactivate, pmap_destroy,
+    pmap_kernel, pmap_protect, pmap_reference, pmap_remove, pmap_remove_holes, pmap_update,
+    pmap_wired_count,
 };
 use crate::machine::vmparam::VmParam;
 use crate::machine::{Machine, Pmap};
@@ -413,6 +415,33 @@ queue_adapter!(
     pub UvmKentryFree: VmMapEntry, addr_kentry => SlistEntry<VmMapEntry>
 );
 
+/// `UVM_MAP_CHECK_COPYIN_MAX`: main, sigtramp, ld.so, libc.so.
+pub const UVM_MAP_CHECK_COPYIN_MAX: usize = 4;
+
+/// `struct uvm_check_copyin`: a region copyin(9) refuses to read from.
+pub struct UvmCheckCopyin {
+    /// `start`.
+    pub start: Cell<usize>,
+    /// `end`.
+    pub end: Cell<usize>,
+}
+
+impl UvmCheckCopyin {
+    /// No region.
+    pub const fn new() -> Self {
+        Self {
+            start: Cell::new(0),
+            end: Cell::new(0),
+        }
+    }
+}
+
+impl Default for UvmCheckCopyin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// `struct vm_map`: a virtual address space, the entries that describe it and the pmap that
 /// backs it.
 ///
@@ -461,7 +490,12 @@ pub struct VmMap {
     /// `uaddr_brk_stack`: brk/stack selector. The uaddr_brk_stack selector will select
     /// addresses that are in the brk/stack area of the map.
     pub uaddr_brk_stack: Cell<Option<&'static UvmAddrState>>,
-    // check_copyin: PMAP_CHECK_COPYIN is not configured.
+    /// `check_copyin[]`: the regions copyin(9) refuses under `PMAP_CHECK_COPYIN` (main,
+    /// sigtramp, ld.so, libc.so). An entry is written under the map's write lock before
+    /// `check_copyin_count` makes it visible.
+    pub check_copyin: [UvmCheckCopyin; UVM_MAP_CHECK_COPYIN_MAX],
+    /// `check_copyin_count`: how many entries of `check_copyin` are in use.
+    pub check_copyin_count: AtomicI32,
     /// `lock`: non-intrsafe lock.
     pub lock: Rwlock,
     /// `mtx`: intrsafe lock.
@@ -492,6 +526,8 @@ impl VmMap {
             uaddr_exe: Cell::new(None),
             uaddr_any: [const { Cell::new(None) }; 4],
             uaddr_brk_stack: Cell::new(None),
+            check_copyin: [const { UvmCheckCopyin::new() }; UVM_MAP_CHECK_COPYIN_MAX],
+            check_copyin_count: AtomicI32::new(0),
             lock: Rwlock::new("vmmaplk"),
             mtx: Mutex::new(IPL_VM),
             flags_lock: Mutex::new(IPL_VM),
@@ -3663,7 +3699,11 @@ pub fn uvmspace_exec(p: &Proc, start: usize, end: usize) {
 
         uvmspace_free(ovm);
     }
-    // PMAP_CHECK_COPYIN is not configured.
+    // disable checks
+    p.vmspace()
+        .vm_map
+        .check_copyin_count
+        .store(0, AtomicOrdering::Relaxed);
 
     // Release dead entries
     uvm_unmap_detach(&dead_entries, 0);
@@ -4069,7 +4109,17 @@ pub fn uvmspace_fork(pr: &Process) -> &'static Vmspace {
     new_map
         .flags
         .set(new_map.flags.get() | (old_map.flags.get() & VM_MAP_PINSYSCALL_ONCE));
-    // PMAP_CHECK_COPYIN is not configured.
+    if pmap_check_copyin() {
+        for (new, old) in new_map.check_copyin.iter().zip(&old_map.check_copyin) {
+            new.start.set(old.start.get());
+            new.end.set(old.end.get());
+        }
+        // membar_producer()
+        new_map.check_copyin_count.store(
+            old_map.check_copyin_count.load(AtomicOrdering::Relaxed),
+            AtomicOrdering::Release,
+        );
+    }
 
     vm_map_unlock(old_map);
     vm_map_unlock(new_map);
@@ -4315,7 +4365,38 @@ pub fn uvm_map_inherit(
     error
 }
 
-// uvm_map_check_copyin_add: PMAP_CHECK_COPYIN is not configured.
+/// `check_copyin_add`: one more region, if the machine checks and there is room.
+fn check_copyin_add(map: &VmMap, start: usize, end: usize) {
+    let count = map.check_copyin_count.load(AtomicOrdering::Relaxed);
+    if !pmap_check_copyin() || count as usize >= UVM_MAP_CHECK_COPYIN_MAX {
+        return;
+    }
+    vm_map_assert_wrlock(map);
+    map.check_copyin[count as usize].start.set(start);
+    map.check_copyin[count as usize].end.set(end);
+    // membar_producer()
+    map.check_copyin_count
+        .store(count + 1, AtomicOrdering::Release);
+}
+
+/// `uvm_map_check_copyin_add`: remember regions which are X-only for copyin(), copyinstr(),
+/// uiomove(), and others.
+///
+/// Map must be unlocked.
+pub fn uvm_map_check_copyin_add(map: &VmMap, start: usize, end: usize) -> Result<(), Errno> {
+    if start > end {
+        return Err(Errno::EINVAL);
+    }
+    let start = start.max(map.min_offset.get());
+    let end = end.min(map.max_offset.get());
+    if start >= end {
+        return Ok(());
+    }
+    vm_map_lock(map);
+    check_copyin_add(map, start, end);
+    vm_map_unlock(map);
+    Ok(())
+}
 
 /// `uvm_map_immutable`: block mapping/mprotect for range of addrs in map.
 ///
