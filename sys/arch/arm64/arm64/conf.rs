@@ -117,6 +117,7 @@ use crate::dev::wscons::wsmux::{
     NWSMUX, wsmuxclose, wsmuxioctl, wsmuxkqfilter, wsmuxopen, wsmuxread,
 };
 use crate::kern::kern_descrip::filedescopen;
+use crate::kern::subr_log::{logclose, logioctl, logkqfilter, logopen, logread};
 use crate::kern::tty_pty::{
     NPTY, ptcclose, ptckqfilter, ptcopen, ptcread, ptcwrite, ptmclose, ptmioctl, ptmopen, ptsclose,
     ptsopen, ptsread, ptsstop, ptswrite, ptyioctl, ptytty,
@@ -133,6 +134,7 @@ use crate::scsi::cd::{NCD, cdclose, cddump, cdioctl, cdopen, cdread, cdsize, cds
 use crate::scsi::sd::{NSD, sdclose, sddump, sdioctl, sdopen, sdread, sdsize, sdstrategy, sdwrite};
 #[cfg(feature = "fuse")]
 use crate::sys::conf::cdev_fuse_init;
+use crate::sys::conf::cdev_log_init;
 use crate::sys::conf::{
     Bdevsw, Cdevsw, bdev_disk_init, bdev_notdef, cdev_audio_init, cdev_bio_init, cdev_bpf_init,
     cdev_cn_init, cdev_ctty_init, cdev_disk_init, cdev_fd_init, cdev_gpio_init, cdev_ipmi_init,
@@ -248,7 +250,15 @@ pub static CDEVSW: Devsw<Cdevsw, 101> = Devsw([
         ptytty,
         ptckqfilter,
     )),
-    cnotdef(), // 7: /dev/klog (log: subr_log.c's logopen .. logkqfilter, not ported)
+    // 7: /dev/klog
+    Cell::new(cdev_log_init(
+        1,
+        logopen,
+        logclose,
+        logread,
+        logioctl,
+        logkqfilter,
+    )),
     // 8: serial port
     Cell::new(cdev_tty_init(
         NCOM, comopen, comclose, comread, comwrite, comioctl, comstop, comtty,

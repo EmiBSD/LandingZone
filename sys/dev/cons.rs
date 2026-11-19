@@ -163,6 +163,13 @@ pub fn constty() -> Option<&'static Tty> {
     unsafe { CONSTTY.load(Ordering::Acquire).as_ref() }
 }
 
+/// `cn_devvp`: the vnode of the device under an open `/dev/console`, if any.
+pub fn cn_devvp() -> Option<&'static Vnode> {
+    // SAFETY: a non-null `cn_devvp` is the vnode `cnopen` holds a reference on until
+    // `cnclose` clears it.
+    unsafe { CN_DEVVP.load(Ordering::Relaxed).as_ref() }
+}
+
 /// `constty = tp`.
 pub fn set_constty(tp: Option<&Tty>) {
     CONSTTY.store(

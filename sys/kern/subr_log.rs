@@ -52,14 +52,15 @@
 //!
 //! Upstream: sys/kern/subr_log.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M2 ports the message buffer itself: `initmsgbuf`,
+//! Status: `ported`. Milestone M2 ports the message buffer itself: `initmsgbuf`,
 //! `msgbuf_putchar`, `msgbuf_putchar_locked`, `logwakeup`, `initconsbuf` and the globals
 //! `log_open`, `msgbufmapped`, `msgbufp`, `consbufp`. M8: `sendsyslog(2)`: the log stash
 //! (`logstash_full`, `logstash_increment`, `logstash_insert`, `logstash_remove`,
 //! `logstash_sendsyslog`), `sys_sendsyslog` and `dosendsyslog`, with `syslogf` and its
-//! rwlock. The `/dev/klog` device (`logopen` through `logkqfilter`, `logtick`, `logioctl`
-//! with `LIOCSFD`) needs the device switch, sockets and kqueue. M11e: `log_mtx`, taken by
-//! `msgbuf_putchar` as in C.
+//! rwlock. M11e: `log_mtx`, taken by `msgbuf_putchar` as in C. TD1: the `/dev/klog` device
+//! (`logopen`, `logclose`, `logread`, `logkqfilter` with its filter, `logtick`, `logioctl`
+//! with `LIOCSFD`, `msgbuf_getlen`), character major 7 on both machines, and
+//! `initconsbuf`'s buffer.
 //!
 //! ## Deviations
 //! - `msgbufp` is a [`StaticCell`] (a `&'static Msgbuf` is a fat pointer, which no atomic holds).
@@ -69,48 +70,74 @@
 //! - `initmsgbuf`'s check and repair of the header is [`initmsgbuf_header`], which works on a
 //!   given overlay without installing it as `msgbufp`, so the host tests exercise it on a
 //!   private buffer: tests run in parallel and print through the global one.
-//! - `logsoftc` is reduced to its `sc_need_wakeup` flag, the only member `logwakeup` touches.
-//! - `initconsbuf` needs `malloc(9)` (M3) and reports the gap instead.
-//! - Nothing sets `syslogf` (that is `logioctl(LIOCSFD)`'s job, with the log device), so
-//!   `dosendsyslog` writes a `LOG_CONS` message to the console through `cnputc` (`constty`
-//!   and `cn_devvp` are NULL without the tty layer) and answers `ENOTCONN`, and the other
-//!   messages are stashed; once a socket is set, the message goes to it through `sosend`. The
-//!   stash's cursors are indices into the ring, not pointers.
+//! - `logsoftc` is five statics (`LOGSOFTC_*`); `sc_state` is an atomic changed under
+//!   `log_mtx`, `sc_need_wakeup` an atomic flag set with no lock, as in C.
+//! - `logread` copies each piece of the ring into a buffer on its stack under `log_mtx`
+//!   and hands that to `uiomove` with the mutex released, at most 256 bytes a turn; the C
+//!   gives `uiomove` the ring itself with the mutex released. What the reader gets is the
+//!   same; a byte the kernel overwrites meanwhile is never read half-written.
+//! - An ioctl's `int` is read from and written to the first four bytes of `data`.
+//! - Until syslogd(8) sets `syslogf` (`logioctl(LIOCSFD)`), `dosendsyslog` writes a
+//!   `LOG_CONS` message to the console, through `cnwrite` when `constty` or `cn_devvp` is
+//!   set and through `cnputc` otherwise, and answers `ENOTCONN`; the other messages are
+//!   stashed. Once a socket is
+//!   set, the message goes to it through `sosend`. The stash's cursors are indices into the
+//!   ring, not pointers.
 
 use core::cell::Cell;
+use core::ffi::c_void;
 use core::ptr::{self, NonNull};
-use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering, fence};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering, fence};
 
 use libkern::StaticCell;
 
-use crate::dev::cons::cnputc;
+use crate::dev::cons::{cn_devvp, cnputc, cnwrite, constty};
 use crate::kassert;
+use crate::kern::kern_event::{
+    klist_free, klist_init_mutex, klist_insert, klist_invalidate, klist_remove, knote,
+};
 use crate::kern::kern_lock::{mtx_enter, mtx_leave};
 use crate::kern::kern_malloc::{free, malloc};
+use crate::kern::kern_prot::suser;
 use crate::kern::kern_rwlock::{
     rw_assert_anylock, rw_assert_wrlock, rw_enter_read, rw_enter_write, rw_exit,
 };
+use crate::kern::kern_sig::{pgsigio, sigio_free, sigio_getown, sigio_setown};
+use crate::kern::kern_subr::uiomove;
+use crate::kern::kern_synch::{sleep_finish, sleep_setup, wakeup};
+use crate::kern::kern_timeout::{timeout_add_msec, timeout_del, timeout_set};
 use crate::kern::subr_prf::snprintf;
 use crate::kern::sys_socket::fp_socket;
 use crate::kern::uipc_socket::sosend;
+use crate::kern::uipc_syscalls::getsock;
 use crate::machine::copy::copyin;
 use crate::machine::intr::IPL_HIGH;
 use crate::machine::{Machine, MachineParam};
 use crate::sys::errno::Errno;
+use crate::sys::event::{
+    EVFILT_READ, FILTEROP_ISFD, FILTEROP_MPSAFE, Filterops, Kevent, Klist, Knote, knote_modify,
+    knote_process,
+};
 use crate::sys::fcntl::FNONBLOCK;
 use crate::sys::file::{File, fref, frele};
-use crate::sys::malloc::{M_LOG, M_WAITOK};
+use crate::sys::filio::{FIOASYNC, FIOGETOWN, FIONREAD, FIOSETOWN};
+use crate::sys::malloc::{M_LOG, M_TTYS, M_WAITOK, M_ZERO};
 use crate::sys::msgbuf::{CONSBUFSIZE, MSG_MAGIC, Msgbuf};
 use crate::sys::mutex::Mutex;
+use crate::sys::param::{PCATCH, PZERO};
 use crate::sys::proc::Proc;
 use crate::sys::rwlock::Rwlock;
+use crate::sys::sigio::{SigioRef, sigio_init};
+use crate::sys::signal::SIGIO;
 use crate::sys::socket::MSG_DONTWAIT;
 use crate::sys::syscallargs::SysSendsyslogArgs;
-use crate::sys::syslog::{LOG_CONS, LOG_KERN, LOG_MAXLINE, LOG_WARNING};
-use crate::sys::systm::{SysArgs, kernel_lock, kernel_unlock, sysargs};
-use crate::sys::types::{Pid, Register};
+use crate::sys::syslog::{LIOCSFD, LOG_CONS, LOG_KERN, LOG_MAXLINE, LOG_WARNING};
+use crate::sys::systm::{INFSLP, SysArgs, kernel_lock, kernel_unlock, sysargs};
+use crate::sys::timeout::Timeout;
+use crate::sys::ttycom::{TIOCGPGRP, TIOCSPGRP};
+use crate::sys::types::{Dev, Pid, Register};
 use crate::sys::uio::{Iovec, Uio, UioRw, UioSeg};
-use crate::unported;
+use crate::sys::vnode::IO_NDELAY;
 
 /// `MSGBUFSIZE` of the selected machine: the static buffer's size.
 const MSGBUFSIZE: usize = <Machine as MachineParam>::MSGBUFSIZE;
@@ -127,6 +154,35 @@ static MSGBUFMAPPED: AtomicBool = AtomicBool::new(false);
 static MSGBUFP: StaticCell<Option<&'static Msgbuf>> = StaticCell::new(None);
 /// `consbufp`: console message buffer.
 static CONSBUFP: StaticCell<Option<&'static Msgbuf>> = StaticCell::new(None);
+/// `LOG_RDPRI`: the priority a reader of the log device sleeps at.
+const LOG_RDPRI: i32 = PZERO + 1;
+/// `LOG_TICK`: log tick interval in msec.
+const LOG_TICK: u64 = 50;
+/// `LOG_ASYNC`: `sc_state`: the owner wants `SIGIO`.
+const LOG_ASYNC: i32 = 0x04;
+/// `LOG_RDWAIT`: `sc_state`: a reader sleeps for data.
+const LOG_RDWAIT: i32 = 0x08;
+
+/// `logread_filtops`: `EVFILT_READ` on the log device.
+pub static LOGREAD_FILTOPS: Filterops = Filterops {
+    f_flags: FILTEROP_ISFD | FILTEROP_MPSAFE,
+    f_attach: None,
+    f_detach: Some(filt_logrdetach),
+    f_event: Some(filt_logread),
+    f_modify: Some(filt_logmodify),
+    f_process: Some(filt_logprocess),
+};
+
+/// `logsoftc.sc_state`: \[L\] `LOG_ASYNC` and `LOG_RDWAIT`, changed under `log_mtx`.
+static LOGSOFTC_STATE: AtomicI32 = AtomicI32::new(0);
+/// `logsoftc.sc_klist`: \[Q\] process waiting on kevent call.
+static LOGSOFTC_KLIST: Klist = Klist::new();
+/// `logsoftc.sc_sigio`: async I/O registration.
+static LOGSOFTC_SIGIO: SigioRef = SigioRef::new();
+/// `logsoftc.sc_tick`: wakeup poll timeout.
+static LOGSOFTC_TICK: Timeout = Timeout::new(logtick, ptr::null_mut());
+/// `log_kq_mtx`: the lock of `sc_klist` (`MTX_NOWITNESS` in C).
+static LOG_KQ_MTX: Mutex = Mutex::new(IPL_HIGH);
 /// `logsoftc.sc_need_wakeup`: if set, wake up waiters.
 static LOGSOFTC_NEED_WAKEUP: AtomicBool = AtomicBool::new(false);
 /// `log_mtx`: serializes access to the log message buffers. This should be kept as a leaf
@@ -214,11 +270,18 @@ pub fn init_static_msgbuf() {
 
 /// `initconsbuf`: sets up a buffer to collect `/dev/console` output.
 pub fn initconsbuf() {
-    // consbufp = malloc(CONSBUFSIZE, M_TTYS, M_WAITOK | M_ZERO): malloc(9) arrives with M3.
-    let _ = CONSBUFSIZE;
-    let _ = unported!("malloc (initconsbuf)");
+    // Set up a buffer to collect /dev/console output
+    let Some(mem) = malloc(CONSBUFSIZE, M_TTYS, M_WAITOK | M_ZERO) else {
+        // malloc(M_WAITOK) does not fail in C.
+        return;
+    };
+    // SAFETY: a fresh malloc(9) block of `CONSBUFSIZE` zeroed bytes, aligned for the header,
+    // never freed and reached only through this overlay.
+    let cbp = unsafe { Msgbuf::from_raw(mem.as_ptr(), CONSBUFSIZE) };
+    cbp.set_magic(MSG_MAGIC);
+    cbp.set_bufs((CONSBUFSIZE - Msgbuf::HEADER_SIZE) as i64);
     // SAFETY: single writer, on the boot CPU (see `consbufp`).
-    unsafe { CONSBUFP.write(None) };
+    unsafe { CONSBUFP.write(Some(cbp)) };
 }
 
 /// `msgbuf_putchar`: appends `c` to `mbp` under `log_mtx`; nothing happens if the buffer was
@@ -255,6 +318,198 @@ pub fn msgbuf_putchar_locked(mbp: &Msgbuf, c: u8) {
     }
 }
 
+/// `msgbuf_getlen`: how many bytes of the buffer have not been read yet.
+pub fn msgbuf_getlen(mbp: &Msgbuf) -> usize {
+    let mut len = mbp.bufx() - mbp.bufr();
+    if len < 0 {
+        len += mbp.bufs();
+    }
+    len as usize
+}
+
+/// `logopen`: `/dev/klog` is opened by one reader at a time, syslogd(8); the opening starts
+/// the tick that turns `logwakeup`'s requests into wakeups.
+pub fn logopen(_dev: Dev, _flags: i32, _mode: i32, _p: &Proc) -> Result<(), Errno> {
+    if LOG_OPEN.load(Ordering::Relaxed) {
+        return Err(Errno::EBUSY);
+    }
+    LOG_OPEN.store(true, Ordering::Relaxed);
+    // SAFETY: `log_kq_mtx` is a static.
+    unsafe { klist_init_mutex(&LOGSOFTC_KLIST, &LOG_KQ_MTX) };
+    sigio_init(&LOGSOFTC_SIGIO);
+    timeout_set(&LOGSOFTC_TICK, logtick, ptr::null_mut());
+    timeout_add_msec(&LOGSOFTC_TICK, LOG_TICK);
+    Ok(())
+}
+
+/// `logclose`: gives the syslog socket back, stops the tick and frees the device's state.
+pub fn logclose(_dev: Dev, _flag: i32, _mode: i32, p: Option<&Proc>) -> Result<(), Errno> {
+    rw_enter_write(&SYSLOGF_RWLOCK);
+    let fp = SYSLOGF.swap(ptr::null_mut(), Ordering::AcqRel);
+    rw_exit(&SYSLOGF_RWLOCK);
+
+    // SAFETY: a non-null `syslogf` is a file the log device held a reference on.
+    if let Some(fp) = unsafe { fp.as_ref() } {
+        let _ = frele(fp, p);
+    }
+    LOG_OPEN.store(false, Ordering::Relaxed);
+    timeout_del(&LOGSOFTC_TICK);
+
+    klist_invalidate(&LOGSOFTC_KLIST);
+    klist_free(&LOGSOFTC_KLIST);
+
+    LOGSOFTC_STATE.store(0, Ordering::Relaxed);
+    sigio_free(&LOGSOFTC_SIGIO);
+    Ok(())
+}
+
+/// `logread`: hands the reader the unread bytes of the message buffer, after a line that
+/// says how many were dropped when the buffer overflowed; with nothing to read it sleeps,
+/// or fails with `EWOULDBLOCK` under `IO_NDELAY`.
+pub fn logread(_dev: Dev, uio: &mut Uio<'_>, flag: i32) -> Result<(), Errno> {
+    let Some(mbp) = msgbufp() else {
+        // The C dereferences msgbufp, which initmsgbuf set long before the device exists.
+        return Err(Errno::ENXIO);
+    };
+    logread_msgbuf(mbp, uio, flag)
+}
+
+/// `logread`'s body over a given buffer (`msgbufp` in the kernel, a private one in the host
+/// tests, which run in parallel and print through the global one).
+fn logread_msgbuf(mbp: &Msgbuf, uio: &mut Uio<'_>, flag: i32) -> Result<(), Errno> {
+    let mut error = Ok(());
+
+    mtx_enter(&LOG_MTX);
+    'out: {
+        while mbp.bufr() == mbp.bufx() {
+            if flag & IO_NDELAY != 0 {
+                error = Err(Errno::EWOULDBLOCK);
+                break 'out;
+            }
+            LOGSOFTC_STATE.fetch_or(LOG_RDWAIT, Ordering::Relaxed);
+            mtx_leave(&LOG_MTX);
+            // Set up and enter sleep manually instead of using msleep() to keep log_mtx as
+            // a leaf lock.
+            sleep_setup(ptr::from_ref(mbp).cast(), LOG_RDPRI | PCATCH, "klog");
+            error = sleep_finish(
+                INFSLP,
+                LOGSOFTC_STATE.load(Ordering::Relaxed) & LOG_RDWAIT != 0,
+            );
+            mtx_enter(&LOG_MTX);
+            if error.is_err() {
+                break 'out;
+            }
+        }
+
+        if mbp.bufd() > 0 {
+            let mut buf = [0u8; 64];
+
+            let ndropped = mbp.bufd();
+            mtx_leave(&LOG_MTX);
+            let l = snprintf(
+                &mut buf,
+                format_args!(
+                    "<{}>klog: dropped {} byte{}, message buffer full\n",
+                    LOG_KERN | LOG_WARNING,
+                    ndropped,
+                    if ndropped == 1 { "" } else { "s" }
+                ),
+            );
+            let l = l.min(buf.len() - 1);
+            error = uiomove(&mut buf[..l], uio);
+            mtx_enter(&LOG_MTX);
+            if error.is_err() {
+                break 'out;
+            }
+            mbp.set_bufd(mbp.bufd() - ndropped);
+        }
+
+        while uio.uio_resid > 0 {
+            let mut chunk = [0u8; 256];
+
+            let l = if mbp.bufx() >= mbp.bufr() {
+                mbp.bufx() - mbp.bufr()
+            } else {
+                mbp.bufs() - mbp.bufr()
+            } as usize;
+            let l = l.min(uio.uio_resid).min(chunk.len());
+            if l == 0 {
+                break;
+            }
+            let rpos = mbp.bufr() as usize;
+            // The bytes are copied out of the ring under log_mtx (see the module's
+            // deviations).
+            for (d, s) in chunk[..l].iter_mut().zip(&mbp.bufc()[rpos..rpos + l]) {
+                *d = s.get();
+            }
+            mtx_leave(&LOG_MTX);
+            // Ignore that concurrent readers may consume the same data.
+            error = uiomove(&mut chunk[..l], uio);
+            mtx_enter(&LOG_MTX);
+            if error.is_err() {
+                break;
+            }
+            let mut r = mbp.bufr() + l as i64;
+            if r < 0 || r >= mbp.bufs() {
+                r = 0;
+            }
+            mbp.set_bufr(r);
+        }
+    }
+    mtx_leave(&LOG_MTX);
+    error
+}
+
+/// `logkqfilter`: `EVFILT_READ` on the log device.
+pub fn logkqfilter(_dev: Dev, kn: &Knote) -> Result<(), Errno> {
+    match kn.kn_filter().get() {
+        EVFILT_READ => kn.kn_fop.set(Some(&LOGREAD_FILTOPS)),
+        _ => return Err(Errno::EINVAL),
+    }
+
+    kn.kn_hook
+        .set(msgbufp().map_or(ptr::null_mut(), |mbp| ptr::from_ref(mbp).cast_mut().cast()));
+    klist_insert(&LOGSOFTC_KLIST, kn);
+
+    Ok(())
+}
+
+/// `filt_logrdetach`.
+pub fn filt_logrdetach(kn: &Knote) {
+    klist_remove(&LOGSOFTC_KLIST, kn);
+}
+
+/// `filt_logread`: readable when the buffer holds unread bytes; their number is the data.
+pub fn filt_logread(kn: &Knote, _hint: i64) -> bool {
+    // kn->kn_hook is msgbufp.
+    let Some(mbp) = msgbufp() else {
+        return false;
+    };
+
+    mtx_enter(&LOG_MTX);
+    kn.kn_data().set(msgbuf_getlen(mbp) as i64);
+    mtx_leave(&LOG_MTX);
+    kn.kn_data().get() != 0
+}
+
+/// `filt_logmodify`.
+pub fn filt_logmodify(kev: &mut Kevent, kn: &Knote) -> bool {
+    mtx_enter(&LOG_KQ_MTX);
+    let active = knote_modify(kev, kn);
+    mtx_leave(&LOG_KQ_MTX);
+
+    active
+}
+
+/// `filt_logprocess`.
+pub fn filt_logprocess(kn: &Knote, kev: Option<&mut Kevent>) -> bool {
+    mtx_enter(&LOG_KQ_MTX);
+    let active = knote_process(kn, kev);
+    mtx_leave(&LOG_KQ_MTX);
+
+    active
+}
+
 /// `logwakeup`: asks for the `/dev/klog` readers to be woken. The actual wakeup has to be
 /// deferred because `logwakeup()` can be called in very varied contexts; keeping the print
 /// routines usable in as many situations as possible means no locking here.
@@ -263,6 +518,103 @@ pub fn logwakeup() {
     // (membar_producer).
     fence(Ordering::Release);
     LOGSOFTC_NEED_WAKEUP.store(true, Ordering::Relaxed);
+}
+
+/// `logtick`: every `LOG_TICK` milliseconds while the device is open, makes the wakeups
+/// `logwakeup` asked for: the knotes, `SIGIO` in async mode, the sleeping reader.
+pub fn logtick(_arg: *mut c_void) {
+    if !LOG_OPEN.load(Ordering::Relaxed) {
+        return;
+    }
+
+    if LOGSOFTC_NEED_WAKEUP.load(Ordering::Relaxed) {
+        LOGSOFTC_NEED_WAKEUP.store(false, Ordering::Relaxed);
+
+        // sc_need_wakeup has to be cleared before handling the wakeup. Visiting log_mtx
+        // ensures the proper order.
+
+        mtx_enter(&LOG_MTX);
+        let state = LOGSOFTC_STATE.load(Ordering::Relaxed);
+        if state & LOG_RDWAIT != 0 {
+            LOGSOFTC_STATE.store(state & !LOG_RDWAIT, Ordering::Relaxed);
+        }
+        mtx_leave(&LOG_MTX);
+
+        knote(&LOGSOFTC_KLIST, 0);
+
+        if state & LOG_ASYNC != 0 {
+            pgsigio(&LOGSOFTC_SIGIO, SIGIO, false);
+        }
+        if state & LOG_RDWAIT != 0
+            && let Some(mbp) = msgbufp()
+        {
+            wakeup(ptr::from_ref(mbp));
+        }
+    }
+
+    timeout_add_msec(&LOGSOFTC_TICK, LOG_TICK);
+}
+
+/// The `int` an ioctl carries in `data`.
+fn ioctl_int(data: &[u8]) -> i32 {
+    data.first_chunk::<4>()
+        .map_or(0, |b| i32::from_ne_bytes(*b))
+}
+
+/// `logioctl`: `FIONREAD` (the unread bytes), `FIOASYNC`, the owner of `SIGIO`
+/// (`FIOSETOWN`/`TIOCSPGRP`, `FIOGETOWN`/`TIOCGPGRP`) and `LIOCSFD`, by which syslogd(8)
+/// hands the kernel the socket `sendsyslog(2)` writes to.
+pub fn logioctl(_dev: Dev, com: u64, data: &mut [u8], _flag: i32, p: &Proc) -> Result<(), Errno> {
+    match com {
+        // return number of characters immediately available
+        FIONREAD => {
+            mtx_enter(&LOG_MTX);
+            let len = msgbufp().map_or(0, msgbuf_getlen) as i32;
+            mtx_leave(&LOG_MTX);
+            if let Some(b) = data.first_chunk_mut::<4>() {
+                *b = len.to_ne_bytes();
+            }
+        }
+
+        FIOASYNC => {
+            mtx_enter(&LOG_MTX);
+            if ioctl_int(data) != 0 {
+                LOGSOFTC_STATE.fetch_or(LOG_ASYNC, Ordering::Relaxed);
+            } else {
+                LOGSOFTC_STATE.fetch_and(!LOG_ASYNC, Ordering::Relaxed);
+            }
+            mtx_leave(&LOG_MTX);
+        }
+
+        FIOSETOWN | TIOCSPGRP => {
+            return sigio_setown(&LOGSOFTC_SIGIO, com, &ioctl_int(data));
+        }
+
+        FIOGETOWN | TIOCGPGRP => {
+            let mut owner = 0;
+            sigio_getown(&LOGSOFTC_SIGIO, com, &mut owner);
+            if let Some(b) = data.first_chunk_mut::<4>() {
+                *b = owner.to_ne_bytes();
+            }
+        }
+
+        LIOCSFD => {
+            suser(p)?;
+            let newfp = getsock(p, ioctl_int(data))?;
+
+            rw_enter_write(&SYSLOGF_RWLOCK);
+            let fp = SYSLOGF.swap(ptr::from_ref(newfp).cast_mut(), Ordering::AcqRel);
+            rw_exit(&SYSLOGF_RWLOCK);
+
+            // SAFETY: a non-null `syslogf` is a file the log device held a reference on.
+            if let Some(fp) = unsafe { fp.as_ref() } {
+                let _ = frele(fp, p);
+            }
+        }
+
+        _ => return Err(Errno::ENOTTY),
+    }
+    Ok(())
 }
 
 /// `LOGSTASH_SIZE`: how many messages the log stash keeps while `syslogd(8)` is away.
@@ -540,24 +892,24 @@ pub fn dosendsyslog(p: &Proc, buf: SyslogBuf, nbyte: usize, flags: i32) -> Resul
 
     // KTRACE: not configured.
     let mut len = nbyte;
+    let (base, segflg) = match buf {
+        SyslogBuf::User(addr) => (addr + start, UioSeg::UIO_USERSPACE),
+        SyslogBuf::Sys(ptr) => (ptr as usize + start, UioSeg::UIO_SYSSPACE),
+    };
+    let mut aiov = [Iovec {
+        iov_base: ptr::without_provenance_mut(base),
+        iov_len: nbyte,
+    }];
+    let mut auio = Uio {
+        uio_iov: &mut aiov,
+        uio_offset: 0,
+        uio_resid: nbyte,
+        uio_segflg: segflg,
+        uio_rw: UioRw::UIO_WRITE,
+        uio_procp: Some(p),
+    };
     let error = match fp {
         Some(fp) => {
-            let (base, segflg) = match buf {
-                SyslogBuf::User(addr) => (addr + start, UioSeg::UIO_USERSPACE),
-                SyslogBuf::Sys(ptr) => (ptr as usize + start, UioSeg::UIO_SYSSPACE),
-            };
-            let mut aiov = [Iovec {
-                iov_base: ptr::without_provenance_mut(base),
-                iov_len: nbyte,
-            }];
-            let mut auio = Uio {
-                uio_iov: &mut aiov,
-                uio_offset: 0,
-                uio_resid: nbyte,
-                uio_segflg: segflg,
-                uio_rw: UioRw::UIO_WRITE,
-                uio_procp: Some(p),
-            };
             let flags = if fp.flag() & FNONBLOCK != 0 {
                 MSG_DONTWAIT
             } else {
@@ -569,10 +921,31 @@ pub fn dosendsyslog(p: &Proc, buf: SyslogBuf, nbyte: usize, flags: i32) -> Resul
             }
             error
         }
+        None if constty().is_some() || cn_devvp().is_some() => {
+            kernel_lock(); // KERNEL_LOCK()
+            let error = cnwrite(0, &mut auio, 0);
+            if error.is_ok() {
+                len -= auio.uio_resid;
+            }
+            let mut crlf = *b"\r\n";
+            let mut aiov = [Iovec {
+                iov_base: crlf.as_mut_ptr().cast(),
+                iov_len: crlf.len(),
+            }];
+            let mut auio = Uio {
+                uio_iov: &mut aiov,
+                uio_offset: 0,
+                uio_resid: 2,
+                uio_segflg: UioSeg::UIO_SYSSPACE,
+                uio_rw: UioRw::UIO_WRITE,
+                uio_procp: Some(p),
+            };
+            let _ = cnwrite(0, &mut auio, 0);
+            kernel_unlock(); // KERNEL_UNLOCK()
+            error
+        }
         None => {
             kernel_lock(); // KERNEL_LOCK()
-            // constty and cn_devvp (the tty layer) are NULL: the console redirection breaks
-            // down and the bytes go to cnputc.
             // XXX console redirection breaks down...
             let mut resid = len;
             let mut error = Ok(());
@@ -650,6 +1023,83 @@ mod tests {
         mbp.set_magic(0);
         msgbuf_putchar(mbp, b'p');
         assert_eq!(mbp.bufx(), 1);
+    }
+
+    /// Reads up to `len` bytes of `mbp` as the log device would, without sleeping.
+    fn read(mbp: &Msgbuf, len: usize) -> Result<std::vec::Vec<u8>, Errno> {
+        let mut buf = std::vec![0u8; len];
+        let mut iov = [Iovec {
+            iov_base: buf.as_mut_ptr().cast(),
+            iov_len: len,
+        }];
+        let mut uio = Uio {
+            uio_iov: &mut iov,
+            uio_offset: 0,
+            uio_resid: len,
+            uio_segflg: UioSeg::UIO_SYSSPACE,
+            uio_rw: UioRw::UIO_READ,
+            uio_procp: None,
+        };
+        logread_msgbuf(mbp, &mut uio, IO_NDELAY)?;
+        let done = len - uio.uio_resid;
+        buf.truncate(done);
+        Ok(buf)
+    }
+
+    #[test]
+    fn the_log_device_reads_what_was_not_read_yet() {
+        let mut area = Area([0; 64]);
+        // SAFETY: the area outlives the test and is used only through the overlay.
+        let mbp = unsafe { Msgbuf::from_raw(area.0.as_mut_ptr(), 64) };
+        mbp.clear();
+        mbp.set_magic(MSG_MAGIC);
+        mbp.set_bufs(24);
+
+        // Nothing to read: the device would sleep, or with IO_NDELAY says so.
+        assert_eq!(msgbuf_getlen(mbp), 0);
+        assert_eq!(read(mbp, 8), Err(Errno::EWOULDBLOCK));
+
+        for b in b"hello, log\n" {
+            msgbuf_putchar(mbp, *b);
+        }
+        assert_eq!(msgbuf_getlen(mbp), 11);
+        // A short read takes the oldest bytes; the next one goes on from there.
+        assert_eq!(read(mbp, 4).expect("read"), b"hell");
+        assert_eq!(msgbuf_getlen(mbp), 7);
+        assert_eq!(read(mbp, 100).expect("read"), b"o, log\n");
+        assert_eq!(msgbuf_getlen(mbp), 0);
+        assert_eq!(read(mbp, 8), Err(Errno::EWOULDBLOCK));
+
+        // Across the end of the ring: the length counts both pieces, and one read returns
+        // them in order.
+        for b in b"0123456789abcdefgh" {
+            msgbuf_putchar(mbp, *b);
+        }
+        assert_eq!(mbp.bufx(), 5);
+        assert_eq!(msgbuf_getlen(mbp), 18);
+        assert_eq!(read(mbp, 100).expect("read"), b"0123456789abcdefgh");
+        assert_eq!(mbp.bufr(), 5);
+    }
+
+    #[test]
+    fn the_log_device_says_what_an_overflow_dropped() {
+        let mut area = Area([0; 64]);
+        // SAFETY: the area outlives the test and is used only through the overlay.
+        let mbp = unsafe { Msgbuf::from_raw(area.0.as_mut_ptr(), 64) };
+        mbp.clear();
+        mbp.set_magic(MSG_MAGIC);
+        mbp.set_bufs(24);
+
+        // 26 bytes into a ring of 24: three of them are dropped (a full ring holds 23).
+        for b in b"abcdefghijklmnopqrstuvwxyz" {
+            msgbuf_putchar(mbp, *b);
+        }
+        assert_eq!(mbp.bufd(), 3);
+        let out = read(mbp, 200).expect("read");
+        let line = b"<4>klog: dropped 3 bytes, message buffer full\n";
+        assert!(out.starts_with(line));
+        assert_eq!(&out[line.len()..], b"defghijklmnopqrstuvwxyz");
+        assert_eq!(mbp.bufd(), 0);
     }
 
     #[test]
