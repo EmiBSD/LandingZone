@@ -49,6 +49,17 @@ reason = "project helper: visible stubs for unported subsystems"
   pin with the reference tree's blob of that file: from 2026-10-04 until then 18 rows carried
   another file's blob and 20 another row's notes, written by an update that matched several
   rows at once.
+- Completeness (the user's standing order of 2026-11-18, `ported-definition.md`; since
+  2026-11-19 in `cargo xtask ports check`, `tools/xtask/src/completeness.rs`): a `ported`
+  row's Rust file holds no `unported!` and no `db_stub!` in its code zone; and for a `.c` row,
+  every function its C file defines has a `fn` (or `macro_rules!`) of that name in the row's
+  Rust file, or an entry in `ports-exceptions.toml` with the date the user approved it. A
+  stale exception (the Rust has the function, or the C does not define it) is an error too.
+  `cargo xtask ports missing [--proposal FILE]` lists the missing functions of the `ported`
+  and `wip` rows with the `#if` conditions around each and what they come to on amd64 and
+  arm64 `GENERIC.MP`; the proposal it writes is not approved. When the checks went in, 134
+  rows marked `ported` failed them and went back to `wip`, each with the reason in its notes.
+  Neither check sees a check or a branch missing inside a function that exists.
 - Zone markers (M15): `cargo xtask ports check` validates `/* <LICENSES> */`, `/* <CODE> */` and
   `/* <TESTS> */` in every `.rs` under `sys/` and `tools/` (`rust-kernel.md`, file layout).
   `<LICENSES>` is in every file and opens with the author's ISC block (`scope-and-stubs.md`,

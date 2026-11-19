@@ -125,6 +125,7 @@ use serde::Deserialize;
 
 mod boot;
 mod bsdmake;
+mod completeness;
 mod devices;
 mod devs;
 mod diffopenbsd;
@@ -158,6 +159,7 @@ const TABLE_BEGIN: &str = "<!-- ports:begin -->";
 const TABLE_END: &str = "<!-- ports:end -->";
 
 const USAGE: &str = "usage: cargo xtask <ports check | ports status [--write] | ports next | \
+                     ports missing [--proposal FILE] | \
                      ports drift [--strict] [--diff] | image --arch A --kernel K [--cmdline C] [--init I] [--ramdisk R] | \
                      qemu --arch A [--kernel K] [--init I] [--ramdisk R] [--disk-fresh] [--disks N] [--disk-set NAME] [--nvme FILE] [--ahci FILE] [--scsi-cd ISO] [--lsi FILE [--lsi-cd ISO]] [--pci-serial FILE] [--pci-bridges] [--machine pc] [--ide|--megasas|--megasas-gen2|--mptsas|--pvscsi|--am53c974|--dc390|--ufs|--sdhci|--floppy FILE]... [--ipmi] [--reboot] [--vio-mq] [--fb] | gen-syscalls [--check] | gen-devs [--check] | \
                      smoke --arch A [--kernel K] [--cmdline C] [--init I] [--ramdisk R] [--expect-ramdisk] [--disk-fresh] [--disks N] [--disk-set NAME] [--nvme FILE] [--ahci FILE] [--scsi-cd ISO] [--lsi FILE [--lsi-cd ISO]] [--pci-serial FILE] [--pci-bridges] [--machine pc] [--ide|--megasas|--megasas-gen2|--mptsas|--pvscsi|--am53c974|--dc390|--ufs|--sdhci|--floppy FILE]... [--ipmi] [--reboot] [--vio-mq] [--expect-pci-serial T]... [--fb] [--screenshot-after L [--screen-text ROW:COL:TEXT]] [--sendkey-after L --sendkeys K] [--usb] [--usb-hc xhci|ehci|uhci|ohci] [--usb-mouse] [--usb-tablet] [--usb-wacom-tablet] [--usb-ccid] [--usb-net] [--usb-serial FILE [--usb-serial-send-after L --usb-serial-send T]... [--expect-usb-serial T]...] [--audio hda|ac97|usb] [--expect-tone] [--status N] [--send-after L --send T]... [--until-seen] [--https-server DIR:PORT:MODE]... [--reject L]... --expect L... | \
@@ -283,6 +285,10 @@ fn run(args: &[String]) -> Result<()> {
         ["ports", "status"] => ports_status(&root, false),
         ["ports", "status", "--write"] => ports_status(&root, true),
         ["ports", "next"] => ports_next(&root),
+        ["ports", "missing"] => completeness::ports_missing(&root, None),
+        ["ports", "missing", "--proposal", file] => {
+            completeness::ports_missing(&root, Some(Path::new(file)))
+        }
         ["ports", "drift", flags @ ..] => ports_drift(
             &root,
             flags.contains(&"--strict"),
@@ -875,6 +881,28 @@ fn ports_check(root: &Path) -> Result<()> {
         ));
     }
     check_layout(root, &ports, &mut errors)?;
+
+    // The completeness of the `ported` rows (`completeness.rs`, the user's standing order of
+    // 2026-11-18): no stub site in the row's Rust file, and every function of its C file in
+    // it or approved as an exception. The second needs the reference tree.
+    let report = completeness::check(root, &ports.files, have_reference, &mut errors)?;
+    let missing_ported = report
+        .missing
+        .iter()
+        .filter(|m| m.row.status == Status::Ported)
+        .count();
+    let missing_wip = report.missing.len() - missing_ported;
+    println!(
+        "completeness: {} ported row(s) with {} unported!/db_stub! site(s); {} ported .c row(s) \
+         compared, {missing_ported} C function(s) missing from them and {missing_wip} from \
+         the wip rows (`cargo xtask ports missing`)",
+        report.stub_rows, report.stub_sites, report.checked_c_rows
+    );
+    if !have_reference {
+        warnings.push(format!(
+            "{REFERENCE_DIR} not present; the C functions of the ported rows were not compared"
+        ));
+    }
     for x in &ports.extras {
         let rust = &x.rust;
         if !root.join(rust).is_file() {

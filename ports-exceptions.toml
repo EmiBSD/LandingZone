@@ -1,0 +1,14 @@
+# The C functions of a ported .c row that may stay out of the row's Rust file, each
+# approved by the user by name (the standing order of 2026-11-18,
+# .claude/rules/ported-definition.md). `cargo xtask ports check` reads this file: a ported
+# row whose Rust file lacks a function of its C file, with no entry here, is an error.
+#
+# An entry is added only after the user approved it, with the date of the approval. A
+# session never adds one on its own judgment. `cargo xtask ports missing --proposal FILE`
+# writes the candidates, unapproved, for the user to read.
+#
+# [[exception]]
+# c = "sys/kern/kern_timeout.c"
+# function = "timeout_sync_order"
+# reason = "#ifdef WITNESS: not configured"
+# approved = "YYYY-MM-DD"
