@@ -603,7 +603,102 @@ pub fn rust_fns(src: &str) -> HashSet<String> {
             }
         }
     }
+    out.extend(macro_made_fns(&text));
     out
+}
+
+/// The `fn`s a file's own `macro_rules!` make from their invocations: for each macro of
+/// one arm whose matcher is a comma-separated list of `$name:frag` and whose body has
+/// `fn $name`, the argument at that position of every `name!(..)` invocation in the file.
+/// A name the macro only takes as a type or calls is not one (the user's decision of
+/// 2026-11-19: hmac.c's HMAC_*_Init/Update/Final, xform.c's *Update_int).
+fn macro_made_fns(text: &str) -> Vec<String> {
+    let b = text.as_bytes();
+    let mut out = Vec::new();
+    let mut from = 0;
+    while let Some(pos) = text[from..].find("macro_rules!") {
+        let at = from + pos;
+        from = at + "macro_rules!".len();
+        let rest = &text[from..];
+        let name: String = rest
+            .trim_start()
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .collect();
+        let Some(open) = rest.find('{') else { continue };
+        let Some(body_end) = matching(b, from + open, b'{', b'}') else {
+            continue;
+        };
+        let def = &text[from + open + 1..body_end];
+        // One arm: `( matcher ) => { body }`.
+        let Some(m_open) = def.find('(') else {
+            continue;
+        };
+        let Some(m_close) = matching(def.as_bytes(), m_open, b'(', b')') else {
+            continue;
+        };
+        let matcher = &def[m_open + 1..m_close];
+        let body = &def[m_close..];
+        let params: Vec<&str> = matcher
+            .split(',')
+            .map(|p| {
+                p.trim()
+                    .strip_prefix('$')
+                    .and_then(|p| p.split(':').next())
+                    .unwrap_or("")
+            })
+            .collect();
+        let made: Vec<usize> = params
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| !p.is_empty() && body.contains(&format!("fn ${p}")))
+            .map(|(i, _)| i)
+            .collect();
+        if made.is_empty() || name.is_empty() {
+            continue;
+        }
+        let call = format!("{name}!(");
+        let mut f = 0;
+        while let Some(cp) = text[f..].find(&call) {
+            let c_at = f + cp;
+            f = c_at + call.len();
+            if c_at > 0 && is_ident(b[c_at - 1]) {
+                continue;
+            }
+            let Some(close) = matching(b, c_at + call.len() - 1, b'(', b')') else {
+                continue;
+            };
+            let args: Vec<&str> = text[c_at + call.len()..close]
+                .split(',')
+                .map(str::trim)
+                .collect();
+            for &i in &made {
+                if let Some(a) = args.get(i)
+                    && !a.is_empty()
+                    && a.bytes().all(is_ident)
+                {
+                    out.push((*a).to_string());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// The index of the bracket that closes the one at `open`.
+fn matching(b: &[u8], open: usize, o: u8, c: u8) -> Option<usize> {
+    let mut depth = 0usize;
+    for (k, &x) in b.iter().enumerate().skip(open) {
+        if x == o {
+            depth += 1;
+        } else if x == c {
+            depth -= 1;
+            if depth == 0 {
+                return Some(k);
+            }
+        }
+    }
+    None
 }
 
 /// The `unported!` and `db_stub!` sites of a Rust file's code zone, as 1-based line numbers
@@ -1663,6 +1758,8 @@ f(void)
             "fn after_raw() { let _ = r#\"fn not_a_fn() \" \"#; let _ = unported!(\"raw\"); }"
                 .into(),
             "/* outer /* fn nested_comment() */ fn still_comment() */ fn after_nested() {}".into(),
+            "macro_rules! fam { ($t:ty, $hash:ident, $init:ident) => { pub fn $init(x: $t) { $hash(x) } } }".into(),
+            "fam!(u8, called_not_made, made_by_macro);".into(),
             "// let _ = unported!(\"commented\");".into(),
             zone(false, "CODE"),
             String::new(),
@@ -1681,8 +1778,10 @@ f(void)
                 "after_nested",
                 "after_quote_char",
                 "after_raw",
+                "fam",
                 "g",
                 "mac",
+                "made_by_macro",
                 "real",
                 "type"
             ]

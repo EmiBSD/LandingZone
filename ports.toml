@@ -4217,11 +4217,11 @@ notes = "HmacMd5Ctx, HmacSha1Ctx, HmacSha256Ctx (one macro_rules family per hash
 [[file]]
 c = "sys/crypto/hmac.c"
 rust = "sys/crypto/hmac.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "ea2c173814292233be1eda4cc2e1f5e6d529b488"
 deps = ["sys/crypto/hmac.h", "sys/crypto/md5.c", "sys/crypto/sha1.c", "sys/crypto/sha2.c", "sys/lib/libkern/explicit_bzero.c"]
-notes = "HMAC_MD5/SHA1/SHA256 Init/Update/Final; only net80211 and softraid-style callers use it (IPsec's HMACs are cryptosoft's own); RFC 2202 and RFC 4231 SHA-256 vectors tested; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 9 C function(s) not in its Rust file: HMAC_MD5_Init, HMAC_MD5_Update, HMAC_MD5_Final, HMAC_SHA1_Init, HMAC_SHA1_Update, HMAC_SHA1_Final, HMAC_SHA256_Init, HMAC_SHA256_Update, HMAC_SHA256_Final"
+notes = "HMAC_MD5/SHA1/SHA256 Init/Update/Final; only net80211 and softraid-style callers use it (IPsec's HMACs are cryptosoft's own); RFC 2202 and RFC 4231 SHA-256 vectors tested; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 9 C function(s) not in its Rust file: HMAC_MD5_Init, HMAC_MD5_Update, HMAC_MD5_Final, HMAC_SHA1_Init, HMAC_SHA1_Update, HMAC_SHA1_Final, HMAC_SHA256_Init, HMAC_SHA256_Update, HMAC_SHA256_Final; they were there, made by the file's macro_rules!, which ports check sees since 2026-11-19, and it accepts the row as ported"
 
 [[file]]
 c = "sys/crypto/rijndael.h"
@@ -4431,11 +4431,11 @@ notes = "AuthHash, EncXform, CompAlgo, AuthCtx (union authctx as an enum), Ksche
 [[file]]
 c = "sys/crypto/xform.c"
 rust = "sys/crypto/xform.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "5b22ce02e2206c621048750836f386aee952a895"
 deps = ["sys/crypto/xform.h", "sys/crypto/aes.c", "sys/crypto/rijndael.c", "sys/crypto/blf.c", "sys/crypto/cast.c", "sys/crypto/rmd160.c", "sys/crypto/md5.c", "sys/crypto/sha1.c", "sys/crypto/sha2.c", "sys/crypto/gmac.c", "sys/crypto/chachapoly.c", "sys/crypto/ecb3_enc.c", "sys/crypto/set_key.c"]
-notes = "enc_xform_3des/blf/cast5/aes/aes_ctr/aes_gcm/aes_gmac/aes_xts/chacha20_poly1305/null and auth_hash_hmac_md5_96/sha1_96/ripemd_160_96/sha2_256_128/384_192/512_256, gmac_aes_128/192/256, chacha20_poly1305 with their wrappers; comp_algo_deflate with deflate_compress/deflate_decompress over xform_ipcomp.c's deflate_global (M9+), which return a Vec<u8> or an error where the C returns a length and a u_int8_t ** buffer; short keys the C would read past are EINVAL; licence: Ioannidis/Keromytis/Provos/Miller/Belopuhov notice, accepted 2026-10-03; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 5 C function(s) not in its Rust file: MD5Update_int, SHA1Update_int, SHA256Update_int, SHA384Update_int, SHA512Update_int"
+notes = "enc_xform_3des/blf/cast5/aes/aes_ctr/aes_gcm/aes_gmac/aes_xts/chacha20_poly1305/null and auth_hash_hmac_md5_96/sha1_96/ripemd_160_96/sha2_256_128/384_192/512_256, gmac_aes_128/192/256, chacha20_poly1305 with their wrappers; comp_algo_deflate with deflate_compress/deflate_decompress over xform_ipcomp.c's deflate_global (M9+), which return a Vec<u8> or an error where the C returns a length and a u_int8_t ** buffer; short keys the C would read past are EINVAL; licence: Ioannidis/Keromytis/Provos/Miller/Belopuhov notice, accepted 2026-10-03; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 5 C function(s) not in its Rust file: MD5Update_int, SHA1Update_int, SHA256Update_int, SHA384Update_int, SHA512Update_int; they were there, made by the file's macro_rules!, which ports check sees since 2026-11-19, and it accepts the row as ported"
 
 [[file]]
 c = "sys/crypto/cryptosoft.h"
