@@ -83,7 +83,8 @@ echo "lz-build-rc-$rc"
 /// Left out: amd64's half (the native arm64 tree has no amd64 target), the smokes (they
 /// boot QEMU), and `check-ports`, `check-syscalls` and `test-ref` (they read the reference
 /// tree, which is not on the disk). Each step's output goes to `/src/ci-<step>.log`, its
-/// last lines and `lz-ci-<step>-rc-<status>` to the console; every step runs whatever the
+/// last lines (and, when it fails, its `test ... FAILED` and `panicked at` lines) and
+/// `lz-ci-<step>-rc-<status>` to the console; every step runs whatever the
 /// one before did, and the last line, `lz-ci-rc-<N>`, counts the steps that failed. The
 /// xtask tests need `lo0` configured (the recipe does it) and sh, sleep, ps and kill.
 const CI_SH: &str = r#"#!/bin/ksh
@@ -105,6 +106,8 @@ step() {
     "$@" > /src/ci-$n.log 2>&1
     rc=$?
     tail -n 4 /src/ci-$n.log | short
+    # A failed step names its failed tests and panics, which the last lines do not show.
+    [ $rc -eq 0 ] || grep -E '^test .* FAILED$|panicked at|^---- ' /src/ci-$n.log | head -n 20 | short
     echo "lz-ci-$n-rc-$rc in $(($(date +%s) - s)) s"
     [ $rc -eq 0 ] || bad=$((bad + 1))
 }

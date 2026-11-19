@@ -1155,6 +1155,7 @@ fn smoke_once(
         .collect();
     let mut timed_out = false;
     let mut stopped_when_seen = false;
+    let mut stopped_on_reject = false;
     let mut next_send = 0;
     // Where in the transcript the next trigger is looked for: after the previous send.
     let mut search_from = 0;
@@ -1207,6 +1208,21 @@ fn smoke_once(
                 .unwrap_or(false);
             if all {
                 stopped_when_seen = true;
+                let _ = child.kill();
+                let _ = child.wait();
+                break None;
+            }
+        }
+        // A rejected line is a failure whatever comes after it: stop at once rather than
+        // wait for the time limit (the user's request of 2026-11-19, after a selfhost ci
+        // that printed lz-ci-rc-1 idled for 45 minutes until its limit).
+        if !rejects.is_empty() {
+            let hit = transcript
+                .lock()
+                .map(|t| !rejected(&String::from_utf8_lossy(&t), rejects).is_empty())
+                .unwrap_or(false);
+            if hit {
+                stopped_on_reject = true;
                 let _ = child.kill();
                 let _ = child.wait();
                 break None;
@@ -1278,7 +1294,9 @@ fn smoke_once(
         print!("{diagnostics}");
     }
     println!("-----");
-    let why = if timed_out {
+    let why = if stopped_on_reject {
+        format!("stopped at a rejected line after {elapsed:.0}s")
+    } else if timed_out {
         format!("timed out after {elapsed:.0}s")
     } else {
         format!("qemu exited with status {code:?}")
