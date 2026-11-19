@@ -461,7 +461,7 @@ pub fn sleep_setup(ident: *const c_void, prio: i32, wmesg: &'static str) {
 
     sched_lock();
 
-    // TRACEPOINT(sched, sleep, NULL): dt(4), not configured.
+    // TRACEPOINT(sched, sleep, NULL): dt(4), configured in GENERIC.MP, not ported yet.
 
     p.p_wchan.set(ident);
     p.p_wmesg.set(Some(wmesg));
@@ -716,7 +716,7 @@ pub fn unsleep(p: &Proc) {
         unsafe { SLPQUE.0[lookup(p.p_wchan.get())].remove(p) };
         p.p_wchan.set(ptr::null());
         p.p_wmesg.set(None);
-        // TRACEPOINT(sched, unsleep, ...): dt(4), not configured.
+        // TRACEPOINT(sched, unsleep, ...): dt(4), configured in GENERIC.MP, not ported yet.
     }
 }
 
@@ -757,7 +757,7 @@ pub fn wakeup_n<T: ?Sized>(ident: *const T, n: i32) {
     while let Some(p) = wakeq.first() {
         // SAFETY: `p` is on `wakeq`.
         unsafe { wakeq.remove(p) };
-        // TRACEPOINT(sched, unsleep, ...): dt(4), not configured.
+        // TRACEPOINT(sched, unsleep, ...): dt(4), configured in GENERIC.MP, not ported yet.
         if p.p_stat.get() == SSLEEP {
             setrunnable(p);
         }
@@ -1056,7 +1056,7 @@ pub fn refcnt_init(r: &Refcnt) {
 pub fn refcnt_init_trace(r: &Refcnt, trace: i32) {
     r.r_traceidx.set(trace);
     r.r_refs.store(1, Ordering::Relaxed);
-    // TRACEINDEX(refcnt, ...): dt(4), not configured.
+    // TRACEINDEX(refcnt, ...): dt(4), configured in GENERIC.MP, not ported yet.
 }
 
 /// `refcnt_take`.

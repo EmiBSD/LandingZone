@@ -80,8 +80,9 @@
 //!   `namei_pool` item, and `KERNELPATH` (`<sys/namei.h>`) is the boolean `incrash`; with no
 //!   file descriptor table there is no `fd_rdir` to release. `WCOREFLAG` is `<sys/wait.h>`'s
 //!   value, kept here until that header is ported.
-//! - `KTRACE`, `WITNESS`, dt(4)'s `TRACEPOINT`, `SMALL_KERNEL` and `PMAP_CHECK_COPYIN` are
-//!   not configured. The kernel lock is taken where the C takes it (M11a; nothing without
+//! - `WITNESS`, `SMALL_KERNEL` and `PMAP_CHECK_COPYIN` are not configured. `KTRACE` and
+//!   dt(4)'s `TRACEPOINT` are configured in `GENERIC.MP` but not ported yet (KTRACE is
+//!   TD3). The kernel lock is taken where the C takes it (M11a; nothing without
 //!   `MULTIPROCESSOR`).
 //! - `sys_sigreturn` lives in `machdep.c` (amd64) and `sig_machdep.c` (arm64); the system
 //!   call table finds `pub fn sys_*` only under `sys/kern` and `sys/uvm`, so the entry here
@@ -1589,7 +1590,7 @@ pub fn proc_stop_setup(p: &Proc) {
     // fixed.
     crate::kern::sched_bsd::sched_assert_locked();
 
-    // TRACEPOINT(sched, stop, NULL): dt(4), not configured.
+    // TRACEPOINT(sched, stop, NULL): dt(4), configured in GENERIC.MP, not ported yet.
 
     p.p_flag.fetch_or(P_INSCHED, Ordering::Relaxed);
     p.p_stat.set(SSTOP);

@@ -509,7 +509,7 @@ pub fn fork_check_maxthread(uid: Uid) -> Result<(), Errno> {
 fn fork_thread_start(p: &Proc, parent: &Proc, flags: i32) {
     sched_lock();
     let ci = sched_choosecpu_fork(parent, flags);
-    // TRACEPOINT(sched, fork, ...): dt(4), not configured.
+    // TRACEPOINT(sched, fork, ...): dt(4), configured in GENERIC.MP, not ported yet.
     setrunqueue(Some(ci), p, p.p_usrpri.get());
     sched_unlock();
 }

@@ -73,8 +73,8 @@
 //! ## Deviations
 //! - `rw_cas`/`rw_inc`/`rw_dec` are the atomics with and without `MULTIPROCESSOR` (on one
 //!   CPU they are equivalent to the C's plain variants). `WITNESS`, `RWDIAG` (the 10 s sleep
-//!   timeout and `db_enter`) and the `dt(4)` tracepoints (`TRACEINDEX`) are not configured;
-//!   `rwl_traceidx` is kept.
+//!   timeout and `db_enter`) are not configured. The `dt(4)` tracepoints (`TRACEINDEX`) are
+//!   configured in `GENERIC.MP` but not ported yet; `rwl_traceidx` is kept.
 //! - The `lock_type` arguments are gone with `WITNESS`: `_rw_init_flags(rwl, name, flags,
 //!   type, trace)` is `rw_init_flags_trace(rwl, name, flags, trace)`, with `rw_init_flags`
 //!   and `rw_init` as the C macros; the same for `rrw_init_flags`/`rrw_init` and

@@ -608,7 +608,7 @@ fn malloc_out(
         unsafe { ptr::write_bytes(va.as_ptr(), 0, size) };
     }
 
-    // TRACEPOINT(uvm, malloc): not configured.
+    // TRACEPOINT(uvm, malloc): dt(4), configured in GENERIC.MP, not ported yet.
 
     Some(va)
 }
@@ -621,7 +621,7 @@ pub fn free(addr: NonNull<u8>, type_: i32, freedsize: usize) {
 
     // DIAGNOSTIC's range check is btokup's.
 
-    // TRACEPOINT(uvm, free): not configured.
+    // TRACEPOINT(uvm, free): dt(4), configured in GENERIC.MP, not ported yet.
 
     mtx_enter(&MALLOC_MTX);
     let kup = btokup(addr);

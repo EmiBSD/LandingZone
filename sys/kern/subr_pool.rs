@@ -895,7 +895,7 @@ fn pool_get_good(pp: &Pool, v: NonNull<u8>, flags: i32) -> NonNull<u8> {
         unsafe { ptr::write_bytes(v.as_ptr(), 0, pp.pr_size.get() as usize) };
     }
 
-    // TRACEPOINT(uvm, pool_get): not configured.
+    // TRACEPOINT(uvm, pool_get): dt(4), configured in GENERIC.MP, not ported yet.
 
     v
 }
@@ -1089,7 +1089,7 @@ pub fn pool_do_get(pp: &Pool, flags: i32, slowdown: &mut i32) -> Option<NonNull<
 pub fn pool_put(pp: &Pool, v: NonNull<u8>) {
     let mut freeph: Option<&PoolPageHeader> = None;
 
-    // TRACEPOINT(uvm, pool_put): not configured.
+    // TRACEPOINT(uvm, pool_put): dt(4), configured in GENERIC.MP, not ported yet.
 
     #[cfg(feature = "multiprocessor")]
     if !pp.pr_cache.load(Ordering::Acquire).is_null() && pp.pr_requests.is_empty() {

@@ -124,7 +124,7 @@
 //! - `__HAVE_PMAP_POPULATE` is the machine's `HAVE_PMAP_POPULATE` constant (arm64), read
 //!   where the C has the `#ifdef`. The `MULTIPROCESSOR` COW paths need
 //!   `!__HAVE_PMAP_MPSAFE_ENTER_COW`, which both machines define; `UVM_PAGE_OWN` is not
-//!   configured, `TRACEPOINT` (dt) is not configured.
+//!   configured; `TRACEPOINT` (dt(4)) is configured in `GENERIC.MP` but not ported yet.
 
 use core::ptr;
 
@@ -677,7 +677,7 @@ pub fn uvm_fault(
     access_type: VmProt,
 ) -> Result<(), Errno> {
     counters_inc(UvmExpCounters::Faults);
-    // TRACEPOINT(uvm, fault, ...): dt is not configured.
+    // TRACEPOINT(uvm, fault, ...): dt(4), configured in GENERIC.MP, not ported yet.
 
     // init the IN parameters in the ufi
     let mut ufi = UvmFaultinfo::new(orig_map, trunc_page(vaddr), PAGE_SIZE);

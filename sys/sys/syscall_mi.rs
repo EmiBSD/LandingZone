@@ -63,7 +63,8 @@
 //!   anything else gets `SIGABRT` (`sigabort`). Its message goes to the console with
 //!   `printf` where the C's `uprintf` writes to the process's terminal: `smoke-boot`
 //!   expects the line on the serial console, from a process that has no terminal.
-//! - `KTRACE` and dt(4) are not configured; `SYSCALL_DEBUG` is the feature `syscall_debug`.
+//! - `KTRACE` and dt(4) are configured in `GENERIC.MP` but not ported yet (KTRACE is TD3): their
+//!   calls are missing, so the row is `wip`. `SYSCALL_DEBUG` is the feature `syscall_debug`.
 //! - `SY_NOLOCK` (M11e): honoured as in C for the system calls whose bodies are audited for
 //!   `MULTIPROCESSOR`; a `NOLOCK` system call whose body is not audited yet is listed in
 //!   [`SY_NOLOCK_DEFERRED`] and still runs under the kernel lock, with the module (and agent
@@ -251,7 +252,7 @@ pub fn mi_syscall(
         crate::kern::kern_xxx::scdebug_call(p, code, argp);
         kernel_unlock(); // KERNEL_UNLOCK()
     }
-    // dt(4), KTRACE: not configured.
+    // dt(4) and KTRACE: configured in GENERIC.MP, not ported yet (KTRACE is TD3).
 
     // SP must be within MAP_STACK space
     let mut ie = p.p_spinentry.get();
@@ -305,14 +306,14 @@ pub fn mi_syscall_return(
         kernel_unlock(); // KERNEL_UNLOCK()
     }
     let _ = (code, error, retval);
-    // dt(4), KTRACE: not configured.
+    // dt(4) and KTRACE: configured in GENERIC.MP, not ported yet (KTRACE is TD3).
     userret(p);
 }
 
 /// `mi_child_return`: finish MI stuff for a new process/thread to return.
 #[inline]
 pub fn mi_child_return(p: &Proc) {
-    // TRACEPOINT(sched, on__cpu, NULL): not configured.
+    // TRACEPOINT(sched, on__cpu, NULL): dt(4), configured in GENERIC.MP, not ported yet.
 
     userret(p);
 
@@ -330,7 +331,7 @@ pub fn mi_child_return(p: &Proc) {
         crate::kern::kern_xxx::scdebug_ret(p, code as Register, 0, &child_retval);
         kernel_unlock(); // KERNEL_UNLOCK()
     }
-    // dt(4), KTRACE: not configured.
+    // dt(4) and KTRACE: configured in GENERIC.MP, not ported yet (KTRACE is TD3).
 }
 
 /// `mi_ast`: do the specific processing necessary for an AST.
