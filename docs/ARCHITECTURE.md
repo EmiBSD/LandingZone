@@ -1030,6 +1030,10 @@ The same arm64 kernel ELF boots from Limine and from arm64's efiboot.
   `kern_ktrace.c` is `skipped`; the system call table takes the C's `#else` (`ktrace` and
   `fktrace` are `sys_nosys`, `utrace` succeeds and records nothing), and the `ktr*` calls of
   the other files are absent, each site saying so. A row that lacks only them is `ported`.
+- dt(4) is left out too although `GENERIC.MP` has `pseudo-device dt` on both machines (the
+  user's decision of 2026-11-19: no tracing at all, no hooks, no empty stubs, no probe
+  catalogue; the user coordinates with ../Kernel). `sys/dev/dt/` is `skipped`, and the
+  `TRACEPOINT`/`TRACEINDEX` calls of the other files are absent, each site saying so.
 - `DEBUG` is not configured (`GENERIC.MP` has none, and the user's decision of 2026-11-19
   puts the cargo feature `debug` outside the definition of `ported`). Its functions are in
   `ports-exceptions.toml`, approved by name.

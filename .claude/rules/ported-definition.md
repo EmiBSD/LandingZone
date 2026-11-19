@@ -58,9 +58,11 @@ Given while TD1 was under way; they hold with the order above.
    `debug` is outside the definition of `ported`. A function that exists only under
    `#ifdef DEBUG` still enters `ports-exceptions.toml` only by the user's approval of its
    name (`pgrpdump` first).
-3. **dt(4) is in TD's scope.** A `ported` row whose C has `TRACEPOINT`s (or other dt probes)
-   that `GENERIC.MP` compiles and its Rust lacks is not complete: it goes to `wip` with the
-   reason in its notes.
+3. **No tracing: neither `KTRACE` nor dt(4)** (the user's decision later the same day, which
+   replaces "dt(4) is in TD's scope"; the user coordinates with ../Kernel). No hooks, no empty
+   stubs, no probe catalogue. `sys/dev/dt/` is out of TD (its rows `skipped`); a row that
+   lacks only its `TRACEPOINT`/`TRACEINDEX` calls is complete; each site says, in one short
+   line, that dt(4) is left out by the user's decision of 2026-11-19.
 4. **C slips** found by a sample are logged in `docs/EXTERNAL_BUGS.md` only after each was
    checked against the C at the pin; one that is not confirmed is not logged, and the user is
    told.
