@@ -54,30 +54,27 @@
 //!
 //! ## Deviations
 //! - `snprintf(buf, len, fmt, ...)` is the [`snprintf!`](crate::snprintf!) macro over Rust
-//!   format strings (see `printf.rs`); `sputchar`'s `sbuf`/`sbuf_end` globals are the state of
-//!   a local writer. The result is the C's: at most `len - 1` bytes and a NUL, and the length
+//!   format strings (see `printf.rs`), through `kdoprnt` with `sputchar` as in the C;
+//!   `sputchar`'s `sbuf`/`sbuf_end` globals are a local state it takes. The result is the C's: at most `len - 1` bytes and a NUL, and the length
 //!   the whole output would have had.
 
-use core::fmt::{self, Write};
+use core::fmt;
 
-use crate::printf::latin1;
+use crate::printf::kdoprnt;
 
-/// `sputchar()`'s state: the buffer and how far the output has gone (past the end, too).
+/// `sputchar()`'s state, the C's `sbuf` and `sbuf_end`: the buffer and how far the output has
+/// gone (past the end, too).
 struct Sbuf<'a> {
     buf: &'a mut [u8],
     pos: usize,
 }
 
-impl Write for Sbuf<'_> {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        for c in s.chars() {
-            if self.pos < self.buf.len() {
-                self.buf[self.pos] = latin1(c) as u8;
-            }
-            self.pos += 1;
-        }
-        Ok(())
+/// `sputchar(c)`: store `c` if there is room, and count it either way.
+fn sputchar(s: &mut Sbuf<'_>, c: i32) {
+    if s.pos < s.buf.len() {
+        s.buf[s.pos] = c as u8;
     }
+    s.pos += 1;
 }
 
 /// `snprintf(buf, len, fmt, ...)`: format into `buf`, NUL-terminated and truncated to fit.
@@ -92,7 +89,7 @@ macro_rules! snprintf {
 pub fn vsnprintf(buf: &mut [u8], args: fmt::Arguments<'_>) -> usize {
     let len = buf.len();
     let mut s = Sbuf { buf, pos: 0 };
-    let _ = s.write_fmt(args);
+    kdoprnt(&mut |c| sputchar(&mut s, c), args);
     let pos = s.pos;
     if pos < len {
         s.buf[pos] = 0;

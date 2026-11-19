@@ -82,9 +82,11 @@
 //!   `%08lx` to `{:08x}`, `%c` to a `char`, `%s` of a NUL-terminated byte string to
 //!   [`Str`]. `%b` (a value and its bit names) has no caller in the boot programs ported
 //!   here; when one comes it gets a `Display` helper as the kernel's `Bitmask`.
-//! - `kdoprnt`, `kprintn` and `kprintn64` are `core::fmt`; the output still goes byte by byte
-//!   through `putchar()`, so the console sees what the C sends (characters above U+00FF,
-//!   which byte strings never produce, become `?`).
+//! - `kdoprnt(put, args)` formats a `core::fmt` argument list where the C interprets `fmt`
+//!   and its `va_list`; the output still goes byte by byte through `put` (`putchar()` for
+//!   `vprintf`, `sputchar` for `snprintf`), so the console sees what the C sends (characters
+//!   above U+00FF, which byte strings never produce, become `?`). The numbers are formatted
+//!   by `core::fmt`, the work of the C's `kprintn` and `kprintn64`.
 
 use core::fmt::{self, Write};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -93,18 +95,6 @@ use crate::putchar::putchar;
 
 /// `hexdig`: the digits of `kprintn`.
 pub const HEXDIG: &[u8; 16] = b"0123456789abcdef";
-
-/// A `fmt::Write` that sends every character to `putchar()`.
-pub struct Putchar;
-
-impl Write for Putchar {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        for c in s.chars() {
-            putchar(latin1(c));
-        }
-        Ok(())
-    }
-}
 
 /// The byte a character stands for: the byte strings [`Str`] prints come back as the bytes
 /// they were (Latin-1), anything else is `?`.
@@ -133,9 +123,26 @@ macro_rules! printf {
     };
 }
 
-/// `vprintf(fmt, ap)`.
+/// `vprintf(fmt, ap)`: [`kdoprnt`] to the console.
 pub fn vprintf(args: fmt::Arguments<'_>) {
-    let _ = Putchar.write_fmt(args);
+    kdoprnt(&mut |c| putchar(c), args);
+}
+
+/// `kdoprnt(put, fmt, ap)`: format `args` and hand each byte of the output to `put`, as
+/// `vprintf` (`putchar`) and `snprintf` (`sputchar`) do.
+pub fn kdoprnt(put: &mut dyn FnMut(i32), args: fmt::Arguments<'_>) {
+    struct Put<'a>(&'a mut dyn FnMut(i32));
+
+    impl Write for Put<'_> {
+        fn write_str(&mut self, s: &str) -> fmt::Result {
+            for c in s.chars() {
+                (self.0)(latin1(c));
+            }
+            Ok(())
+        }
+    }
+
+    let _ = Put(put).write_fmt(args);
 }
 
 /// `donottwiddle`: no progress marks when set.

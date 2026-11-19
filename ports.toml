@@ -9367,10 +9367,10 @@ notes = "M14 A1, libsa as efiboot builds it (__INTERNAL_LIBSA_CREAD): opendir/re
 [[file]]
 c = "sys/lib/libsa/snprintf.c"
 rust = "sys/lib/libsa/snprintf.rs"
-status = "wip"
+status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "d3ed5986873f901e104b65d8a0e5b9a9ab904707"
-notes = "M14 A1, libsa as efiboot builds it (__INTERNAL_LIBSA_CREAD): snprintf! macro: C truncation and return value; host test; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 1 C function(s) not in its Rust file: sputchar"
+notes = "M14 A1, libsa as efiboot builds it (__INTERNAL_LIBSA_CREAD): snprintf! macro: C truncation and return value; host test; TD1 audit (2026-11-19): back to wip by ports check's completeness checks: 1 C function(s) not in its Rust file: sputchar; sputchar is there by name, given to kdoprnt as in the C, and ports check accepts the row as ported"
 
 [[file]]
 c = "sys/lib/libsa/stat.c"
