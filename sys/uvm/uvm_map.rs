@@ -112,8 +112,6 @@
 //!   in host tests), as `option VMMAP_DEBUG`.
 //! - [`uvm_map_inentry`] prints with `printf` (no controlling terminal: `uprintf`); its
 //!   printf format becomes two words (`what`, `reason`).
-//! - [`uvm_map_protect`] reports the `RLIMIT_DATA` check (`lim_cur` is not ported) instead
-//!   of enforcing it.
 //! - `uvm_map_splitentry` takes the pager reference under `KERNEL_LOCK`, as the C (M11a).
 //! - `uvm_map_fill_vmmap` (`kinfo_vmentry`, sysctl) and the `ddb` printers
 //!   (`uvm_map_printit`, `uvm_object_printit`, `uvm_page_printit`) wait for their
@@ -174,6 +172,8 @@ use crate::sys::param::{PAGE_MASK, PAGE_SHIFT, PAGE_SIZE};
 use crate::sys::pool::{PR_NOWAIT, PR_WAITOK, PR_ZERO, Pool};
 use crate::sys::proc::{PInentry, Proc, Process};
 use crate::sys::queue::{SlistEntry, TailqEntry, TailqHead};
+use crate::sys::resource::RLIMIT_DATA;
+use crate::sys::resourcevar::lim_cur;
 use crate::sys::rwlock::{
     RW_DOWNGRADE, RW_NOSLEEP, RW_UPGRADE, RW_WRITE, RWL_DUPOK, Rwlock, rw_write_held,
 };
@@ -217,7 +217,7 @@ use crate::uvm::uvm_page::{PQ_ANON, uvm_pagedeactivate};
 use crate::uvm::uvm_pager::{PGO_CLEANIT, PGO_DEACTIVATE, PGO_FREE};
 use crate::uvm::uvm_param::{atop, ptoa, round_page, trunc_page};
 use crate::uvm::uvm_pmap::{pmap_prefer_align, pmap_prefer_offset};
-use crate::{kassert, kdassert, kprintf, queue_adapter, tree_adapter, unported};
+use crate::{kassert, kdassert, kprintf, queue_adapter, tree_adapter};
 
 /// `VM_MAP_PAGEABLE`: ro: entries are pageable.
 pub const VM_MAP_PAGEABLE: i32 = 0x01;
@@ -3393,9 +3393,11 @@ fn uvm_map_protect_locked(
 
     // Check limits.
     if dused > 0 && map.flags.get() & VM_MAP_ISVMSPACE != 0 {
-        // vsize_t limit = lim_cur(RLIMIT_DATA); ENOMEM when ptoa(dused) exceeds it with
-        // the current vm_dused: the limits are not ported (see the module's deviations).
-        let _ = unported!("uvm_map_protect: the RLIMIT_DATA check (lim_cur)");
+        let limit = lim_cur(RLIMIT_DATA) as usize;
+        let dused = ptoa(dused);
+        if limit < dused || limit - dused < ptoa(map.vmspace().vm_dused.get() as usize) {
+            return Err(Errno::ENOMEM);
+        }
     }
 
     // only apply UVM_ET_STACK on a mapping changing to RW
@@ -5530,9 +5532,28 @@ mod tests {
 
     #[test]
     fn protect_clips_and_checks_limits() {
+        use crate::machine::cpu::Cpu;
+        use crate::sys::resource::{RLIM_INFINITY, Rlimit};
+        use crate::sys::resourcevar::Plimit;
+
         let _g = setup();
         let vm = user_vmspace();
         let map = &vm.vm_map;
+        // uvm_map_protect reads the running thread's RLIMIT_DATA: a thread with no limits.
+        let unlimited = Rlimit {
+            rlim_cur: RLIM_INFINITY,
+            rlim_max: RLIM_INFINITY,
+        };
+        let limit: &'static Plimit = std::boxed::Box::leak(std::boxed::Box::new(Plimit::new()));
+        for l in &limit.pl_rlimit {
+            l.set(unlimited);
+        }
+        let pr: &'static Process = std::boxed::Box::leak(std::boxed::Box::new(Process::new()));
+        let p: &'static Proc = std::boxed::Box::leak(std::boxed::Box::new(Proc::new()));
+        pr.ps_limit.set(limit);
+        p.p_p.set(pr);
+        p.p_limit.set(limit);
+        Machine::set_curproc(Machine::curcpu(), p);
         let mut addr = 0x4000_0000;
         let len = 4 * PAGE_SIZE;
         uvm_mapanon(map, &mut addr, len, 0, anon_flags(UVM_FLAG_FIXED)).expect("mapanon");
@@ -5569,9 +5590,21 @@ mod tests {
         // PROT_NONE drops the pages from vm_dused; back to RW restores them.
         uvm_map_protect(map, addr, addr + len, PROT_NONE, 0, false, true).expect("none");
         assert_eq!(vm.vm_dused.get(), 0);
+        // A data limit of two pages refuses to make the four usable again.
+        limit.pl_rlimit[RLIMIT_DATA].set(Rlimit {
+            rlim_cur: 2 * PAGE_SIZE as u64,
+            rlim_max: RLIM_INFINITY,
+        });
+        assert_eq!(
+            uvm_map_protect(map, addr, addr + len, RW, 0, false, true),
+            Err(Errno::ENOMEM)
+        );
+        assert_eq!(vm.vm_dused.get(), 0);
+        limit.pl_rlimit[RLIMIT_DATA].set(unlimited);
         uvm_map_protect(map, addr, addr + len, RW, 0, false, true).expect("rw");
         assert_eq!(vm.vm_dused.get(), 4);
 
+        Machine::set_curproc(Machine::curcpu(), ptr::null());
         uvmspace_free(vm);
     }
 

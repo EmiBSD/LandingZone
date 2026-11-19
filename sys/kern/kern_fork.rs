@@ -73,8 +73,8 @@
 //!   `klist_init_mutex` since `kern_event.c` and `prof_fork` since `subr_prof.c` (TD1), as
 //!   is `process_new`'s `startprofclock`;
 //!   `sigactsinit` is real since `kern_sig.c`, `fdcopy`/`fdshare` since `kern_descrip.c`
-//!   and `lim_fork` since the `plimit` port. `fork1` skips the `RLIMIT_NPROC` check for
-//!   root as the C does, reports it for other users (the limits); `knote_processfork` is
+//!   and `lim_fork` since the `plimit` port. `fork1`'s `RLIMIT_NPROC` check of a
+//!   user other than root is the C's since TD1; `knote_processfork` is
 //!   real since `kern_event.c`. The credentials (`crhold` in `thread_new` and
 //!   `process_initialize`, the forking thread's real uid in `fork1`) are real since
 //!   `kern_prot.c`.
@@ -133,12 +133,14 @@ use crate::sys::proc::{
     THREAD_PID_OFFSET, TID_MASK,
 };
 use crate::sys::queue::ListHead;
+use crate::sys::resource::RLIMIT_NPROC;
+use crate::sys::resourcevar::lim_cur;
 use crate::sys::sched::{SPCF_ITIMER, SPCF_PROFCLOCK};
 use crate::sys::signal::{SIGSEGV, SIGTRAP};
 use crate::sys::syscallargs::SysTforkArgs;
 use crate::sys::systm::{INFSLP, SysArgs, kernel_assert_unlocked, kernel_lock, sysargs};
 use crate::sys::time::Timeval;
-use crate::sys::types::{Pid, Register, Uid};
+use crate::sys::types::{Pid, Register, Rlim, Uid};
 use crate::sys::unistd::Tfork;
 use crate::sys::user::User;
 use crate::sys::vmmeter::Forkstat;
@@ -557,10 +559,12 @@ pub fn fork1(
 
     // Increment the count of processes running with this uid. Don't allow a nonprivileged
     // user to exceed their current limit.
-    let _count = chgproccnt(uid, 1);
-    if uid != 0 {
-        // count > lim_cur(RLIMIT_NPROC): the limits (kern_resource.c, M6).
-        let _ = unported!("fork1: lim_cur(RLIMIT_NPROC) (M6)");
+    let count = chgproccnt(uid, 1);
+    if uid != 0 && count as Rlim > lim_cur(RLIMIT_NPROC) {
+        chgproccnt(uid, -1);
+        NPROCESSES.fetch_sub(1, Ordering::Relaxed);
+        NTHREADS.fetch_sub(1, Ordering::Relaxed);
+        return Err(Errno::EAGAIN);
     }
 
     let Some(uaddr) = uvm_uarea_alloc() else {

@@ -55,7 +55,7 @@
 //!
 //! Upstream: sys/kern/kern_exec.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. The whole file: `exec_free_package`, `check_exec` (`namei` with the
+//! Status: `ported`. The whole file: `exec_free_package`, `check_exec` (`namei` with the
 //! realpath for `AUX_openbsd_execpath`, `VOP_GETATTR`, `VOP_ACCESS`, `VOP_OPEN`, the header
 //! through `vn_rdwr`), `sys_execve` (the `NCARGS` argument buffer in `exec_map`, the stack
 //! gap, `ps_strings`, the execpath, the pin tables, set[ug]id executables, the pledge
@@ -75,9 +75,6 @@
 //!   skips `namei` and the attribute, mount, access and open checks (an image has no vnode,
 //!   no set[ug]id bits, no realpath), `ep_hdr` is the image's first `exec_maxhdrsz` bytes
 //!   and the vmcmds read the image (`exec_subr.rs`). It goes away when `init` is a file.
-//! - The set[ug]id stdin/stdout/stderr fix-up opens `/dev/null` with `cdevvp(getnulldev())`:
-//!   the device switch (`<sys/conf.h>`) is not ported, so a set[ug]id exec with one of the
-//!   three descriptors closed reports it and fails (the C would succeed).
 //! - `KTRACE` is not configured.
 //! - The 4-clause licence (advertising clause) was accepted by the user at M2 for this
 //!   project.
@@ -91,7 +88,9 @@ use crate::kern::exec_elf::{exec_elf_fixup, exec_elf_makecmds};
 use crate::kern::exec_script::exec_script_makecmds;
 use crate::kern::exec_subr::exec_process_vmcmds;
 use crate::kern::kern_clock::stopprofclock;
-use crate::kern::kern_descrip::{closef, falloc, fd_getfile, fdprepforexec, fdrelease, fdremove};
+use crate::kern::kern_descrip::{
+    closef, falloc, fd_getfile, fdinsert, fdprepforexec, fdrelease, fdremove,
+};
 use crate::kern::kern_event::knote;
 use crate::kern::kern_exit::{exit1, pin_free};
 use crate::kern::kern_malloc::{free, malloc};
@@ -105,10 +104,11 @@ use crate::kern::subr_prof::prof_exec;
 use crate::kern::vfs_getcwd::vfs_getcwd_common;
 use crate::kern::vfs_init::NAMEI_POOL;
 use crate::kern::vfs_lookup::{namei, ndinit};
-use crate::kern::vfs_subr::{vput, vref, vrele};
+use crate::kern::vfs_subr::{cdevvp, vput, vref, vrele};
 use crate::kern::vfs_syscalls::NameiBuf;
-use crate::kern::vfs_vnops::{vn_close, vn_rdwr};
+use crate::kern::vfs_vnops::{VNOPS, vn_close, vn_rdwr};
 use crate::kern::vfs_vops::{VOP_ACCESS, VOP_GETATTR, VOP_OPEN, VOP_UNLOCK};
+use crate::machine::conf::getnulldev;
 use crate::machine::copy::{copyin, copyinstr, copyout, copyoutstr};
 use crate::machine::cpu::Cpu;
 use crate::machine::param::MachineParam;
@@ -124,8 +124,8 @@ use crate::sys::exec::{
 };
 use crate::sys::exec_elf::{ELF_AUX_WORDS, ElfEhdr};
 use crate::sys::exec_script::EXEC_SCRIPT_HDRSZ;
-use crate::sys::fcntl::FREAD;
-use crate::sys::file::frele;
+use crate::sys::fcntl::{FREAD, FWRITE};
+use crate::sys::file::{DTYPE_VNODE, frele};
 use crate::sys::filedesc::{fdplock, fdpunlock};
 use crate::sys::malloc::{M_PINSYSCALL, M_TEMP, M_WAITOK};
 use crate::sys::mman::{
@@ -155,7 +155,6 @@ use crate::sys::timetc::{TK_VERSION, Timekeep};
 use crate::sys::types::{Register, Vaddr, Vsize};
 use crate::sys::uio::{UioRw, UioSeg};
 use crate::sys::vnode::{VEXEC, VREG, VSGID, VSUID};
-use crate::unported;
 use crate::uvm::uvm_aobj::{uao_create, uao_detach, uao_reference};
 use crate::uvm::uvm_extern::{KmemVaMode, KvMap, UVM_FLAG_COPYONW, uvm_mapflag};
 use crate::uvm::uvm_fault::uvm_fault_wire;
@@ -914,12 +913,40 @@ fn execve_common(
                     if indx != i {
                         panic(format_args!("sys_execve: falloc indx != i"));
                     }
-                    // cdevvp(getnulldev(), &vp), VOP_OPEN, the DTYPE_VNODE file: the device
-                    // switch is not ported (see the module's deviations).
-                    fdremove(fdp, indx);
-                    let _ = closef(fp, p);
-                    error = Err(unported!("sys_execve: cdevvp(getnulldev()) (<sys/conf.h>)"));
-                    break;
+                    let flags = FREAD | if i == 0 { 0 } else { FWRITE };
+                    let vp = match cdevvp(getnulldev()) {
+                        Ok(Some(vp)) => vp,
+                        // No vnode comes back only for NODEV, which the null device is not.
+                        Ok(None) => {
+                            fdremove(fdp, indx);
+                            let _ = closef(fp, p);
+                            error = Err(Errno::ENXIO);
+                            break;
+                        }
+                        Err(e) => {
+                            fdremove(fdp, indx);
+                            let _ = closef(fp, p);
+                            error = Err(e);
+                            break;
+                        }
+                    };
+                    if let Err(e) = VOP_OPEN(vp, flags, cred, p) {
+                        fdremove(fdp, indx);
+                        let _ = closef(fp, p);
+                        vrele(vp);
+                        error = Err(e);
+                        break;
+                    }
+                    if flags & FWRITE != 0 {
+                        vp.v_writecount.set(vp.v_writecount.get() + 1);
+                    }
+                    fp.f_flag.store(flags as u32, Ordering::SeqCst);
+                    fp.f_type.set(DTYPE_VNODE);
+                    fp.f_ops.set(Some(&VNOPS));
+                    fp.f_data
+                        .set(ptr::from_ref(vp).cast_mut().cast::<core::ffi::c_void>());
+                    fdinsert(fdp, indx, 0, fp);
+                    fp
                 }
             };
             let _ = frele(fp, p);

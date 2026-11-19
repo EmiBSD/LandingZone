@@ -53,18 +53,16 @@
 //!
 //! Upstream: sys/sys/syscall_mi.h @ 3ce1f3f79392
 //!
-//! Status: `wip`: `pin_check`, `mi_syscall`, `mi_syscall_return`, `mi_child_return` and
+//! Status: `ported`: `pin_check`, `mi_syscall`, `mi_syscall_return`, `mi_child_return` and
 //! `mi_ast`.
 //!
 //! ## Deviations
 //! - `pin_check` is the C's: a system call must come from the call site the executable's
 //!   `PT_OPENBSD_SYSCALLS` table (`ps_pin`, loaded by `exec`) or `pinsyscalls(2)`
 //!   (`ps_libcpin`) names for its number, or be `sigreturn` from the signal trampoline;
-//!   anything else gets `SIGABRT` (`sigabort`). Its message goes to the console with
-//!   `printf` where the C's `uprintf` writes to the process's terminal (no tty layer yet).
-//! - `mi_syscall` reports the `MAP_STACK` check (`uvm_map_inentry`, with the user map);
-//!   `KTRACE` and dt(4) are not configured (`SYSCALL_DEBUG` is the feature `syscall_debug`;
-//!   `mi_child_return` does not print the child's return).
+//!   anything else gets `SIGABRT` (`sigabort`), with the C's `uprintf` message to the
+//!   process's terminal.
+//! - `KTRACE` and dt(4) are not configured; `SYSCALL_DEBUG` is the feature `syscall_debug`.
 //! - `SY_NOLOCK` (M11e): honoured as in C for the system calls whose bodies are audited for
 //!   `MULTIPROCESSOR`; a `NOLOCK` system call whose body is not audited yet is listed in
 //!   [`SY_NOLOCK_DEFERRED`] and still runs under the kernel lock, with the module (and agent
@@ -77,8 +75,7 @@ use core::sync::atomic::Ordering;
 use crate::kern::kern_pledge::{pledge_fail, pledge_syscall};
 use crate::kern::kern_sig::{sigabort, single_thread_set, userret};
 use crate::kern::sched_bsd::preempt;
-use crate::kern::subr_prf::Str;
-use crate::kprintf;
+use crate::kern::subr_prf::{Str, uprintf};
 use crate::machine::Machine;
 use crate::machine::cpu::Cpu;
 use crate::machine::signal::MachineSignal;
@@ -87,11 +84,13 @@ use crate::sys::errno::Errno;
 use crate::sys::proc::{
     P_OWEUPC, PS_PLEDGE, Pinsyscall, Proc, SINGLE_DEEP, SINGLE_UNWIND, p_hassibling, refreshcreds,
 };
+#[cfg(feature = "syscall_debug")]
+use crate::sys::proc::{P_THREAD, PS_PPWAIT};
 use crate::sys::resourcevar::adduprof;
 use crate::sys::syscall::*;
 use crate::sys::systm::{SY_NOLOCK, SysArgs, Sysent, kernel_lock, kernel_unlock};
 use crate::sys::types::Register;
-use crate::unported;
+use crate::uvm::uvm_map::{uvm_map_inentry, uvm_map_inentry_sp};
 
 /// `NOLOCK` system calls (`syscalls.master`) whose bodies are not audited for
 /// `MULTIPROCESSOR`: `mi_syscall` keeps the kernel lock for them although `sysent` marks them
@@ -197,7 +196,7 @@ pub fn pin_check(p: &Proc, code: Register) -> Result<(), Errno> {
         }
     };
     // XXX remove or simplify this uprintf() call after OpenBSD 7.5 release
-    kprintf!(
+    uprintf(format_args!(
         "{}[{}]: pinsyscalls addr {:x} code {}, pinoff {:#x} (pin{} {} {:x}-{:x} {:x}) \
          (libcpin{} {} {:x}-{:x} {:x}) error {}\n",
         Str(pr.comm()),
@@ -216,7 +215,7 @@ pub fn pin_check(p: &Proc, code: Register) -> Result<(), Errno> {
         plibcpin.pn_end.get(),
         plibcpin.pn_end.get().wrapping_sub(plibcpin.pn_start.get()),
         error as i32
-    );
+    ));
     pr.ps_acflag.set(pr.ps_acflag.get() | APINSYS);
 
     // Try to stop threads immediately, because this process is suspect
@@ -252,9 +251,21 @@ pub fn mi_syscall(
     }
     // dt(4), KTRACE: not configured.
 
-    // SP must be within MAP_STACK space: uvm_map_inentry(p, &p->p_spinentry, PROC_STACK(p),
-    // ...) with the user map.
-    let _ = unported!("mi_syscall: uvm_map_inentry (the MAP_STACK check)");
+    // SP must be within MAP_STACK space
+    let mut ie = p.p_spinentry.get();
+    let sp_ok = uvm_map_inentry(
+        p,
+        &mut ie,
+        <Machine as Cpu>::proc_stack(p),
+        "sp",
+        "not MAP_STACK",
+        uvm_map_inentry_sp,
+        p.vmspace().vm_map.sserial.get(),
+    );
+    p.p_spinentry.set(ie);
+    if !sp_ok {
+        return Err(Errno::EPERM);
+    }
 
     pin_check(p, code)?;
 
@@ -299,8 +310,25 @@ pub fn mi_syscall_return(
 /// `mi_child_return`: finish MI stuff for a new process/thread to return.
 #[inline]
 pub fn mi_child_return(p: &Proc) {
-    // TRACEPOINT(sched, on__cpu, NULL), SYSCALL_DEBUG, dt(4), KTRACE: not configured.
+    // TRACEPOINT(sched, on__cpu, NULL): not configured.
+
     userret(p);
+
+    #[cfg(feature = "syscall_debug")]
+    {
+        let code = if p.p_flag.load(Ordering::Relaxed) & P_THREAD != 0 {
+            SYS___tfork
+        } else if p.process().ps_flags.load(Ordering::Relaxed) & PS_PPWAIT != 0 {
+            SYS_vfork
+        } else {
+            SYS_fork
+        };
+        let child_retval: [Register; 2] = [0, 1];
+        kernel_lock(); // KERNEL_LOCK()
+        crate::kern::kern_xxx::scdebug_ret(p, code as Register, 0, &child_retval);
+        kernel_unlock(); // KERNEL_UNLOCK()
+    }
+    // dt(4), KTRACE: not configured.
 }
 
 /// `mi_ast`: do the specific processing necessary for an AST.
