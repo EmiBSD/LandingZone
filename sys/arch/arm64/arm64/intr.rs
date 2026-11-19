@@ -393,6 +393,11 @@ pub fn splraise(ipl: i32) -> i32 {
     (arm_intr_func().raise)(ipl)
 }
 
+/// `_spllower`: through `arm_intr_func` (XXX - called from asm?, the C asks).
+pub fn _spllower(ipl: i32) -> i32 {
+    (arm_intr_func().lower)(ipl)
+}
+
 /// `spllower`: through `arm_intr_func`.
 pub fn spllower(ipl: i32) -> i32 {
     (arm_intr_func().lower)(ipl)

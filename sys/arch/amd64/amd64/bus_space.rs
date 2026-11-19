@@ -197,6 +197,29 @@ pub unsafe fn bus_space_map(
     r
 }
 
+/// `_bus_space_map`: [`bus_space_map`] for an extra extent manager: no kernel built-in
+/// extent is asked, I/O space just fills in the handle and memory space is always mapped
+/// into fresh kernel virtual space.
+///
+/// # Safety
+///
+/// As for [`bus_space_map`]: the range is a device the caller owns.
+pub unsafe fn _bus_space_map(
+    t: X86BusSpace,
+    bpa: BusAddr,
+    size: BusSize,
+    flags: u32,
+) -> Result<BusSpaceHandle, Errno> {
+    // For I/O space, just fill in the handle.
+    if t == X86BusSpace::Io {
+        return Ok(BusSpaceHandle(bpa));
+    }
+
+    // For memory space, map the bus physical address to a kernel virtual address.
+    // SAFETY: the caller vouches for the device range.
+    unsafe { x86_mem_add_mapping(bpa, size, flags) }
+}
+
 /// `x86_mem_add_mapping`: maps `[bpa, bpa + size)` into fresh kernel virtual space, page by
 /// page, uncached unless `BUS_SPACE_MAP_CACHEABLE` (write-back) or
 /// `BUS_SPACE_MAP_PREFETCHABLE` (write-combining) asks otherwise.
@@ -251,6 +274,43 @@ pub unsafe fn x86_mem_add_mapping(
     pmap_update(pmap_kernel());
 
     Ok(bsh)
+}
+
+/// `_bus_space_unmap`: the mapping of a handle from [`_bus_space_map`] released, without the
+/// kernel built-in extents, and the bus physical address it was (the C's `*adrp`).
+pub fn _bus_space_unmap(t: X86BusSpace, bsh: BusSpaceHandle, size: BusSize) -> BusAddr {
+    // Find the correct bus physical address.
+    match t {
+        X86BusSpace::Io => bsh.0,
+        X86BusSpace::Mem => {
+            let bpa = isa_physaddr(bsh.0);
+            if (IOM_BEGIN..=IOM_END).contains(&bpa) {
+                return bpa;
+            }
+
+            let va = trunc_page(bsh.0);
+            let endva = round_page(bsh.0 + size);
+
+            #[cfg(feature = "diagnostic")]
+            if endva <= va {
+                crate::kern::subr_prf::panic(format_args!("_bus_space_unmap: overflow"));
+            }
+
+            let bpa = pmap_extract(pmap_kernel(), Vaddr::new(va)).map_or(0, Paddr::as_usize)
+                + (bsh.0 & PGOFSET);
+
+            // SAFETY: `[va, endva)` is a mapping `x86_mem_add_mapping` made for this handle,
+            // which the caller gives up.
+            unsafe { pmap_kremove(Vaddr::new(va), Vsize::new(endva - va)) };
+            pmap_update(pmap_kernel());
+
+            // Free the kernel virtual mapping.
+            if let Some(v) = core::ptr::NonNull::new(va as *mut u8) {
+                km_free(v, endva - va, &KV_ANY, &KP_NONE);
+            }
+            bpa
+        }
+    }
 }
 
 /// `bus_space_unmap`: releases a mapping.
