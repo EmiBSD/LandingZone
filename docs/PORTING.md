@@ -93,6 +93,9 @@ When something the file needs is not ported yet, stub it visibly
 In `ports.toml`: `status = "ported"`, `upstream_commit` = `[meta].pinned`,
 `upstream_blob` = `git -C reference/openbsd-src rev-parse HEAD:<c path>`, `notes` for stubs.
 Then `cargo xtask ports check` and `cargo xtask ports status --write`.
+`ports check` compares the blob of every row ported at the pin with the reference tree's, so a
+row never carries another file's blob; change one row at a time, found by its `c =` line, never
+by its blob or its notes.
 
 ## 7. Commit
 

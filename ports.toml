@@ -2545,15 +2545,15 @@ c = "sys/kern/kern_resource.c"
 rust = "sys/kern/kern_resource.rs"
 status = "wip"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "6b849af48cf3f896ae687673f076b96fa37a03d8"
+upstream_blob = "32e2d1e40bff5a8c0457de13d9c542e9c2090358"
 deps = ["sys/sys/proc.h", "sys/kern/kern_tc.c", "sys/kern/kern_lock.c"]
-notes = "M5-b2: enodev, enxio, eopnotsupp, nullop, assertwaitok (SMR_ASSERT_NONCRITICAL is kern_smr.c, M7); M8: bdevsw_lookup (a copy of the entry), chrtoblk, blktochr over machine::conf; M11a: assertwaitok's SMR_ASSERT_NONCRITICAL (kern_smr.c); M11e: uvm_purge's KERNEL_ASSERT_UNLOCKED is real; __HAVE_PMAP_PURGE: uvm_purge calls machine::pmap::pmap_purge (arm64's; nothing on amd64)"
+notes = "M5-b2: tuagg_sumup, tuagg_get_proc, tuagg_get_process, tuagg_add_process, tuagg_add_runtime; the priority/limit/rusage syscalls, the plimit management (lim_*), calcru/calctsru, ruadd, rucheck are M6; M6-b: calctsru, calcru (returning the three times), ruadd; M7a-3b: maxdmap/maxsmap, rlimit_lock, sys_setrlimit/dosetrlimit, sys_getrlimit, sys_getrusage/dogetrusage, rucheck (prsignal reported), plimit_pool, lim_startup/copy/free/fork/write_begin/write_commit/read_enter/cur_proc; with kern_prot.c: suser in dosetrlimit, sys_getpriority/sys_setpriority/donice; kern_sig.c: rucheck sends SIGKILL/SIGXCPU with prsignal"
 [[file]]
 c = "sys/kern/subr_xxx.c"
 rust = "sys/kern/subr_xxx.rs"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "6b849af48cf3f896ae687673f076b96fa37a03d8"
+upstream_blob = "1df181a8a8b5ffb8126ef6a16fec8d5f55f02534"
 deps = ["sys/kern/subr_prf.c"]
 notes = "enodev, enxio, eopnotsupp, nullop (Result<(), Errno>), bdevsw_lookup (a copy of the entry), chrtoblk, blktochr, assertwaitok (splassert, SMR_ASSERT_NONCRITICAL, the DIAGNOSTIC mutex count) (TD1: read again whole, nothing missing)"
 [[file]]
@@ -2563,40 +2563,40 @@ status = "wip"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "6b849af48cf3f896ae687673f076b96fa37a03d8"
 deps = ["sys/uvm/uvm_km.c", "sys/sys/proc.h", "sys/uvm/uvm_fault.c"]
-notes = "M5-b2: enodev, enxio, eopnotsupp, nullop, assertwaitok (SMR_ASSERT_NONCRITICAL is kern_smr.c, M7); M8: bdevsw_lookup (a copy of the entry), chrtoblk, blktochr over machine::conf; M11a: assertwaitok's SMR_ASSERT_NONCRITICAL (kern_smr.c); M11e: uvm_purge's KERNEL_ASSERT_UNLOCKED is real; __HAVE_PMAP_PURGE: uvm_purge calls machine::pmap::pmap_purge (arm64's; nothing on amd64)"
+notes = "M5-b2: kv_uarea, uvm_uarea_alloc (the __HAVE_USPACE_GUARD guard page is reported until km_alloc allocates from kernel_map, M6), uvm_uarea_free; uvm_kernacc, uvm_vslock/vsunlock, uvm_exit, uvm_init_limits, uvm_atopg are M6/M7; M6-b: uvm_purge (curproc's vmspace; __HAVE_PMAP_PURGE not set) and uvm_exit; M7a-3b: uvm_init_limits; kern_sysctl.c: uvm_vslock and uvm_vsunlock (uvm_map_pageable over the process's map); M10a (physio): uvm_vslock_device (uvm_fault_wire under the map timestamp retry, pmap_extract of each page, PADDR_IS_DMA_REACHABLE, else a bounce buffer: km_alloc kv_any/kp_none/kd_nowait, uvm_pglistalloc in dma_constraint, pmap_kenter_pa, copyin; the map stays read-locked on success; *retp is Result<Option<NonNull<u8>>>) and uvm_vsunlock_device (copyout of the bounce, unwire, unlock, free the bounce); M11e: uvm_purge's KERNEL_ASSERT_UNLOCKED is real; __HAVE_PMAP_PURGE: uvm_purge calls machine::pmap::pmap_purge (arm64's; nothing on amd64)"
 [[file]]
 c = "sys/arch/amd64/amd64/vm_machdep.c"
 rust = "sys/arch/amd64/amd64/vm_machdep.rs"
 status = "wip"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "6b849af48cf3f896ae687673f076b96fa37a03d8"
+upstream_blob = "6a3ee3f5fb99979fab38ecf58a0365b7e7650ca3"
 deps = ["sys/arch/amd64/amd64/locore.S", "sys/arch/amd64/amd64/pmap.c", "sys/sys/proc.h"]
-notes = "M5-b2: enodev, enxio, eopnotsupp, nullop, assertwaitok (SMR_ASSERT_NONCRITICAL is kern_smr.c, M7); M8: bdevsw_lookup (a copy of the entry), chrtoblk, blktochr over machine::conf; M11a: assertwaitok's SMR_ASSERT_NONCRITICAL (kern_smr.c); M11e: uvm_purge's KERNEL_ASSERT_UNLOCKED is real; __HAVE_PMAP_PURGE: uvm_purge calls machine::pmap::pmap_purge (arm64's; nothing on amd64)"
+notes = "M5-b2: cpu_fork (fpusave of a user-mode parent reported, M6; the function goes into sf_r12 as a pointer for proc_trampoline_run) and cpu_exit; kern_prot.c: tcb_get and tcb_set (KASSERT curproc, reset_segs, pcb_fsbase; the TCB is a usize); M10a: kv_physwait (phys_map, kv_wait), vmapbuf and vunmapbuf (km_alloc/km_free kp_none in phys_map, pmap_extract of the user pages, pmap_kenter_pa, pmap_kremove), reached through machine::cpu::Cpu::vmapbuf/vunmapbuf; vmapbuf panics on an unmapped user page where the C maps an uninitialised address (the pages are wired)"
 [[file]]
 c = "sys/arch/arm64/arm64/vm_machdep.c"
 rust = "sys/arch/arm64/arm64/vm_machdep.rs"
 status = "wip"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "6b849af48cf3f896ae687673f076b96fa37a03d8"
+upstream_blob = "16373552031692e8432f7c6ff8565d5aa72b73c4"
 deps = ["sys/arch/arm64/arm64/cpuswitch.S", "sys/arch/arm64/arm64/pmap.c", "sys/arch/arm64/arm64/fpu.c", "sys/sys/proc.h"]
-notes = "M5-b2: enodev, enxio, eopnotsupp, nullop, assertwaitok (SMR_ASSERT_NONCRITICAL is kern_smr.c, M7); M8: bdevsw_lookup (a copy of the entry), chrtoblk, blktochr over machine::conf; M11a: assertwaitok's SMR_ASSERT_NONCRITICAL (kern_smr.c); M11e: uvm_purge's KERNEL_ASSERT_UNLOCKED is real; __HAVE_PMAP_PURGE: uvm_purge calls machine::pmap::pmap_purge (arm64's; nothing on amd64)"
+notes = "M5-b2: cpu_fork (the pauth keys wait for user pmaps, M6; the function goes into sf_x19 as a pointer for proc_trampoline_run) and cpu_exit; M10a: kv_physwait (phys_map, kv_wait), vmapbuf and vunmapbuf (km_alloc/km_free kp_none in phys_map, pmap_extract of the user pages, pmap_kenter_pa, pmap_kremove), reached through machine::cpu::Cpu::vmapbuf/vunmapbuf; vmapbuf panics on an unmapped user page where the C maps an uninitialised address (the pages are wired)"
 [[file]]
 c = "sys/arch/arm64/arm64/cpuswitch.S"
 rust = "sys/arch/arm64/arm64/cpuswitch.rs"
 license = "none"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "6b849af48cf3f896ae687673f076b96fa37a03d8"
+upstream_blob = "68943c938008d3a8e6661fd579daf7a11dcbf12a"
 deps = ["sys/arch/arm64/include/frame.h", "sys/arch/arm64/include/pcb.h", "sys/sys/proc.h"]
-notes = "M5-b2: enodev, enxio, eopnotsupp, nullop, assertwaitok (SMR_ASSERT_NONCRITICAL is kern_smr.c, M7); M8: bdevsw_lookup (a copy of the entry), chrtoblk, blktochr over machine::conf; M11a: assertwaitok's SMR_ASSERT_NONCRITICAL (kern_smr.c); M11e: uvm_purge's KERNEL_ASSERT_UNLOCKED is real; __HAVE_PMAP_PURGE: uvm_purge calls machine::pmap::pmap_purge (arm64's; nothing on amd64)"
+notes = "M5-b2: cpu_switchto_asm and proc_trampoline, in cpuswitch.S (included by global_asm! with the frame, pcb, proc and cpu_info offsets as placeholders: assym.h), without retguard; proc_trampoline calls proc_trampoline_run (Rust) with the function and argument, M6-b2: after it returns the thread leaves through syscall_return, as in C"
 [[file]]
 c = "sys/arch/arm64/arm64/fpu.c"
 rust = "sys/arch/arm64/arm64/fpu.rs"
 status = "wip"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "6b849af48cf3f896ae687673f076b96fa37a03d8"
+upstream_blob = "908f949f3faa70b01be624fe981d8fe8174e4430"
 deps = ["sys/arch/arm64/include/armreg.h", "sys/arch/arm64/include/pcb.h"]
-notes = "M5-b2: enodev, enxio, eopnotsupp, nullop, assertwaitok (SMR_ASSERT_NONCRITICAL is kern_smr.c, M7); M8: bdevsw_lookup (a copy of the entry), chrtoblk, blktochr over machine::conf; M11a: assertwaitok's SMR_ASSERT_NONCRITICAL (kern_smr.c); M11e: uvm_purge's KERNEL_ASSERT_UNLOCKED is real; __HAVE_PMAP_PURGE: uvm_purge calls machine::pmap::pmap_purge (arm64's; nothing on amd64)"
+notes = "M5-b2: fpu_drop; fpu_save, fpu_load (the str q/ldr q register blocks) and fpu_kernel_enter/exit are user FP state (M6), reported; kern_sig.c: fpu_save and fpu_load (the str q/ldr q blocks as inline asm between .arch_extension fp/nofp, fpsr/fpcr by encoding), for the trampoline's first FP use; sve_save/sve_load reported (SVE stays trapped), fpu_kernel_enter/exit not needed by the softfloat kernel; efi(4): fpu_kernel_enter/exit (the UEFI runtime services may use the FPU)"
 
 
 [[file]]
@@ -2614,53 +2614,53 @@ rust = "sys/arch/arm64/arm64/locore.rs"
 license = "none"
 status = "wip"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "e152f14712f309732038b85e5772983bf029cc91"
+upstream_blob = "94f9d8cebd4a1af242c3a16f6a31f6cd1d23b263"
 deps = ["sys/arch/arm64/include/frame.h"]
-notes = "pin_check (SIGABRT through sigabort, the message by printf: no uprintf without a tty; KTRACE not configured), mi_syscall (refreshcreds, pin_check, pledge_syscall/pledge_fail, the MAP_STACK check uvm_map_inentry reported; SYSCALL_DEBUG as feature syscall_debug; KTRACE and dt(4) not configured), mi_syscall_return, mi_child_return, mi_ast (ADDUPROF reported, subr_prof.c); M11a: the kernel lock at the C's sites; M11e: SY_NOLOCK honoured as in C for the audited bodies (kern_prot.c ids, kern_sig.c sigprocmask/sigsuspend/__thrsigdivert, kern_time.c, getrlimit, futex, sched_yield, getentropy, utrace, __set_tcb/__get_tcb; the files audit: open, openat, __pledge_open, stat, lstat, fstatat, __realpath, dup, flock, lseek, kqueue, kqueue1, pipe, pipe2, getrtable, getdtablecount; the uvm audit: munmap, mprotect, minherit, kbind, and setrlimit); MULTIPROCESSOR deviation: SY_NOLOCK_DEFERRED lists the NOLOCK system calls still run under the kernel lock: after the whole M11e audit only the unported __thrsleep/__thrwakeup, empty since TD1 ported them; host tests check the table against sysent (syscall_mi/tests.rs); M14 (A3): the boot half for boot(8)'s entry: drop_to_el1 + hyp_vectors, get_virt_delta, start_mmu, switch_mmu_kernel, mair/tcr/sctlr words (this kernel's MAIR layout, T1SZ 16), abort, esym, the page tables (+ L0 TTBR1 and the direct map's L1), initstack (64 KiB), MULTIPROCESSOR cpu_hatch_secondary (PSCI CPU_ON entry: context = the cpu_info's VA, TTBR1 from cpu.rs AP_TTBR1, then cpu_hatch_entry); no RETGUARD/CODEPATCH; hyp_vectors by adr alone (the C subtracts x29 before get_virt_delta sets it); cpu_hatch_secondary_spin/cpu_hatch_ci (spin tables) not ported"
+notes = "kern_sig.c: sigcode/sigcodecall/sigcoderet/esigcode/sigfill/sigfillsiz in locore.S (global_asm! with SF_SC and SYS_sigreturn as placeholders; .arch_extension fp around it); the kernel entry (drop_to_el1, the boot page tables, initstack) is replaced by the boot protocol (Limine); M8: .balign 4 before sigfillsiz, which a word load reads (the link failed with an unaligned R_AARCH64_LDST32 once .data moved); M8: sigcodecall exported to Rust (machine::signal sigcodecall, for pin_check); M11a: the MULTIPROCESSOR cpu_hatch_secondary/cpu_hatch_secondary_spin/cpu_hatch_ci are replaced by cpu.rs's cpu_hatch_entry, reached through the boot protocol (BootMp); cpu_park (HIBERNATE) and cpu_hatch_primary (SUSPEND) not configured"
 [[file]]
 c = "sys/kern/syscalls.master"
 status = "skipped"
-notes = "pin_check (SIGABRT through sigabort, the message by printf: no uprintf without a tty; KTRACE not configured), mi_syscall (refreshcreds, pin_check, pledge_syscall/pledge_fail, the MAP_STACK check uvm_map_inentry reported; SYSCALL_DEBUG as feature syscall_debug; KTRACE and dt(4) not configured), mi_syscall_return, mi_child_return, mi_ast (ADDUPROF reported, subr_prof.c); M11a: the kernel lock at the C's sites; M11e: SY_NOLOCK honoured as in C for the audited bodies (kern_prot.c ids, kern_sig.c sigprocmask/sigsuspend/__thrsigdivert, kern_time.c, getrlimit, futex, sched_yield, getentropy, utrace, __set_tcb/__get_tcb; the files audit: open, openat, __pledge_open, stat, lstat, fstatat, __realpath, dup, flock, lseek, kqueue, kqueue1, pipe, pipe2, getrtable, getdtablecount; the uvm audit: munmap, mprotect, minherit, kbind, and setrlimit); MULTIPROCESSOR deviation: SY_NOLOCK_DEFERRED lists the NOLOCK system calls still run under the kernel lock: after the whole M11e audit only the unported __thrsleep/__thrwakeup, empty since TD1 ported them; host tests check the table against sysent (syscall_mi/tests.rs)"
+notes = "replaced-by-xtask: the input of cargo xtask gen-syscalls (tools/xtask/src/syscalls.rs), which does what makesyscalls.sh does for the C tree"
 [[file]]
 c = "sys/kern/makesyscalls.sh"
 status = "skipped"
-notes = "pin_check (SIGABRT through sigabort, the message by printf: no uprintf without a tty; KTRACE not configured), mi_syscall (refreshcreds, pin_check, pledge_syscall/pledge_fail, the MAP_STACK check uvm_map_inentry reported; SYSCALL_DEBUG as feature syscall_debug; KTRACE and dt(4) not configured), mi_syscall_return, mi_child_return, mi_ast (ADDUPROF reported, subr_prof.c); M11a: the kernel lock at the C's sites; M11e: SY_NOLOCK honoured as in C for the audited bodies (kern_prot.c ids, kern_sig.c sigprocmask/sigsuspend/__thrsigdivert, kern_time.c, getrlimit, futex, sched_yield, getentropy, utrace, __set_tcb/__get_tcb; the files audit: open, openat, __pledge_open, stat, lstat, fstatat, __realpath, dup, flock, lseek, kqueue, kqueue1, pipe, pipe2, getrtable, getdtablecount; the uvm audit: munmap, mprotect, minherit, kbind, and setrlimit); MULTIPROCESSOR deviation: SY_NOLOCK_DEFERRED lists the NOLOCK system calls still run under the kernel lock: after the whole M11e audit only the unported __thrsleep/__thrwakeup, empty since TD1 ported them; host tests check the table against sysent (syscall_mi/tests.rs)"
+notes = "replaced-by-xtask: cargo xtask gen-syscalls (host Rust, with tests) generates sys/sys/syscall.rs, sys/sys/syscallargs.rs, sys/kern/init_sysent.rs and sys/kern/syscalls.rs from syscalls.master; --check keeps them current in CI"
 [[file]]
 c = "sys/sys/syscall.h"
 rust = "sys/sys/syscall.rs"
 license = "none"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "e152f14712f309732038b85e5772983bf029cc91"
+upstream_blob = "ae54566c08bc950f949be7c3745e10bc95d65c7b"
 deps = ["sys/kern/syscalls.master"]
-notes = "pin_check (SIGABRT through sigabort, the message by printf: no uprintf without a tty; KTRACE not configured), mi_syscall (refreshcreds, pin_check, pledge_syscall/pledge_fail, the MAP_STACK check uvm_map_inentry reported; SYSCALL_DEBUG as feature syscall_debug; KTRACE and dt(4) not configured), mi_syscall_return, mi_child_return, mi_ast (ADDUPROF reported, subr_prof.c); M11a: the kernel lock at the C's sites; M11e: SY_NOLOCK honoured as in C for the audited bodies (kern_prot.c ids, kern_sig.c sigprocmask/sigsuspend/__thrsigdivert, kern_time.c, getrlimit, futex, sched_yield, getentropy, utrace, __set_tcb/__get_tcb; the files audit: open, openat, __pledge_open, stat, lstat, fstatat, __realpath, dup, flock, lseek, kqueue, kqueue1, pipe, pipe2, getrtable, getdtablecount; the uvm audit: munmap, mprotect, minherit, kbind, and setrlimit); MULTIPROCESSOR deviation: SY_NOLOCK_DEFERRED lists the NOLOCK system calls still run under the kernel lock: after the whole M11e audit only the unported __thrsleep/__thrwakeup, empty since TD1 ported them; host tests check the table against sysent (syscall_mi/tests.rs)"
+notes = "M6-a: generated (cargo xtask gen-syscalls): the SYS_* numbers and SYS_MAXSYSCALL; do not edit"
 [[file]]
 c = "sys/sys/syscallargs.h"
 rust = "sys/sys/syscallargs.rs"
 license = "none"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "e152f14712f309732038b85e5772983bf029cc91"
+upstream_blob = "1d2c696798745f3d83c5e3d161f13f383c85324f"
 deps = ["sys/kern/syscalls.master", "sys/sys/types.h"]
-notes = "pin_check (SIGABRT through sigabort, the message by printf: no uprintf without a tty; KTRACE not configured), mi_syscall (refreshcreds, pin_check, pledge_syscall/pledge_fail, the MAP_STACK check uvm_map_inentry reported; SYSCALL_DEBUG as feature syscall_debug; KTRACE and dt(4) not configured), mi_syscall_return, mi_child_return, mi_ast (ADDUPROF reported, subr_prof.c); M11a: the kernel lock at the C's sites; M11e: SY_NOLOCK honoured as in C for the audited bodies (kern_prot.c ids, kern_sig.c sigprocmask/sigsuspend/__thrsigdivert, kern_time.c, getrlimit, futex, sched_yield, getentropy, utrace, __set_tcb/__get_tcb; the files audit: open, openat, __pledge_open, stat, lstat, fstatat, __realpath, dup, flock, lseek, kqueue, kqueue1, pipe, pipe2, getrtable, getdtablecount; the uvm audit: munmap, mprotect, minherit, kbind, and setrlimit); MULTIPROCESSOR deviation: SY_NOLOCK_DEFERRED lists the NOLOCK system calls still run under the kernel lock: after the whole M11e audit only the unported __thrsleep/__thrwakeup, empty since TD1 ported them; host tests check the table against sysent (syscall_mi/tests.rs)"
+notes = "M6-a: generated: the sys_*_args structs over the Syscallarg<T> union (syscallarg(x)); pointers to unported structures are opaque c_void pointers; do not edit"
 [[file]]
 c = "sys/kern/init_sysent.c"
 rust = "sys/kern/init_sysent.rs"
 license = "none"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "e152f14712f309732038b85e5772983bf029cc91"
+upstream_blob = "8fa24582fe2defb50069f7f9c5b5c3b2a48516fd"
 deps = ["sys/kern/syscalls.master", "sys/sys/systm.h", "sys/kern/kern_sig.c"]
-notes = "pin_check (SIGABRT through sigabort, the message by printf: no uprintf without a tty; KTRACE not configured), mi_syscall (refreshcreds, pin_check, pledge_syscall/pledge_fail, the MAP_STACK check uvm_map_inentry reported; SYSCALL_DEBUG as feature syscall_debug; KTRACE and dt(4) not configured), mi_syscall_return, mi_child_return, mi_ast (ADDUPROF reported, subr_prof.c); M11a: the kernel lock at the C's sites; M11e: SY_NOLOCK honoured as in C for the audited bodies (kern_prot.c ids, kern_sig.c sigprocmask/sigsuspend/__thrsigdivert, kern_time.c, getrlimit, futex, sched_yield, getentropy, utrace, __set_tcb/__get_tcb; the files audit: open, openat, __pledge_open, stat, lstat, fstatat, __realpath, dup, flock, lseek, kqueue, kqueue1, pipe, pipe2, getrtable, getdtablecount; the uvm audit: munmap, mprotect, minherit, kbind, and setrlimit); MULTIPROCESSOR deviation: SY_NOLOCK_DEFERRED lists the NOLOCK system calls still run under the kernel lock: after the whole M11e audit only the unported __thrsleep/__thrwakeup, empty since TD1 ported them; host tests check the table against sysent (syscall_mi/tests.rs)"
+notes = "M6-a: generated: sysent[] with every unported syscall at sys_nosys (noted per entry); the generator scans sys/kern and sys/uvm for pub fn sys_*; do not edit; kern_prot.c: regenerated, the 31 kern_prot syscalls point at kern_prot.rs; kern_sig.c: regenerated: sigaction, sigprocmask, sigpending, sigreturn, sigsuspend, thrkill, kill, sigaltstack and __thrsigdivert point at kern_sig.rs; M10e: regenerated: the generator scans sys/nfs too and configures NFSCLIENT and NFSSERVER; nfssvc (155) has two cfg rows (the second, sys_nosys, for a kernel with neither feature), gen-syscalls GATED table"
 [[file]]
 c = "sys/kern/syscalls.c"
 rust = "sys/kern/syscalls.rs"
 license = "none"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "e152f14712f309732038b85e5772983bf029cc91"
+upstream_blob = "8c29d60b562201aca355b8970db52312aacf66c1"
 deps = ["sys/kern/syscalls.master"]
-notes = "pin_check (SIGABRT through sigabort, the message by printf: no uprintf without a tty; KTRACE not configured), mi_syscall (refreshcreds, pin_check, pledge_syscall/pledge_fail, the MAP_STACK check uvm_map_inentry reported; SYSCALL_DEBUG as feature syscall_debug; KTRACE and dt(4) not configured), mi_syscall_return, mi_child_return, mi_ast (ADDUPROF reported, subr_prof.c); M11a: the kernel lock at the C's sites; M11e: SY_NOLOCK honoured as in C for the audited bodies (kern_prot.c ids, kern_sig.c sigprocmask/sigsuspend/__thrsigdivert, kern_time.c, getrlimit, futex, sched_yield, getentropy, utrace, __set_tcb/__get_tcb; the files audit: open, openat, __pledge_open, stat, lstat, fstatat, __realpath, dup, flock, lseek, kqueue, kqueue1, pipe, pipe2, getrtable, getdtablecount; the uvm audit: munmap, mprotect, minherit, kbind, and setrlimit); MULTIPROCESSOR deviation: SY_NOLOCK_DEFERRED lists the NOLOCK system calls still run under the kernel lock: after the whole M11e audit only the unported __thrsleep/__thrwakeup, empty since TD1 ported them; host tests check the table against sysent (syscall_mi/tests.rs)"
+notes = "M6-a: generated: syscallnames[]; do not edit"
 [[file]]
 c = "sys/sys/syscall_mi.h"
 rust = "sys/sys/syscall_mi.rs"
@@ -2674,61 +2674,61 @@ c = "sys/kern/kern_sig.c"
 rust = "sys/kern/kern_sig.rs"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "e152f14712f309732038b85e5772983bf029cc91"
+upstream_blob = "40ebf21aa155b9199b0888e31b14e2ec81007586"
 deps = ["sys/sys/proc.h", "sys/sys/signal.h", "sys/sys/signalvar.h", "sys/sys/siginfo.h", "sys/sys/sigio.h", "sys/sys/ttycom.h", "sys/kern/kern_exit.c", "sys/kern/kern_synch.c", "sys/kern/kern_prot.c", "sys/kern/kern_proc.c"]
-notes = "pin_check (SIGABRT through sigabort, the message by printf: no uprintf without a tty; KTRACE not configured), mi_syscall (refreshcreds, pin_check, pledge_syscall/pledge_fail, the MAP_STACK check uvm_map_inentry reported; SYSCALL_DEBUG as feature syscall_debug; KTRACE and dt(4) not configured), mi_syscall_return, mi_child_return, mi_ast (ADDUPROF reported, subr_prof.c); M11a: the kernel lock at the C's sites; M11e: SY_NOLOCK honoured as in C for the audited bodies (kern_prot.c ids, kern_sig.c sigprocmask/sigsuspend/__thrsigdivert, kern_time.c, getrlimit, futex, sched_yield, getentropy, utrace, __set_tcb/__get_tcb; the files audit: open, openat, __pledge_open, stat, lstat, fstatat, __realpath, dup, flock, lseek, kqueue, kqueue1, pipe, pipe2, getrtable, getdtablecount; the uvm audit: munmap, mprotect, minherit, kbind, and setrlimit); MULTIPROCESSOR deviation: SY_NOLOCK_DEFERRED lists the NOLOCK system calls still run under the kernel lock: after the whole M11e audit only the unported __thrsleep/__thrwakeup, empty since TD1 ported them; host tests check the table against sysent (syscall_mi/tests.rs)"
+notes = "the whole file: sigprop, cansignal, signal_init/sigacts_pool, sigstkinit, sigactsinit/sigactsfree (pool items as &'static Sigacts), sys_sigaction/setsigvec, siginit, execsigs, sys_sigprocmask, sys_sigpending, dosigsuspend/sys_sigsuspend, sigonstack, sys_sigaltstack, sys_kill, sys_thrkill, killpg1, pgsignal, pgsigio, postsig_done, trapsignal, psignal/prsignal/ptsignal/ptsignal_locked, setsigctx, cursig, proc_trap, process_continue, process_stop, proc_stop_setup/finish, process_suspend_signal, postsig, sigexit, sigabort, sigismasked, coredump/coredump_write/coredump_unmap, sys_nosys (SIGSYS), sys___thrsigdivert, initsiginfo (returns the siginfo), userret, proc_suspend_check[_locked], single_thread_set/clear, sigio_del/unlink/free/freelist/setown/getown/copy; sys_sigreturn forwards to machine::MachineSignal (the generator scans sys/kern and sys/uvm only); sys_kill calls kern_pledge.c's pledge_kill; stubs: coredump's vn_open and everything after it (no core is written, sigexit never sets WCOREFLAG; the name is built in a stack buffer, KERNELPATH is a bool, no fd_rdir), coredump_write's vn_rdwr; WCOREFLAG kept here until <sys/wait.h>; KTRACE/WITNESS/dt/SMALL_KERNEL/MULTIPROCESSOR not configured; filt_sig* are kern_event.c's; host tests (sigprop, cursig selection, setsigvec/execsigs, initsiginfo) and a test-ref check of sigprop against kern_sig.c; kern_event.c: ptsignal_locked posts NOTE_SIGNAL | signum on ps_klist; M11a: the kernel lock at the C's sites (pgsigio, trapsignal, postsig, single_thread_check, sigio_setown)"
 [[file]]
 c = "sys/arch/amd64/amd64/copy.S"
 rust = "sys/arch/amd64/amd64/copy.rs"
 license = "none"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "e152f14712f309732038b85e5772983bf029cc91"
+upstream_blob = "fda317bec35ee81c86b4f186138907242e69c9e3"
 deps = ["sys/arch/amd64/include/pcb.h", "sys/arch/amd64/include/vmparam.h"]
-notes = "pin_check (SIGABRT through sigabort, the message by printf: no uprintf without a tty; KTRACE not configured), mi_syscall (refreshcreds, pin_check, pledge_syscall/pledge_fail, the MAP_STACK check uvm_map_inentry reported; SYSCALL_DEBUG as feature syscall_debug; KTRACE and dt(4) not configured), mi_syscall_return, mi_child_return, mi_ast (ADDUPROF reported, subr_prof.c); M11a: the kernel lock at the C's sites; M11e: SY_NOLOCK honoured as in C for the audited bodies (kern_prot.c ids, kern_sig.c sigprocmask/sigsuspend/__thrsigdivert, kern_time.c, getrlimit, futex, sched_yield, getentropy, utrace, __set_tcb/__get_tcb; the files audit: open, openat, __pledge_open, stat, lstat, fstatat, __realpath, dup, flock, lseek, kqueue, kqueue1, pipe, pipe2, getrtable, getdtablecount; the uvm audit: munmap, mprotect, minherit, kbind, and setrlimit); MULTIPROCESSOR deviation: SY_NOLOCK_DEFERRED lists the NOLOCK system calls still run under the kernel lock: after the whole M11e audit only the unported __thrsleep/__thrwakeup, empty since TD1 ported them; host tests check the table against sysent (syscall_mi/tests.rs)"
+notes = "M6-a: kcopy, copyout, _copyin, copy_fault, copyoutstr, _copyinstr, copystr_fault and the .nofault table, in copy.S (global_asm! with the pcb/cpu_info offsets); no SMAP stac/clac code patches, no retguard; copy.rs gives the machine::copy entry points over slices"
 [[file]]
 c = "sys/arch/amd64/include/frameasm.h"
 rust = "sys/arch/amd64/amd64/locore.rs"
 license = "none"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "e152f14712f309732038b85e5772983bf029cc91"
+upstream_blob = "18840bc7180ae907bfc73d46ba0e8e7ca9771815"
 deps = []
-notes = "pin_check (SIGABRT through sigabort, the message by printf: no uprintf without a tty; KTRACE not configured), mi_syscall (refreshcreds, pin_check, pledge_syscall/pledge_fail, the MAP_STACK check uvm_map_inentry reported; SYSCALL_DEBUG as feature syscall_debug; KTRACE and dt(4) not configured), mi_syscall_return, mi_child_return, mi_ast (ADDUPROF reported, subr_prof.c); M11a: the kernel lock at the C's sites; M11e: SY_NOLOCK honoured as in C for the audited bodies (kern_prot.c ids, kern_sig.c sigprocmask/sigsuspend/__thrsigdivert, kern_time.c, getrlimit, futex, sched_yield, getentropy, utrace, __set_tcb/__get_tcb; the files audit: open, openat, __pledge_open, stat, lstat, fstatat, __realpath, dup, flock, lseek, kqueue, kqueue1, pipe, pipe2, getrtable, getdtablecount; the uvm audit: munmap, mprotect, minherit, kbind, and setrlimit); MULTIPROCESSOR deviation: SY_NOLOCK_DEFERRED lists the NOLOCK system calls still run under the kernel lock: after the whole M11e audit only the unported __thrsleep/__thrwakeup, empty since TD1 ported them; host tests check the table against sysent (syscall_mi/tests.rs)"
+notes = "M4/M6-a: the entry macros are expanded where they are used: INTRENTRY, INTR_SAVE_*, INTR_CLEAR_GPRS, TRAP_ENTRY_KERN, INTR_RECURSE in vector.S; SYSCALL_ENTRY, CHECK_ASTPENDING, CLEAR_ASTPENDING in locore.S (Xsyscall); TRAP_ENTRY_USER and INTRENTRY's user path are M6-b"
 [[file]]
 c = "sys/arch/arm64/arm64/copy.S"
 rust = "sys/arch/arm64/arm64/copy.rs"
 license = "none"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "e152f14712f309732038b85e5772983bf029cc91"
+upstream_blob = "bc7a3c71c0519a3a1b94592c9f38a9f2c6e94dbe"
 deps = ["sys/arch/arm64/include/pcb.h"]
-notes = "pin_check (SIGABRT through sigabort, the message by printf: no uprintf without a tty; KTRACE not configured), mi_syscall (refreshcreds, pin_check, pledge_syscall/pledge_fail, the MAP_STACK check uvm_map_inentry reported; SYSCALL_DEBUG as feature syscall_debug; KTRACE and dt(4) not configured), mi_syscall_return, mi_child_return, mi_ast (ADDUPROF reported, subr_prof.c); M11a: the kernel lock at the C's sites; M11e: SY_NOLOCK honoured as in C for the audited bodies (kern_prot.c ids, kern_sig.c sigprocmask/sigsuspend/__thrsigdivert, kern_time.c, getrlimit, futex, sched_yield, getentropy, utrace, __set_tcb/__get_tcb; the files audit: open, openat, __pledge_open, stat, lstat, fstatat, __realpath, dup, flock, lseek, kqueue, kqueue1, pipe, pipe2, getrtable, getdtablecount; the uvm audit: munmap, mprotect, minherit, kbind, and setrlimit); MULTIPROCESSOR deviation: SY_NOLOCK_DEFERRED lists the NOLOCK system calls still run under the kernel lock: after the whole M11e audit only the unported __thrsleep/__thrwakeup, empty since TD1 ported them; host tests check the table against sysent (syscall_mi/tests.rs)"
+notes = "M6-a: copyin, copyin32, copyout, kcopy in copy.S (global_asm! with the pcb/cpu_info offsets), no retguard; copy.rs gives the machine::copy entry points over slices"
 [[file]]
 c = "sys/arch/arm64/arm64/copystr.S"
 rust = "sys/arch/arm64/arm64/copystr.rs"
 license = "none"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "e152f14712f309732038b85e5772983bf029cc91"
+upstream_blob = "9ab67d94cbf55a4aa1ab281537d47b243733cebe"
 deps = ["sys/arch/arm64/include/pcb.h"]
-notes = "pin_check (SIGABRT through sigabort, the message by printf: no uprintf without a tty; KTRACE not configured), mi_syscall (refreshcreds, pin_check, pledge_syscall/pledge_fail, the MAP_STACK check uvm_map_inentry reported; SYSCALL_DEBUG as feature syscall_debug; KTRACE and dt(4) not configured), mi_syscall_return, mi_child_return, mi_ast (ADDUPROF reported, subr_prof.c); M11a: the kernel lock at the C's sites; M11e: SY_NOLOCK honoured as in C for the audited bodies (kern_prot.c ids, kern_sig.c sigprocmask/sigsuspend/__thrsigdivert, kern_time.c, getrlimit, futex, sched_yield, getentropy, utrace, __set_tcb/__get_tcb; the files audit: open, openat, __pledge_open, stat, lstat, fstatat, __realpath, dup, flock, lseek, kqueue, kqueue1, pipe, pipe2, getrtable, getdtablecount; the uvm audit: munmap, mprotect, minherit, kbind, and setrlimit); MULTIPROCESSOR deviation: SY_NOLOCK_DEFERRED lists the NOLOCK system calls still run under the kernel lock: after the whole M11e audit only the unported __thrsleep/__thrwakeup, empty since TD1 ported them; host tests check the table against sysent (syscall_mi/tests.rs)"
+notes = "M6-a: copyinstr, copyoutstr in copystr.S, no retguard"
 [[file]]
 c = "sys/arch/arm64/arm64/syscall.c"
 rust = "sys/arch/arm64/arm64/syscall.rs"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "e152f14712f309732038b85e5772983bf029cc91"
+upstream_blob = "1657d9674586e2a19dba57475b98626340a918cd"
 deps = ["sys/sys/syscall_mi.h", "sys/kern/init_sysent.c"]
-notes = "pin_check (SIGABRT through sigabort, the message by printf: no uprintf without a tty; KTRACE not configured), mi_syscall (refreshcreds, pin_check, pledge_syscall/pledge_fail, the MAP_STACK check uvm_map_inentry reported; SYSCALL_DEBUG as feature syscall_debug; KTRACE and dt(4) not configured), mi_syscall_return, mi_child_return, mi_ast (ADDUPROF reported, subr_prof.c); M11a: the kernel lock at the C's sites; M11e: SY_NOLOCK honoured as in C for the audited bodies (kern_prot.c ids, kern_sig.c sigprocmask/sigsuspend/__thrsigdivert, kern_time.c, getrlimit, futex, sched_yield, getentropy, utrace, __set_tcb/__get_tcb; the files audit: open, openat, __pledge_open, stat, lstat, fstatat, __realpath, dup, flock, lseek, kqueue, kqueue1, pipe, pipe2, getrtable, getdtablecount; the uvm audit: munmap, mprotect, minherit, kbind, and setrlimit); MULTIPROCESSOR deviation: SY_NOLOCK_DEFERRED lists the NOLOCK system calls still run under the kernel lock: after the whole M11e audit only the unported __thrsleep/__thrwakeup, empty since TD1 ported them; host tests check the table against sysent (syscall_mi/tests.rs)"
+notes = "M6-a: svc_handler and child_return; M6-b: svc_handler hands x0..x5 as a SysArgs block; M8: child_return behind machine::cpu; copyin32 (copy.S) behind machine::copy; M11a: child_return's KERNEL_UNLOCK (sys::systm::kernel_unlock; it pairs with proc_trampoline_mi's KERNEL_LOCK)"
 [[file]]
 c = "sys/arch/arm64/arm64/ast.c"
 rust = "sys/arch/arm64/arm64/ast.rs"
 status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
-upstream_blob = "e152f14712f309732038b85e5772983bf029cc91"
+upstream_blob = "689fd18cdfc5fa4641d977012e0507b44c4aac35"
 deps = ["sys/sys/syscall_mi.h"]
-notes = "pin_check (SIGABRT through sigabort, the message by printf: no uprintf without a tty; KTRACE not configured), mi_syscall (refreshcreds, pin_check, pledge_syscall/pledge_fail, the MAP_STACK check uvm_map_inentry reported; SYSCALL_DEBUG as feature syscall_debug; KTRACE and dt(4) not configured), mi_syscall_return, mi_child_return, mi_ast (ADDUPROF reported, subr_prof.c); M11a: the kernel lock at the C's sites; M11e: SY_NOLOCK honoured as in C for the audited bodies (kern_prot.c ids, kern_sig.c sigprocmask/sigsuspend/__thrsigdivert, kern_time.c, getrlimit, futex, sched_yield, getentropy, utrace, __set_tcb/__get_tcb; the files audit: open, openat, __pledge_open, stat, lstat, fstatat, __realpath, dup, flock, lseek, kqueue, kqueue1, pipe, pipe2, getrtable, getdtablecount; the uvm audit: munmap, mprotect, minherit, kbind, and setrlimit); MULTIPROCESSOR deviation: SY_NOLOCK_DEFERRED lists the NOLOCK system calls still run under the kernel lock: after the whole M11e audit only the unported __thrsleep/__thrwakeup, empty since TD1 ported them; host tests check the table against sysent (syscall_mi/tests.rs)"
+notes = "M6-a: ast"
 
 [[file]]
 c = "sys/kern/kern_smr.c"

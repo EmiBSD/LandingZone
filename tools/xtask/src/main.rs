@@ -824,6 +824,34 @@ fn ports_check(root: &Path) -> Result<()> {
         }
     }
 
+    // A row ported at the pin names the blob of its own C file there. `ports drift` compares
+    // the same blobs after a pin bump; this catches a row that was given another row's blob
+    // (18 rows carried one from 2026-10-04 to 2026-11-18). Only when the clone is at the pin.
+    if have_reference && git(&reference, &["rev-parse", "HEAD"]).is_ok_and(|h| h == pinned) {
+        let tree = git(&reference, &["ls-tree", "-r", "HEAD", "sys"])?;
+        let blobs: HashMap<&str, &str> = tree
+            .lines()
+            .filter_map(|l| {
+                let (meta, path) = l.split_once('\t')?;
+                Some((path, meta.split(' ').nth(2)?))
+            })
+            .collect();
+        for e in &ports.files {
+            if e.upstream_commit != pinned || e.upstream_blob.is_empty() {
+                continue;
+            }
+            if let Some(blob) = blobs.get(e.c.as_str())
+                && *blob != e.upstream_blob
+            {
+                let (c, have) = (&e.c, &e.upstream_blob);
+                errors.push(format!(
+                    "[[file]] c = \"{c}\": upstream_blob {have} is not this file's blob at the \
+                     pin ({blob})"
+                ));
+            }
+        }
+    }
+
     // Every non-structural Rust file under sys/ is a tracked port or a declared extra.
     let tracked: HashSet<&str> = ports
         .files

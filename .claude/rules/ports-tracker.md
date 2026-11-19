@@ -44,6 +44,11 @@ reason = "project helper: visible stubs for unported subsystems"
   `dev/`; `dev/`'s own files are in) has a row, `todo` with the milestone that claims it in
   `notes`, or `skipped` with its reason, and `cargo xtask ports check` refuses such a file
   with no row (`in_inventory`). The drivers' directories keep the old rule.
+- A row is found by its `c =` line, never by its blob or its notes, and changed alone. Since
+  2026-11-18 `cargo xtask ports check` compares the `upstream_blob` of every row ported at the
+  pin with the reference tree's blob of that file: from 2026-10-04 until then 18 rows carried
+  another file's blob and 20 another row's notes, written by an update that matched several
+  rows at once.
 - Zone markers (M15): `cargo xtask ports check` validates `/* <LICENSES> */`, `/* <CODE> */` and
   `/* <TESTS> */` in every `.rs` under `sys/` and `tools/` (`rust-kernel.md`, file layout).
   `<LICENSES>` is in every file and opens with the author's ISC block (`scope-and-stubs.md`,
