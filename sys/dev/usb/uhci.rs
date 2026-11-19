@@ -498,14 +498,16 @@ pub fn uwrite4(sc: &UhciSoftc, r: BusSize, x: u32) {
 }
 
 /// `UREAD1(sc, r)`.
-pub fn uread1(sc: &UhciSoftc, r: BusSize) -> u8 {
+#[allow(non_snake_case)] // the C name
+pub fn UREAD1(sc: &UhciSoftc, r: BusSize) -> u8 {
     ubarr(sc);
     let (t, h) = sc.regs();
     bus_space_read_1(t, h, r)
 }
 
 /// `UREAD2(sc, r)`.
-pub fn uread2(sc: &UhciSoftc, r: BusSize) -> u16 {
+#[allow(non_snake_case)] // the C name
+pub fn UREAD2(sc: &UhciSoftc, r: BusSize) -> u16 {
     ubarr(sc);
     let (t, h) = sc.regs();
     bus_space_read_2(t, h, r)
@@ -653,7 +655,7 @@ pub fn uhci_globalreset(sc: &UhciSoftc) {
 /// its interrupt QHs and the control and bulk queues, and starts the controller.
 pub fn uhci_init(sc: &'static UhciSoftc) -> UsbdStatus {
     // Save SOF over HC reset.
-    sc.sc_saved_sof.set(uread1(sc, UHCI_SOF));
+    sc.sc_saved_sof.set(UREAD1(sc, UHCI_SOF));
 
     uwrite2(sc, UHCI_INTR, 0); // disable interrupts
     uhci_globalreset(sc); // reset the controller
@@ -815,11 +817,11 @@ pub fn uhci_activate(self_: &Device, act: i32) -> Result<(), Errno> {
             let _ = uhci_run(sc, 0); // stop the controller
 
             // save some state if BIOS doesn't
-            sc.sc_saved_frnum.set(uread2(sc, UHCI_FRNUM));
+            sc.sc_saved_frnum.set(UREAD2(sc, UHCI_FRNUM));
 
             uwrite2(sc, UHCI_INTR, 0); // disable intrs
 
-            let cmd = uread2(sc, UHCI_CMD);
+            let cmd = UREAD2(sc, UHCI_CMD);
             uhcicmd(sc, cmd | UHCI_CMD_EGSM); // enter global suspend
             usb_delay_ms(&sc.sc_bus, USB_RESUME_WAIT);
             sc.sc_suspend.set(act as i8);
@@ -840,7 +842,7 @@ pub fn uhci_activate(self_: &Device, act: i32) -> Result<(), Errno> {
             }
             sc.sc_bus.use_polling.set(sc.sc_bus.use_polling.get() + 1);
             sc.sc_suspend.set(act as i8);
-            let cmd = uread2(sc, UHCI_CMD);
+            let cmd = UREAD2(sc, UHCI_CMD);
             if cmd & UHCI_CMD_RS != 0 {
                 let _ = uhci_run(sc, 0); // in case BIOS has started it
             }
@@ -932,10 +934,10 @@ pub fn uhci_poll_hub(addr: *mut c_void) {
 
     let p = kernaddr(&xfer.dmabuf, 0);
     let mut v: u8 = 0;
-    if uread2(sc, UHCI_PORTSC1) & (UHCI_PORTSC_CSC | UHCI_PORTSC_OCIC) != 0 {
+    if UREAD2(sc, UHCI_PORTSC1) & (UHCI_PORTSC_CSC | UHCI_PORTSC_OCIC) != 0 {
         v |= 1 << 1;
     }
-    if uread2(sc, UHCI_PORTSC2) & (UHCI_PORTSC_CSC | UHCI_PORTSC_OCIC) != 0 {
+    if UREAD2(sc, UHCI_PORTSC2) & (UHCI_PORTSC_CSC | UHCI_PORTSC_OCIC) != 0 {
         v |= 1 << 2;
     }
     // SAFETY: the root hub's interrupt xfer is started (`sc_intrxfer`), so `usbd_transfer`
@@ -1086,7 +1088,7 @@ pub fn uhci_intr(arg: *mut c_void) -> i32 {
 
 /// `uhci_intr1`: acknowledges the controller's interrupts and schedules the soft interrupt.
 pub fn uhci_intr1(sc: &'static UhciSoftc) -> i32 {
-    let status = uread2(sc, UHCI_STS);
+    let status = UREAD2(sc, UHCI_STS);
     if status == 0xffff {
         sc.sc_bus.dying.set(1);
         return 0;
@@ -1372,7 +1374,7 @@ pub fn uhci_timeout_task(addr: *mut c_void) {
 pub fn uhci_poll(bus: &'static UsbdBus) {
     let sc = uhci_softc(bus);
 
-    if uread2(sc, UHCI_STS) & UHCI_STS_ALLINTRS != 0 {
+    if UREAD2(sc, UHCI_STS) & UHCI_STS_ALLINTRS != 0 {
         uhci_intr1(sc);
     }
 }
@@ -1383,7 +1385,7 @@ pub fn uhci_reset(sc: &UhciSoftc) {
     uhcicmd(sc, UHCI_CMD_HCRESET);
     // The reset bit goes low when the controller is done.
     let mut n = 0;
-    while n < UHCI_RESET_TIMEOUT && uread2(sc, UHCI_CMD) & UHCI_CMD_HCRESET != 0 {
+    while n < UHCI_RESET_TIMEOUT && UREAD2(sc, UHCI_CMD) & UHCI_CMD_HCRESET != 0 {
         usb_delay_ms(&sc.sc_bus, 1);
         n += 1;
     }
@@ -1397,7 +1399,7 @@ pub fn uhci_reset(sc: &UhciSoftc) {
 pub fn uhci_run(sc: &UhciSoftc, run: i32) -> UsbdStatus {
     let run = run != 0;
     let s = splhardusb();
-    let mut cmd = uread2(sc, UHCI_CMD);
+    let mut cmd = UREAD2(sc, UHCI_CMD);
     if run {
         cmd |= UHCI_CMD_RS;
     } else {
@@ -1405,7 +1407,7 @@ pub fn uhci_run(sc: &UhciSoftc, run: i32) -> UsbdStatus {
     }
     uhcicmd(sc, cmd);
     for _ in 0..10 {
-        let running = uread2(sc, UHCI_STS) & UHCI_STS_HCH == 0;
+        let running = UREAD2(sc, UHCI_STS) & UHCI_STS_HCH == 0;
         // return when we've entered the state we want
         if run == running {
             splx(s);
@@ -2110,7 +2112,7 @@ pub fn uhci_device_isoc_enter(xfer: &'static UsbdXfer) {
     let mut next = upipe.iso_next.get();
     if next == -1 {
         // Not in use yet, schedule it a few frames ahead.
-        next = ((u32::from(uread2(sc, UHCI_FRNUM)) + 3) % UHCI_VFRAMELIST_COUNT as u32) as i32;
+        next = ((u32::from(UREAD2(sc, UHCI_FRNUM)) + 3) % UHCI_VFRAMELIST_COUNT as u32) as i32;
     }
 
     xfer.status.set(USBD_IN_PROGRESS);
@@ -2646,17 +2648,17 @@ pub fn uhci_portreset(sc: &UhciSoftc, index: i32) -> UsbdStatus {
         _ => return USBD_IOERROR,
     };
 
-    let x = urwmask(uread2(sc, port));
+    let x = urwmask(UREAD2(sc, port));
     uwrite2(sc, port, x | UHCI_PORTSC_PR);
 
     usb_delay_ms(&sc.sc_bus, USB_PORT_ROOT_RESET_DELAY);
 
-    let x = urwmask(uread2(sc, port));
+    let x = urwmask(UREAD2(sc, port));
     uwrite2(sc, port, x & !UHCI_PORTSC_PR);
 
     delay(100);
 
-    let x = urwmask(uread2(sc, port));
+    let x = urwmask(UREAD2(sc, port));
     uwrite2(sc, port, x | UHCI_PORTSC_PE);
 
     let mut lim = 10;
@@ -2667,7 +2669,7 @@ pub fn uhci_portreset(sc: &UhciSoftc, index: i32) -> UsbdStatus {
         }
         usb_delay_ms(&sc.sc_bus, USB_PORT_RESET_DELAY);
 
-        let x = uread2(sc, port);
+        let x = UREAD2(sc, port);
 
         if x & UHCI_PORTSC_CCS == 0 {
             // No device is connected (or was disconnected during reset). Consider the port
@@ -2866,27 +2868,27 @@ pub fn uhci_root_ctrl_start(xfer: &'static UsbdXfer) -> UsbdStatus {
                 };
                 match i32::from(value) {
                     UHF_PORT_ENABLE => {
-                        let x = urwmask(uread2(sc, port));
+                        let x = urwmask(UREAD2(sc, port));
                         uwrite2(sc, port, x & !UHCI_PORTSC_PE);
                     }
                     UHF_PORT_SUSPEND => {
-                        let x = urwmask(uread2(sc, port));
+                        let x = urwmask(UREAD2(sc, port));
                         uwrite2(sc, port, x & !UHCI_PORTSC_SUSP);
                     }
                     UHF_PORT_RESET => {
-                        let x = urwmask(uread2(sc, port));
+                        let x = urwmask(UREAD2(sc, port));
                         uwrite2(sc, port, x & !UHCI_PORTSC_PR);
                     }
                     UHF_C_PORT_CONNECTION => {
-                        let x = urwmask(uread2(sc, port));
+                        let x = urwmask(UREAD2(sc, port));
                         uwrite2(sc, port, x | UHCI_PORTSC_CSC);
                     }
                     UHF_C_PORT_ENABLE => {
-                        let x = urwmask(uread2(sc, port));
+                        let x = urwmask(UREAD2(sc, port));
                         uwrite2(sc, port, x | UHCI_PORTSC_POEDC);
                     }
                     UHF_C_PORT_OVER_CURRENT => {
-                        let x = urwmask(uread2(sc, port));
+                        let x = urwmask(UREAD2(sc, port));
                         uwrite2(sc, port, x | UHCI_PORTSC_OCIC);
                     }
                     UHF_C_PORT_RESET => {
@@ -2903,7 +2905,7 @@ pub fn uhci_root_ctrl_start(xfer: &'static UsbdXfer) -> UsbdStatus {
                     break 'ret Err(USBD_IOERROR);
                 };
                 if len > 0 {
-                    buf[0] = ((uread2(sc, port) & UHCI_PORTSC_LS) >> UHCI_PORTSC_LS_SHIFT) as u8;
+                    buf[0] = ((UREAD2(sc, port) & UHCI_PORTSC_LS) >> UHCI_PORTSC_LS_SHIFT) as u8;
                     totlen = 1;
                 }
             }
@@ -2931,7 +2933,7 @@ pub fn uhci_root_ctrl_start(xfer: &'static UsbdXfer) -> UsbdStatus {
                 if len != 4 {
                     break 'ret Err(USBD_IOERROR);
                 }
-                let x = uread2(sc, port);
+                let x = UREAD2(sc, port);
                 let (status, change) = uhci_port_status(x, sc.sc_isreset.get() != 0);
                 let mut ps = UsbPortStatus::zeroed();
                 usetw(&mut ps.wPortStatus, status);
@@ -2948,11 +2950,11 @@ pub fn uhci_root_ctrl_start(xfer: &'static UsbdXfer) -> UsbdStatus {
                 };
                 match i32::from(value) {
                     UHF_PORT_ENABLE => {
-                        let x = urwmask(uread2(sc, port));
+                        let x = urwmask(UREAD2(sc, port));
                         uwrite2(sc, port, x | UHCI_PORTSC_PE);
                     }
                     UHF_PORT_SUSPEND => {
-                        let x = urwmask(uread2(sc, port));
+                        let x = urwmask(UREAD2(sc, port));
                         uwrite2(sc, port, x | UHCI_PORTSC_SUSP);
                     }
                     UHF_PORT_RESET => {

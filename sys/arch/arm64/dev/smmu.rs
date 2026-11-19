@@ -1029,27 +1029,32 @@ pub fn smmu_reserve_region(cookie: *mut c_void, sid: u32, addr: BusAddr, size: B
 // basically pmap follows
 
 /// `VP_IDX0(va)`.
-const fn vp_idx0(va: usize) -> usize {
+#[allow(non_snake_case)] // the C name
+const fn VP_IDX0(va: usize) -> usize {
     (va >> VP_IDX0_POS) & VP_IDX0_MASK
 }
 
 /// `VP_IDX1(va)`.
-const fn vp_idx1(va: usize) -> usize {
+#[allow(non_snake_case)] // the C name
+const fn VP_IDX1(va: usize) -> usize {
     (va >> VP_IDX1_POS) & VP_IDX1_MASK
 }
 
 /// `VP_IDX2(va)`.
-const fn vp_idx2(va: usize) -> usize {
+#[allow(non_snake_case)] // the C name
+const fn VP_IDX2(va: usize) -> usize {
     (va >> VP_IDX2_POS) & VP_IDX2_MASK
 }
 
 /// `VP_IDX3(va)`.
-const fn vp_idx3(va: usize) -> usize {
+#[allow(non_snake_case)] // the C name
+const fn VP_IDX3(va: usize) -> usize {
     (va >> VP_IDX3_POS) & VP_IDX3_MASK
 }
 
 /// `VP_Lx(pa)`: a table descriptor for the table at `pa`.
-const fn vp_lx(pa: usize) -> u64 {
+#[allow(non_snake_case)] // the C name
+const fn VP_Lx(pa: usize) -> u64 {
     pa as u64 | Lx_TYPE_PT
 }
 
@@ -1064,7 +1069,7 @@ fn smmu_table_entry(func: &str, va: usize) -> u64 {
         panic(format_args!("{func}: misaligned L2 table"));
     }
 
-    vp_lx(pa)
+    VP_Lx(pa)
 }
 
 /// Makes a descriptor the SMMU walks visible to it.
@@ -1082,7 +1087,7 @@ fn smmu_set_l1(dom: &SmmuDomain, va: usize, l1_va: &'static SmmuVp1) {
         panic(format_args!("smmu_set_l1: no l0"));
     };
 
-    let idx0 = vp_idx0(va);
+    let idx0 = VP_IDX0(va);
     l0.vp[idx0].store(ptr::from_ref(l1_va).cast_mut(), Ordering::Release);
     l0.l0[idx0].store(pg_entry, Ordering::Relaxed);
     smmu_pte_sync(dom.sd_sc, &l0.l0[idx0]);
@@ -1092,7 +1097,7 @@ fn smmu_set_l1(dom: &SmmuDomain, va: usize, l1_va: &'static SmmuVp1) {
 fn smmu_set_l2(dom: &SmmuDomain, va: usize, vp1: &SmmuVp1, l2_va: &'static SmmuVp2) {
     let pg_entry = smmu_table_entry("smmu_set_l2", l2_va.l2.as_ptr() as usize);
 
-    let idx1 = vp_idx1(va);
+    let idx1 = VP_IDX1(va);
     vp1.vp[idx1].store(ptr::from_ref(l2_va).cast_mut(), Ordering::Release);
     vp1.l1[idx1].store(pg_entry, Ordering::Relaxed);
     smmu_pte_sync(dom.sd_sc, &vp1.l1[idx1]);
@@ -1102,7 +1107,7 @@ fn smmu_set_l2(dom: &SmmuDomain, va: usize, vp1: &SmmuVp1, l2_va: &'static SmmuV
 fn smmu_set_l3(dom: &SmmuDomain, va: usize, vp2: &SmmuVp2, l3_va: &'static SmmuVp3) {
     let pg_entry = smmu_table_entry("smmu_set_l3", l3_va.l3.as_ptr() as usize);
 
-    let idx2 = vp_idx2(va);
+    let idx2 = VP_IDX2(va);
     vp2.vp[idx2].store(ptr::from_ref(l3_va).cast_mut(), Ordering::Release);
     vp2.l2[idx2].store(pg_entry, Ordering::Relaxed);
     smmu_pte_sync(dom.sd_sc, &vp2.l2[idx2]);
@@ -1118,7 +1123,7 @@ fn vp_next<T: SmmuVpTable>(link: &AtomicPtr<T>) -> Option<&'static T> {
 /// The level-1 table for `va`: the root of a 3-level domain, or the 4-level root's entry.
 fn smmu_vp1(dom: &SmmuDomain, va: usize) -> Option<&'static SmmuVp1> {
     if dom.sd_4level.get() != 0 {
-        vp_next(&dom.sd_vp_l0.get()?.vp[vp_idx0(va)])
+        vp_next(&dom.sd_vp_l0.get()?.vp[VP_IDX0(va)])
     } else {
         dom.sd_vp_l1.get()
     }
@@ -1128,10 +1133,10 @@ fn smmu_vp1(dom: &SmmuDomain, va: usize) -> Option<&'static SmmuVp1> {
 /// is missing.
 fn smmu_vp_lookup(dom: &SmmuDomain, va: usize) -> Result<&'static AtomicU64, Errno> {
     let vp1 = smmu_vp1(dom, va).ok_or(Errno::ENXIO)?;
-    let vp2 = vp_next(&vp1.vp[vp_idx1(va)]).ok_or(Errno::ENXIO)?;
-    let vp3 = vp_next(&vp2.vp[vp_idx2(va)]).ok_or(Errno::ENXIO)?;
+    let vp2 = vp_next(&vp1.vp[VP_IDX1(va)]).ok_or(Errno::ENXIO)?;
+    let vp3 = vp_next(&vp2.vp[VP_IDX2(va)]).ok_or(Errno::ENXIO)?;
 
-    Ok(&vp3.l3[vp_idx3(va)])
+    Ok(&vp3.l3[VP_IDX3(va)])
 }
 
 /// `smmu_vp_enter(dom, va, &pl3entry, flags)`: the L3 descriptor of `va`, adding the
@@ -1143,11 +1148,11 @@ fn smmu_vp_enter(dom: &SmmuDomain, va: usize, _flags: i32) -> Result<&'static At
         let Some(l0) = dom.sd_vp_l0.get() else {
             return Err(Errno::ENXIO);
         };
-        match vp_next(&l0.vp[vp_idx0(va)]) {
+        match vp_next(&l0.vp[VP_IDX0(va)]) {
             Some(vp1) => vp1,
             None => {
                 mtx_enter(&dom.sd_pmap_mtx);
-                let vp1 = match vp_next(&l0.vp[vp_idx0(va)]) {
+                let vp1 = match vp_next(&l0.vp[VP_IDX0(va)]) {
                     Some(vp1) => vp1,
                     None => {
                         let Some(vp1) = smmu_vp_get::<SmmuVp1>(smmu_pool(sc, false), PR_NOWAIT)
@@ -1170,11 +1175,11 @@ fn smmu_vp_enter(dom: &SmmuDomain, va: usize, _flags: i32) -> Result<&'static At
         }
     };
 
-    let vp2 = match vp_next(&vp1.vp[vp_idx1(va)]) {
+    let vp2 = match vp_next(&vp1.vp[VP_IDX1(va)]) {
         Some(vp2) => vp2,
         None => {
             mtx_enter(&dom.sd_pmap_mtx);
-            let vp2 = match vp_next(&vp1.vp[vp_idx1(va)]) {
+            let vp2 = match vp_next(&vp1.vp[VP_IDX1(va)]) {
                 Some(vp2) => vp2,
                 None => {
                     let Some(vp2) = smmu_vp_get::<SmmuVp2>(smmu_pool(sc, false), PR_NOWAIT) else {
@@ -1190,11 +1195,11 @@ fn smmu_vp_enter(dom: &SmmuDomain, va: usize, _flags: i32) -> Result<&'static At
         }
     };
 
-    let vp3 = match vp_next(&vp2.vp[vp_idx2(va)]) {
+    let vp3 = match vp_next(&vp2.vp[VP_IDX2(va)]) {
         Some(vp3) => vp3,
         None => {
             mtx_enter(&dom.sd_pmap_mtx);
-            let vp3 = match vp_next(&vp2.vp[vp_idx2(va)]) {
+            let vp3 = match vp_next(&vp2.vp[VP_IDX2(va)]) {
                 Some(vp3) => vp3,
                 None => {
                     let Some(vp3) = smmu_vp_get::<SmmuVp3>(smmu_pool(sc, true), PR_NOWAIT) else {
@@ -1210,7 +1215,7 @@ fn smmu_vp_enter(dom: &SmmuDomain, va: usize, _flags: i32) -> Result<&'static At
         }
     };
 
-    Ok(&vp3.l3[vp_idx3(va)])
+    Ok(&vp3.l3[VP_IDX3(va)])
 }
 
 /// `smmu_fill_pte(dom, va, pa, prot, flags, cache)`: the software form of a mapping: the
@@ -1324,19 +1329,19 @@ fn smmu_pte_remove(dom: &SmmuDomain, va: usize) {
             dom
         ));
     };
-    let Some(vp2) = vp_next(&vp1.vp[vp_idx1(va)]) else {
+    let Some(vp2) = vp_next(&vp1.vp[VP_IDX1(va)]) else {
         panic(format_args!(
             "smmu_pte_remove: missing the l2 for va {va:x} domain {:p}",
             dom
         ));
     };
-    let Some(vp3) = vp_next(&vp2.vp[vp_idx2(va)]) else {
+    let Some(vp3) = vp_next(&vp2.vp[VP_IDX2(va)]) else {
         panic(format_args!(
             "smmu_pte_remove: missing the l3 for va {va:x} domain {:p}",
             dom
         ));
     };
-    let pl3 = &vp3.l3[vp_idx3(va)];
+    let pl3 = &vp3.l3[VP_IDX3(va)];
     pl3.store(0, Ordering::Relaxed);
     smmu_pte_sync(dom.sd_sc, pl3);
 }

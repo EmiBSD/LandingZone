@@ -541,43 +541,51 @@ pub fn pmap_unmap_direct(va: Vaddr) -> Option<&'static VmPage> {
 // virtual to physical helpers
 
 /// `VP_IDX0(va)`.
-fn vp_idx0(va: usize) -> usize {
+#[allow(non_snake_case)] // the C name
+fn VP_IDX0(va: usize) -> usize {
     (va >> VP_IDX0_POS) & VP_IDX0_MASK
 }
 
 /// `VP_IDX1(va)`.
-fn vp_idx1(va: usize) -> usize {
+#[allow(non_snake_case)] // the C name
+fn VP_IDX1(va: usize) -> usize {
     (va >> VP_IDX1_POS) & VP_IDX1_MASK
 }
 
 /// `VP_IDX2(va)`.
-fn vp_idx2(va: usize) -> usize {
+#[allow(non_snake_case)] // the C name
+fn VP_IDX2(va: usize) -> usize {
     (va >> VP_IDX2_POS) & VP_IDX2_MASK
 }
 
 /// `VP_IDX3(va)`.
-fn vp_idx3(va: usize) -> usize {
+#[allow(non_snake_case)] // the C name
+fn VP_IDX3(va: usize) -> usize {
     (va >> VP_IDX3_POS) & VP_IDX3_MASK
 }
 
 /// `VP_Lx(pa)`: this function takes the pa address given and manipulates it into the form
 /// that should be inserted into the VM table.
-fn vp_lx(pa: Paddr) -> u64 {
+#[allow(non_snake_case)] // the C name
+fn VP_Lx(pa: Paddr) -> u64 {
     pa.as_usize() as u64 | Lx_TYPE_PT
 }
 
 /// `PTED_MANAGED(pted)`.
-fn pted_managed(pted: &PteDesc) -> bool {
+#[allow(non_snake_case)] // the C name
+fn PTED_MANAGED(pted: &PteDesc) -> bool {
     pted.pted_va.get() & PTED_VA_MANAGED_M as usize != 0
 }
 
 /// `PTED_WIRED(pted)`.
-fn pted_wired(pted: &PteDesc) -> bool {
+#[allow(non_snake_case)] // the C name
+fn PTED_WIRED(pted: &PteDesc) -> bool {
     pted.pted_va.get() & PTED_VA_WIRED_M as usize != 0
 }
 
 /// `PTED_VALID(pted)`.
-fn pted_valid(pted: &PteDesc) -> bool {
+#[allow(non_snake_case)] // the C name
+fn PTED_VALID(pted: &PteDesc) -> bool {
     pted.pted_pte.get() != 0
 }
 
@@ -609,7 +617,7 @@ fn ttlb_flush(pm: &Pmap, va: usize) {
 fn pmap_vp1(pm: &Pmap, va: usize) -> Option<&'static Pmapvp1> {
     match pm.pm_vp.get() {
         // SAFETY: a non-null `pm_vp` names a table allocated for the pmap's life.
-        PmVp::L0(l0) => unsafe { l0.as_ref() }.and_then(|l0| l0.vp(vp_idx0(va))),
+        PmVp::L0(l0) => unsafe { l0.as_ref() }.and_then(|l0| l0.vp(VP_IDX0(va))),
         // SAFETY: as above.
         PmVp::L1(l1) => unsafe { l1.as_ref() },
     }
@@ -627,13 +635,13 @@ pub fn pmap_vp_lookup(
     let Some(vp1) = pmap_vp1(pm, va) else {
         return (None, None);
     };
-    let Some(vp2) = vp1.vp(vp_idx1(va)) else {
+    let Some(vp2) = vp1.vp(VP_IDX1(va)) else {
         return (None, None);
     };
-    let Some(vp3) = vp2.vp(vp_idx2(va)) else {
+    let Some(vp3) = vp2.vp(VP_IDX2(va)) else {
         return (None, None);
     };
-    (vp3.vp(vp_idx3(va)), Some((vp3, vp_idx3(va))))
+    (vp3.vp(VP_IDX3(va)), Some((vp3, VP_IDX3(va))))
 }
 
 /// `pool_get(&pmap_vp_pool, PR_NOWAIT | PR_ZERO)`: a zeroed vp table for `pm`.
@@ -673,7 +681,7 @@ pub fn pmap_vp_enter(pm: &Pmap, va: usize, pted: &PteDesc, flags: i32) -> Result
                     panic!("pmap_vp_enter: pmap without a level-0 table");
                 }
             };
-            match l0.vp(vp_idx0(va)) {
+            match l0.vp(VP_IDX0(va)) {
                 Some(vp1) => vp1,
                 None => {
                     let vp1 = pmap_vp_alloc(pm, flags, "L1")?.cast::<Pmapvp1>();
@@ -696,7 +704,7 @@ pub fn pmap_vp_enter(pm: &Pmap, va: usize, pted: &PteDesc, flags: i32) -> Result
         }
     };
 
-    let vp2 = match vp1.vp(vp_idx1(va)) {
+    let vp2 = match vp1.vp(VP_IDX1(va)) {
         Some(vp2) => vp2,
         None => {
             let vp2 = pmap_vp_alloc(pm, flags, "L2")?.cast::<Pmapvp2>();
@@ -707,7 +715,7 @@ pub fn pmap_vp_enter(pm: &Pmap, va: usize, pted: &PteDesc, flags: i32) -> Result
         }
     };
 
-    let vp3 = match vp2.vp(vp_idx2(va)) {
+    let vp3 = match vp2.vp(VP_IDX2(va)) {
         Some(vp3) => vp3,
         None => {
             let vp3 = pmap_vp_alloc(pm, flags, "L3")?.cast::<Pmapvp3>();
@@ -718,7 +726,7 @@ pub fn pmap_vp_enter(pm: &Pmap, va: usize, pted: &PteDesc, flags: i32) -> Result
         }
     };
 
-    vp3.set_vp(vp_idx3(va), Some(pted));
+    vp3.set_vp(VP_IDX3(va), Some(pted));
     Ok(())
 }
 
@@ -758,7 +766,7 @@ pub fn pmap_vp_populate(pm: &Pmap, va: usize) {
                     panic!("pmap_vp_populate: pmap without a level-0 table");
                 }
             };
-            match l0.vp(vp_idx0(va)) {
+            match l0.vp(VP_IDX0(va)) {
                 Some(vp1) => vp1,
                 None => {
                     // SAFETY: a fresh, zeroed table that lives for the pmap's life.
@@ -787,7 +795,7 @@ pub fn pmap_vp_populate(pm: &Pmap, va: usize) {
         pmap_lock(pm);
     }
 
-    let vp2 = match vp1.vp(vp_idx1(va)) {
+    let vp2 = match vp1.vp(VP_IDX1(va)) {
         Some(vp2) => vp2,
         None => {
             // SAFETY: as above.
@@ -804,7 +812,7 @@ pub fn pmap_vp_populate(pm: &Pmap, va: usize) {
         pmap_lock(pm);
     }
 
-    let vp3 = match vp2.vp(vp_idx2(va)) {
+    let vp3 = match vp2.vp(VP_IDX2(va)) {
         Some(vp3) => vp3,
         None => {
             // SAFETY: as above.
@@ -815,12 +823,12 @@ pub fn pmap_vp_populate(pm: &Pmap, va: usize) {
         }
     };
 
-    if vp3.vp(vp_idx3(va)).is_none()
+    if vp3.vp(VP_IDX3(va)).is_none()
         && let Some(mem) = pted.take()
     {
         // SAFETY: a zeroed pool item of `size_of::<PteDesc>()` bytes, suitably aligned;
         // all-zero is a valid, empty pted. It lives until `pmap_remove_pted` frees it.
-        vp3.set_vp(vp_idx3(va), Some(unsafe { mem.cast::<PteDesc>().as_ref() }));
+        vp3.set_vp(VP_IDX3(va), Some(unsafe { mem.cast::<PteDesc>().as_ref() }));
     }
 
     pmap_unlock(pm);
@@ -964,9 +972,9 @@ pub fn pmap_set_l1(pm: &Pmap, va: usize, l1_va: &Pmapvp1) {
         }
     }
 
-    let pg_entry = vp_lx(l1_pa);
+    let pg_entry = VP_Lx(l1_pa);
 
-    let idx0 = vp_idx0(va);
+    let idx0 = VP_IDX0(va);
     let PmVp::L0(l0) = pm.pm_vp.get() else {
         #[allow(clippy::panic)] // the C dereferences pm_vp.l0 of a three-level pmap
         {
@@ -995,9 +1003,9 @@ pub fn pmap_set_l2(_pm: &Pmap, va: usize, vp1: &Pmapvp1, l2_va: &Pmapvp2) {
         }
     }
 
-    let pg_entry = vp_lx(l2_pa);
+    let pg_entry = VP_Lx(l2_pa);
 
-    let idx1 = vp_idx1(va);
+    let idx1 = VP_IDX1(va);
     vp1.set_vp(idx1, Some(l2_va));
     vp1.set_table(idx1, pg_entry);
 }
@@ -1018,9 +1026,9 @@ pub fn pmap_set_l3(_pm: &Pmap, va: usize, vp2: &Pmapvp2, l3_va: &Pmapvp3) {
         }
     }
 
-    let pg_entry = vp_lx(l3_pa);
+    let pg_entry = VP_Lx(l3_pa);
 
-    let idx2 = vp_idx2(va);
+    let idx2 = VP_IDX2(va);
     vp2.set_vp(idx2, Some(l3_va));
     vp2.set_table(idx2, pg_entry);
 }
@@ -1045,7 +1053,7 @@ pub fn pmap_growkernel(maxkvaddr: Vaddr) -> Vaddr {
     // at IPL_VM: splvm(), M4.
 
     'fail: {
-        for i in vp_idx1(cur)..=vp_idx1(maxkvaddr - 1) {
+        for i in VP_IDX1(cur)..=VP_IDX1(maxkvaddr - 1) {
             let vp2 = match vp1.vp(i) {
                 Some(vp2) => vp2,
                 None => {
@@ -1059,9 +1067,9 @@ pub fn pmap_growkernel(maxkvaddr: Vaddr) -> Vaddr {
                 }
             };
 
-            let lb_idx2 = if i == vp_idx1(cur) { vp_idx2(cur) } else { 0 };
-            let ub_idx2 = if i == vp_idx1(maxkvaddr - 1) {
-                vp_idx2(maxkvaddr - 1)
+            let lb_idx2 = if i == VP_IDX1(cur) { VP_IDX2(cur) } else { 0 };
+            let ub_idx2 = if i == VP_IDX1(maxkvaddr - 1) {
+                VP_IDX2(maxkvaddr - 1)
             } else {
                 VP_IDX2_CNT - 1
             };
@@ -1169,7 +1177,7 @@ pub unsafe fn pmap_bootstrap(_ram_start: Paddr, _ram_end: Paddr) -> Vaddr {
         vp0.set_table(i, unsafe { ptr::read_volatile(src_l0.add(i)) });
     }
 
-    let kslot = vp_idx0(VM_MIN_KERNEL_ADDRESS);
+    let kslot = VP_IDX0(VM_MIN_KERNEL_ADDRESS);
     let l1_desc = vp0.table(kslot);
     if l1_desc & Lx_TYPE_MASK != Lx_TYPE_PT {
         #[allow(clippy::panic)] // the kernel image is mapped under that slot
@@ -1193,7 +1201,7 @@ pub unsafe fn pmap_bootstrap(_ram_start: Paddr, _ram_end: Paddr) -> Vaddr {
     }
     let vp1_pa = pmap_direct_unmap(Vaddr::new(ptr::from_ref(vp1) as usize));
     vp0.set_vp(kslot, Some(vp1));
-    vp0.set_table(kslot, vp_lx(vp1_pa));
+    vp0.set_table(kslot, VP_Lx(vp1_pa));
 
     // Nothing of the kernel half is executable at EL0 (see the module's deviations): the
     // adopted descriptors get the `ATTR_UXN` every kernel mapping of the C carries. The
@@ -1476,7 +1484,7 @@ pub fn pmap_pte_remove(pted: &PteDesc, remove_pted: bool) {
             );
         }
     };
-    let Some(vp2) = vp1.vp(vp_idx1(va)) else {
+    let Some(vp2) = vp1.vp(VP_IDX1(va)) else {
         #[allow(clippy::panic)] // the C panics here too
         {
             panic!(
@@ -1485,7 +1493,7 @@ pub fn pmap_pte_remove(pted: &PteDesc, remove_pted: bool) {
             );
         }
     };
-    let Some(vp3) = vp2.vp(vp_idx2(va)) else {
+    let Some(vp3) = vp2.vp(VP_IDX2(va)) else {
         #[allow(clippy::panic)] // the C panics here too
         {
             panic!(
@@ -1494,9 +1502,9 @@ pub fn pmap_pte_remove(pted: &PteDesc, remove_pted: bool) {
             );
         }
     };
-    vp3.set_table(vp_idx3(va), 0);
+    vp3.set_table(VP_IDX3(va), 0);
     if remove_pted {
-        vp3.set_vp(vp_idx3(va), None);
+        vp3.set_vp(VP_IDX3(va), None);
     }
 }
 
@@ -1517,7 +1525,7 @@ fn _pmap_kenter_pa(va: usize, pa: usize, prot: VmProt, flags: i32, cache: i32) {
         }
     };
 
-    if pted_valid(pted) {
+    if PTED_VALID(pted) {
         pmap_kremove_pg(va); // pted is reused
     }
 
@@ -1577,7 +1585,7 @@ pub fn pmap_kremove_pg(va: usize) {
         return;
     };
 
-    if !pted_valid(pted) {
+    if !PTED_VALID(pted) {
         return; // not mapped
     }
 
@@ -1590,11 +1598,11 @@ pub fn pmap_kremove_pg(va: usize) {
     pmap_pte_remove(pted, false);
     ttlb_flush(pm, pted.pted_va.get() & !PAGE_MASK);
 
-    if pted_managed(pted) {
+    if PTED_MANAGED(pted) {
         pmap_remove_pv(pted);
     }
 
-    if pted_wired(pted) {
+    if PTED_WIRED(pted) {
         pm.pm_stats
             .wired_count
             .set(pm.pm_stats.wired_count.get() - 1);
@@ -1691,7 +1699,7 @@ pub fn pmap_extract(pm: &Pmap, va: Vaddr) -> Option<Paddr> {
 
     pmap_lock(pm);
     let (pted, _) = pmap_vp_lookup(pm, va.as_usize());
-    let pa = pted.filter(|pted| pted_valid(pted)).map(|pted| {
+    let pa = pted.filter(|pted| PTED_VALID(pted)).map(|pted| {
         Paddr::new((pted.pted_pte.get() & PTE_RPGN) as usize | (va.as_usize() & PAGE_MASK))
     });
     pmap_unlock(pm);
@@ -1942,7 +1950,7 @@ fn pmap_enter_locked(
     cache: i32,
 ) -> Result<(), Errno> {
     let (mut pted, _) = pmap_vp_lookup(pm, va);
-    if let Some(old) = pted.filter(|pted| pted_valid(pted)) {
+    if let Some(old) = pted.filter(|pted| PTED_VALID(pted)) {
         if old.pted_pte.get() & PTE_RPGN == pa as u64 & PTE_RPGN
             && old.pted_va.get() & PROT_MASK as usize == (prot & PROT_MASK) as usize
             && old.pted_va.get() & PMAP_CACHE_BITS as usize == cache as usize
@@ -2037,7 +2045,7 @@ pub fn pmap_remove(pm: &Pmap, sva: Vaddr, eva: Vaddr) {
     while va < eva.as_usize() {
         let (pted, _) = pmap_vp_lookup(pm, va);
         if let Some(pted) = pted {
-            if pted_wired(pted) {
+            if PTED_WIRED(pted) {
                 pm.pm_stats
                     .wired_count
                     .set(pm.pm_stats.wired_count.get() - 1);
@@ -2045,7 +2053,7 @@ pub fn pmap_remove(pm: &Pmap, sva: Vaddr, eva: Vaddr) {
                     .set(pted.pted_va.get() & !(PTED_VA_WIRED_M as usize));
             }
 
-            if pted_valid(pted) {
+            if PTED_VALID(pted) {
                 pmap_remove_pted(pm, pted);
             }
         }
@@ -2061,7 +2069,7 @@ pub fn pmap_page_ro(pm: &Pmap, va: usize, prot: VmProt) {
     let (Some(pted), Some(pl3)) = (pted, pl3) else {
         return;
     };
-    if !pted_valid(pted) {
+    if !PTED_VALID(pted) {
         return;
     }
 
@@ -2157,7 +2165,7 @@ fn pmap_fault_fixup_locked(pm: &Pmap, va: usize, ftype: VmProt) -> bool {
     let (Some(pted), Some(pl3)) = (pted, pl3) else {
         return false;
     };
-    if !pted_valid(pted) {
+    if !PTED_VALID(pted) {
         return false;
     }
 
@@ -2289,7 +2297,7 @@ pub fn pmap_clear_reference(pg: &VmPage) -> bool {
 pub fn pmap_unwire(pm: &Pmap, va: Vaddr) {
     pmap_lock(pm);
     let (pted, _) = pmap_vp_lookup(pm, va.as_usize());
-    if let Some(pted) = pted.filter(|pted| pted_wired(pted)) {
+    if let Some(pted) = pted.filter(|pted| PTED_WIRED(pted)) {
         pm.pm_stats
             .wired_count
             .set(pm.pm_stats.wired_count.get() - 1);
@@ -2305,7 +2313,7 @@ pub fn pmap_remove_pted(pm: &Pmap, pted: &PteDesc) {
         .resident_count
         .set(pm.pm_stats.resident_count.get() - 1);
 
-    if pted_wired(pted) {
+    if PTED_WIRED(pted) {
         pm.pm_stats
             .wired_count
             .set(pm.pm_stats.wired_count.get() - 1);
@@ -2316,7 +2324,7 @@ pub fn pmap_remove_pted(pm: &Pmap, pted: &PteDesc) {
     pmap_pte_remove(pted, !ptr::eq(pm, pmap_kernel()));
     ttlb_flush(pm, pted.pted_va.get() & !PAGE_MASK);
 
-    if pted_managed(pted) {
+    if PTED_MANAGED(pted) {
         pmap_remove_pv(pted);
     }
 

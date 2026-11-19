@@ -1030,7 +1030,7 @@ macro_rules! icc_write {
 }
 
 /// `__isb()`.
-fn isb() {
+fn __isb() {
     // SAFETY: a barrier.
     unsafe { core::arch::asm!("isb", options(nostack, preserves_flags)) };
 }
@@ -1275,7 +1275,7 @@ pub fn agintc_attach(parent: Option<&Device>, self_: &Device, aux: *mut c_void) 
     evcount_attach(&sc.sc_spur, "irq1023/spur", ptr::null());
 
     icc_write!(ICC_SRE_EL1, ICC_SRE_EL1_EN);
-    isb();
+    __isb();
 
     let mut nintr = 32 * (typer & GICD_TYPER_ITLINE_M) as i32;
     nintr += 32; // ICD_ICTR + 1, irq 0-31 is SGI, 32+ is PPI
@@ -1762,7 +1762,7 @@ pub fn agintc_setipl(ipl: i32) {
 
     let prival = agintc_prival(ipl, sc.sc_pmr_shift.get());
     icc_write!(ICC_PMR, u64::from(prival));
-    isb();
+    __isb();
 
     // SAFETY: `psw` is this CPU's DAIF from `intr_disable`.
     unsafe { intr_restore(psw) };
@@ -2309,7 +2309,7 @@ pub fn agintc_intr_establish_mbi(
 /// `agintc_eoi`: ends the interrupt (priority drop and deactivation).
 pub fn agintc_eoi(eoi: u32) {
     icc_write!(ICC_EOIR1, u64::from(eoi));
-    isb();
+    __isb();
 }
 
 /// `agintc_d_wait_rwp`: waits for a distributor register write to take effect.
@@ -2424,7 +2424,7 @@ pub fn agintc_send_ipi(ci: &CpuInfo, reason: i32) {
     // SAFETY: a barrier.
     unsafe { core::arch::asm!("dsb ish", options(nostack, preserves_flags)) };
     icc_write!(ICC_SGI1R, sendmask);
-    isb();
+    __isb();
 }
 
 /// `agintc_msi_match`: an ITS, unless ACPI describes it on a Qualcomm Oryon (X1E), where
