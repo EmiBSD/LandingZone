@@ -84,7 +84,7 @@
 //!   ([`SysctlPlain`]). `int *valp` is `&AtomicI32`, the C's atomic operations on it are the
 //!   atomic's; a C local passed by address is an `AtomicI32` read back with `into_inner`.
 //! - Every node whose subsystem is not ported reports itself with `unported!` and fails with
-//!   `ENOSYS`: `clockintr`, `proc_vmmap` after its checks
+//!   `ENOSYS`: `proc_vmmap` after its checks
 //!   (`fill_vmmap`); `hw.model` (`cpu_model`, `identcpu.c`/arm64 `cpu.c`),
 //!   `setperf`/`perfpolicy` (`sched_bsd.c`). The top-level `machdep` tree is the machine's
 //!   `cpu_sysctl` (`machine::cpu::cpu_sysctl`). `kern.proc_cwd` of a process
@@ -139,6 +139,7 @@ use crate::dev::cons::cn_tab;
 use crate::dev::usb::ucom::sysctl_ucominit;
 use crate::kern::init_main::{NCPUS, NCPUSFOUND};
 use crate::kern::kern_clock::sysctl_clockrate;
+use crate::kern::kern_clockintr::sysctl_clockintr;
 use crate::kern::kern_descrip::{NUMFILES, fd_getfile, fd_iterfile};
 use crate::kern::kern_event::fp_kqueue;
 use crate::kern::kern_fork::{FORKSTAT, NPROCESSES, NTHREADS};
@@ -583,9 +584,7 @@ fn kern_sysctl_dirs_locked(
         KERN_INTRCNT => sysctl_intrcnt(name, oldp, oldlenp),
         KERN_WATCHDOG => sysctl_wdog(name, oldp, oldlenp, newp, newlen),
         KERN_EVCOUNT => evcount_sysctl(name, oldp, oldlenp, newp, newlen),
-        KERN_CLOCKINTR => Err(unported!(
-            "kern.clockintr: sysctl_clockintr (kern_clockintr.c)"
-        )),
+        KERN_CLOCKINTR => sysctl_clockintr(name, oldp, oldlenp, newp, newlen),
         KERN_TTY => sysctl_tty(name, oldp, oldlenp, newp, newlen),
         // KERN_PROF: GPROF and DDBPROF are not configured.
         KERN_TIMECOUNTER => sysctl_tc(name, oldp, oldlenp, newp, newlen),

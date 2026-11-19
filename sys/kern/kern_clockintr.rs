@@ -41,21 +41,22 @@
 //!
 //! Upstream: sys/kern/kern_clockintr.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M5 ports `clockintr_cpu_init`, `clockintr_trigger`,
+//! Status: `ported`. Milestone M5 ports `clockintr_cpu_init`, `clockintr_trigger`,
 //! `clockintr_dispatch`, `clockintr_advance`, `clockrequest_advance`,
 //! `clockrequest_advance_random`, `clockintr_cancel[_locked]`, `clockintr_bind`,
 //! `clockintr_unbind`, `clockintr_schedule[_locked]`, `clockintr_stagger`,
 //! `clockintr_hardclock`, `clockqueue_init`, `clockqueue_intrclock_install`,
 //! `clockqueue_next`, `clockqueue_pend_delete/insert`, `clockqueue_intrclock_reprogram`,
-//! `intrclock_rearm/trigger` and `nsec_advance`. `sysctl_clockintr` is not here yet
-//! (`kern_sysctl.rs` reports `kern.clockintr`); the `ddb` `show all clockintr` printers come
-//! with the real ddb (M7).
+//! `intrclock_rearm/trigger` and `nsec_advance`; TD1 `sysctl_clockintr` and ddb's
+//! `show all clockintr` printers, and the file is whole.
 //!
 //! ## Deviations
-//! - `clockintr_unbind` with `CL_BARRIER` sleeps (`msleep_nsec`) until the running callback
-//!   returns: reported as unported until the sleep queues exist (M5-b); nothing unbinds a
-//!   running callback before then.
 //! - The callback runs with the clock frame as an opaque `*mut c_void`, as in C.
+//! - `db_show_clockintr` prints the function through `db_printsym` where the C looks its
+//!   name up with `db_find_sym_and_offset` and prints `?` for none: `db_sym.c` is not
+//!   ported, and `db_printsym` says so and prints the address.
+//! - `sysctl_clockintr` copies `struct clockintr_stat` out member by member (seven 64-bit
+//!   counts, the C's layout).
 //! - Not a deviation, a reminder: the `cq_stat` time sums keep the C's modular `uint64_t`
 //!   arithmetic (`wrapping_add`/`wrapping_sub`). `clockintr_dispatch` can read the clock
 //!   behind its own `start`: amd64's only timecounter is the i8254 behind the LAPIC timer,
@@ -77,28 +78,35 @@ use core::ptr;
 use core::sync::atomic::AtomicU64;
 use core::sync::atomic::{Ordering, fence};
 
+use crate::ddb::db_command::{DbResult, db_printsym};
 use crate::kassert;
 use crate::kern::kern_clock::{
     STATCLOCK_AVG, STATCLOCK_IS_RANDOMIZED, hardclock, hardclock_period,
 };
 use crate::kern::kern_lock::{mtx_enter, mtx_leave};
-use crate::kern::kern_synch::wakeup;
-use crate::kern::kern_tc::nsecuptime;
+use crate::kern::kern_synch::{msleep_nsec, wakeup};
+use crate::kern::kern_sysctl::sysctl_rdstruct;
+use crate::kern::kern_tc::{nanouptime, nsecuptime};
 use crate::kern::sched_bsd::roundrobin_period;
-use crate::kern::subr_prf::panic;
 #[cfg(feature = "qemu")]
 use crate::kern::subr_prf::printf;
+use crate::kern::subr_prf::{db_printf, panic};
 use crate::kern::subr_prof::profclock_period;
 use crate::machine::Machine;
-use crate::machine::cpu::{Cpu, CpuInfo, MAXCPUS, curcpu};
+use crate::machine::cpu::{Cpu, CpuInfo, MAXCPUS, cpu_info_foreach, curcpu};
+use crate::machine::db_machdep::{DbAddr, DbExpr};
 use crate::machine::intr::{IPL_CLOCK, IPL_NONE, splassert};
 use crate::sys::clockintr::{
     CL_FLAG_MASK, CLST_PENDING, CQ_IGNORE_REQUEST, CQ_INIT, CQ_INTRCLOCK, CQ_NEED_WAKEUP,
-    CR_RESCHEDULE, Clockintr, ClockintrFn, Clockqueue, Clockrequest, Intrclock,
+    CR_RESCHEDULE, Clockintr, ClockintrFn, ClockintrStat, Clockqueue, Clockrequest, Intrclock,
 };
+use crate::sys::errno::Errno;
 use crate::sys::mutex::mutex_assert_locked;
+use crate::sys::param::{PNORELOCK, PWAIT};
 use crate::sys::queue::TailqHead;
-use crate::unported;
+use crate::sys::sysctl::KERN_CLOCKINTR_STATS;
+use crate::sys::systm::INFSLP;
+use crate::sys::time::nsec_to_timespec;
 
 /// The last uptime `clockintr_dispatch` read on each CPU, by `cpu_number()` (feature `qemu`,
 /// see the module's deviations).
@@ -510,9 +518,13 @@ pub fn clockintr_unbind(cl: &Clockintr, flags: u32) {
 
     if flags & crate::sys::clockintr::CL_BARRIER != 0 && ptr::eq(cl, cq.cq_running.get()) {
         cq.cq_flags.set(cq.cq_flags.get() | CQ_NEED_WAKEUP);
-        // msleep_nsec(&cq->cq_running, &cq->cq_mtx, PWAIT | PNORELOCK, "clkbar", INFSLP)
-        let _ = unported!("clockintr_unbind: msleep_nsec (CL_BARRIER, M5-b)");
-        mtx_leave(&cq.cq_mtx);
+        let _ = msleep_nsec(
+            ptr::addr_of!(cq.cq_running),
+            &cq.cq_mtx,
+            PWAIT | PNORELOCK,
+            "clkbar",
+            INFSLP,
+        );
     } else {
         mtx_leave(&cq.cq_mtx);
     }
@@ -681,6 +693,136 @@ pub fn nsec_advance(next: &mut u64, period: u64, now: u64) -> u64 {
     let elapsed = (now - *next) / period + 1;
     *next = next.wrapping_add(period.wrapping_mul(elapsed));
     elapsed
+}
+
+/// `sysctl_clockintr`: `kern.clockintr.stats`, the dispatch statistics of every CPU summed
+/// (a `struct clockintr_stat`: seven 64-bit counts).
+pub fn sysctl_clockintr(
+    name: &[i32],
+    oldp: usize,
+    oldlenp: &mut usize,
+    newp: usize,
+    _newlen: usize,
+) -> Result<(), Errno> {
+    if name.len() != 1 {
+        return Err(Errno::ENOTDIR);
+    }
+
+    match name[0] {
+        KERN_CLOCKINTR_STATS => {
+            let mut sum = ClockintrStat::default();
+            cpu_info_foreach(&mut |ci| {
+                let cq = Machine::ci_queue(ci);
+                if cq.cq_flags.get() & CQ_INIT == 0 {
+                    return;
+                }
+                let tmp = loop {
+                    let generation = cq.cq_gen.load(Ordering::Relaxed);
+                    fence(Ordering::Acquire); // membar_consumer()
+                    let tmp = cq.cq_stat.get();
+                    fence(Ordering::Acquire); // membar_consumer()
+                    if generation != 0 && generation == cq.cq_gen.load(Ordering::Relaxed) {
+                        break tmp;
+                    }
+                };
+                sum.cs_dispatched = sum.cs_dispatched.wrapping_add(tmp.cs_dispatched);
+                sum.cs_early = sum.cs_early.wrapping_add(tmp.cs_early);
+                sum.cs_earliness = sum.cs_earliness.wrapping_add(tmp.cs_earliness);
+                sum.cs_lateness = sum.cs_lateness.wrapping_add(tmp.cs_lateness);
+                sum.cs_prompt = sum.cs_prompt.wrapping_add(tmp.cs_prompt);
+                sum.cs_run = sum.cs_run.wrapping_add(tmp.cs_run);
+                sum.cs_spurious = sum.cs_spurious.wrapping_add(tmp.cs_spurious);
+            });
+            // The C's struct: its seven members in order, no padding.
+            let mut out = [0u8; 7 * size_of::<u64>()];
+            let members = [
+                sum.cs_dispatched,
+                sum.cs_early,
+                sum.cs_earliness,
+                sum.cs_lateness,
+                sum.cs_prompt,
+                sum.cs_run,
+                sum.cs_spurious,
+            ];
+            for (i, member) in members.iter().enumerate() {
+                out[i * size_of::<u64>()..(i + 1) * size_of::<u64>()]
+                    .copy_from_slice(&member.to_ne_bytes());
+            }
+            sysctl_rdstruct(oldp, oldlenp, newp, &out)
+        }
+        _ => Err(Errno::EINVAL),
+    }
+}
+
+/// `db_show_all_clockintr` (`DDB`): `show all clockintr`: the uptime, then every clock
+/// interrupt of every CPU: the running one, the pending ones in order, the idle ones.
+pub fn db_show_all_clockintr(
+    _addr: DbExpr,
+    _haddr: bool,
+    _count: DbExpr,
+    _modif: &[u8],
+) -> DbResult {
+    let width = size_of::<usize>() * 2 + 2; // +2 for "0x" prefix
+
+    let now = nanouptime();
+    db_printf(format_args!("{:>20}\n", "UPTIME"));
+    db_printf(format_args!("{:>10}.{:09}\n", now.tv_sec, now.tv_nsec));
+    db_printf(format_args!("\n"));
+    db_printf(format_args!(
+        "{:>20}  {:>5}  {:>3}  {:>width$}  {}\n",
+        "EXPIRATION", "STATE", "CPU", "ARG", "NAME"
+    ));
+    cpu_info_foreach(&mut |ci| {
+        if Machine::ci_queue(ci).cq_flags.get() & CQ_INIT != 0 {
+            db_show_clockintr_cpu(ci);
+        }
+    });
+    Ok(())
+}
+
+/// `db_show_clockintr_cpu`: the clock interrupts of one CPU.
+pub fn db_show_clockintr_cpu(ci: &CpuInfo) {
+    let cq = Machine::ci_queue(ci);
+    let cpu = Machine::cpu_info_unit(ci);
+
+    // SAFETY: `cq_running`, when it is not null, is the clockintr the queue is running, which
+    // stays bound while the debugger has the machine.
+    if let Some(running) = unsafe { cq.cq_running.get().as_ref() } {
+        db_show_clockintr(running, "run", cpu);
+    }
+    for elm in cq.cq_pend.iter() {
+        db_show_clockintr(elm, "pend", cpu);
+    }
+    for elm in cq.cq_all.iter() {
+        if elm.cl_flags.get() & CLST_PENDING == 0 {
+            db_show_clockintr(elm, "idle", cpu);
+        }
+    }
+}
+
+/// `db_show_clockintr`: one clock interrupt: when it expires, its state and CPU, its
+/// argument and the name of its function.
+pub fn db_show_clockintr(cl: &Clockintr, state: &str, cpu: u32) {
+    let width = size_of::<usize>() * 2;
+
+    let ts = nsec_to_timespec(cl.cl_expiration.get());
+    db_printf(format_args!(
+        "{:>10}.{:09}  {:>5}  {:>3}  0x{:0width$x}  ",
+        ts.tv_sec,
+        ts.tv_nsec,
+        state,
+        cpu,
+        cl.cl_arg.get() as usize
+    ));
+    // db_find_sym_and_offset and the name: ddb's symbol printer (see the module's
+    // deviations).
+    db_printsym(cl.cl_func.get().map_or(0, |f| f as usize) as DbAddr, db_pr);
+    db_printf(format_args!("\n"));
+}
+
+/// `db_printf` as the printer `db_printsym` takes.
+fn db_pr(args: core::fmt::Arguments<'_>) {
+    db_printf(args);
 }
 /* </CODE> */
 
@@ -856,6 +998,48 @@ mod tests {
         // Back to the dummy counter.
         tc_reset_quality(&STEPTC, -1);
         tc_ticktock();
+    }
+
+    #[test]
+    fn sysctl_clockintr_sums_the_statistics() {
+        let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let cq = Machine::ci_queue(curcpu());
+        clockqueue_init(cq);
+        let saved = cq.cq_stat.get();
+        cq.cq_stat.set(ClockintrStat {
+            cs_dispatched: 1,
+            cs_early: 2,
+            cs_earliness: 3,
+            cs_lateness: 4,
+            cs_prompt: 5,
+            cs_run: 6,
+            cs_spurious: 7,
+        });
+
+        // The host has one CPU: the sum is its counts, in the C struct's order.
+        let mut out = [0u64; 7];
+        let mut len = size_of_val(&out);
+        sysctl_clockintr(
+            &[KERN_CLOCKINTR_STATS],
+            out.as_mut_ptr() as usize,
+            &mut len,
+            0,
+            0,
+        )
+        .expect("kern.clockintr.stats");
+        assert_eq!(len, 56);
+        assert_eq!(out, [1, 2, 3, 4, 5, 6, 7]);
+
+        // A longer name is not a directory here; another node does not exist.
+        assert_eq!(
+            sysctl_clockintr(&[KERN_CLOCKINTR_STATS, 0], 0, &mut len, 0, 0),
+            Err(Errno::ENOTDIR)
+        );
+        assert_eq!(
+            sysctl_clockintr(&[99], 0, &mut len, 0, 0),
+            Err(Errno::EINVAL)
+        );
+        cq.cq_stat.set(saved);
     }
 
     #[test]
