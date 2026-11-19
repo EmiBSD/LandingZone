@@ -97,12 +97,9 @@
 //! the DVD structure and authentication requests, and hands the rest to `scsi_do_ioctl`.
 //!
 //! ## Deviations
-//! - Small fixed-size buffers (the table of contents, the sub-channel reply, the READ
-//!   CAPACITY replies, the mode sense buffer) are locals, as in `sd.rs`, where the C
-//!   `dma_alloc`s them: every command here is synchronous (`scsi_xs_sync`), so they outlive
-//!   the transfer, and the allocation failures the C tests for on them cannot happen. The
-//!   DVD buffers (up to 2052 bytes) are `scsiconf.rs`'s `DmaBuf` (`dma_alloc(9)`), freed
-//!   when dropped.
+//! - The reply buffers (the table of contents, the sub-channel reply, the READ CAPACITY
+//!   replies, the mode sense buffer, the DVD buffers) are `scsiconf.rs`'s `DmaBuf`,
+//!   `dma_alloc(9)` with the C's flags, freed when dropped.
 //! - The C's `-1`-less errno returns are `Result<(), Errno>`. `cd_getvol` keeps the C's
 //!   `return 0` after a failed mode sense (the C ignores `error`).
 //! - The in-core label is handled as in `sd.rs`: `cdgetdisklabel` builds the label in a
@@ -174,8 +171,8 @@ use crate::scsi::scsi_ioctl::scsi_do_ioctl;
 use crate::scsi::scsiconf::{
     _2btol, _4btol, _8btol, _lto2b, _lto3b, _lto4b, ADEV_LITTLETOC, ADEV_NOCAPACITY, DmaBuf,
     SCSI_AUTOCONF, SCSI_DATA_IN, SCSI_DATA_OUT, SCSI_IGNORE_ILLEGAL_REQUEST,
-    SCSI_IGNORE_MEDIA_CHANGE, SCSI_IGNORE_NOT_READY, SCSI_RESET, SCSI_REV_2, SCSI_REV_SPC,
-    SCSI_SILENT, SDEV_ATAPI, SDEV_EJECTING, SDEV_MEDIA_LOADED, SDEV_OPEN, SDEV_UMASS,
+    SCSI_IGNORE_MEDIA_CHANGE, SCSI_IGNORE_NOT_READY, SCSI_NOSLEEP, SCSI_RESET, SCSI_REV_2,
+    SCSI_REV_SPC, SCSI_SILENT, SDEV_ATAPI, SDEV_EJECTING, SDEV_MEDIA_LOADED, SDEV_OPEN, SDEV_UMASS,
     ScsiAttachArgs, ScsiInquiryPattern, ScsiLink, ScsiXfer, ScsiXshandler, TEST_READY_RETRIES,
     XS_BUSY, XS_NOERROR, XS_SENSE, XS_SHORTSENSE, XS_TIMEOUT, scsi_inqmatch, sid_ansii_rev,
 };
@@ -211,7 +208,7 @@ use crate::sys::fcntl::FWRITE;
 use crate::sys::ioctl::{ioctl_arg, ioctl_ret};
 use crate::sys::mtio::{MTIOCTOP, MTOFFL, MTRETEN};
 use crate::sys::param::howmany;
-use crate::sys::pool::{PR_WAITOK, PR_ZERO};
+use crate::sys::pool::{PR_NOWAIT, PR_WAITOK, PR_ZERO};
 use crate::sys::proc::Proc;
 use crate::sys::scsiio::{SCIOCCOMMAND, SCIOCDEBUG, SCIOCIDENTIFY, SCIOCRESET};
 use crate::sys::stat::S_IFCHR;
@@ -724,6 +721,7 @@ scsi_wire!(
     CdAudioPage,
     ScsiReadDvdStructure,
     ScsiReadDvdStructureData,
+    CdToc,
 );
 
 // `cd.c`
@@ -747,6 +745,7 @@ pub const CD_TOC_SIZE: usize = size_of::<IocTocHeader>() + (MAXTRACK + 1) * size
 
 /// `struct cd_toc`: the table of contents as the device writes it, header first.
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct CdToc {
     /// The `struct ioc_toc_header` and the `entries[MAXTRACK + 1]` as bytes.
     pub bytes: [u8; CD_TOC_SIZE],
@@ -1689,26 +1688,30 @@ fn cdioctl_locked(
             {
                 return Err(EINVAL);
             }
-            let mut data = CdSubChannelInfo::zeroed();
+            let mut databuf =
+                DmaBuf::new(size_of::<CdSubChannelInfo>(), PR_WAITOK).ok_or(ENOMEM)?;
+            let data = databuf.bytes();
             cd_read_subchannel(
                 sc,
                 args.address_format,
                 args.data_format,
                 args.track,
-                data.as_bytes_mut(),
+                data,
                 len as usize,
             )?;
+            let header = ioctl_arg::<CdSubChannelHeader>(data);
             let len = (len as u32)
-                .min(_2btol(&data.header.data_len) + size_of::<CdSubChannelHeader>() as u32)
+                .min(_2btol(&header.data_len) + size_of::<CdSubChannelHeader>() as u32)
                 as usize;
-            copyout(&data.as_bytes()[..len], args.data)
+            copyout(&data[..len], args.data)
         }
 
         CDIOREADTOCHEADER => {
-            let mut th = [0u8; size_of::<IocTocHeader>()];
+            let mut thbuf = DmaBuf::new(size_of::<IocTocHeader>(), PR_WAITOK).ok_or(ENOMEM)?;
+            let th = thbuf.bytes();
 
-            cd_read_toc(sc, 0, 0, &mut th, size_of::<IocTocHeader>(), 0)?;
-            let mut hdr = ioctl_arg::<IocTocHeader>(&th);
+            cd_read_toc(sc, 0, 0, th, size_of::<IocTocHeader>(), 0)?;
+            let mut hdr = ioctl_arg::<IocTocHeader>(th);
             hdr.len = toc_len(link, hdr.len);
             if hdr.len > 0 {
                 ioctl_ret(addr, &hdr);
@@ -1720,7 +1723,8 @@ fn cdioctl_locked(
 
         CDIOREADTOCENTRYS => {
             let te = ioctl_arg::<IocReadTocEntry>(addr);
-            let mut toc = CdToc::new();
+            let mut tocbuf = DmaBuf::new(size_of::<CdToc>(), PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
+            let toc = tocbuf.wire::<CdToc>();
             let mut len = usize::from(te.data_len);
 
             if len > toc.entries().len() || len < size_of::<CdTocEntry>() {
@@ -1760,11 +1764,13 @@ fn cdioctl_locked(
 
         CDIOREADMSADDR => {
             let sessno = ioctl_arg::<i32>(addr);
-            let mut toc = CdToc::new();
 
             if sessno != 0 {
                 return Err(EINVAL);
             }
+
+            let mut tocbuf = DmaBuf::new(size_of::<CdToc>(), PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
+            let toc = tocbuf.wire::<CdToc>();
 
             // 0x40: control word for "get MS info".
             cd_read_toc(
@@ -2020,9 +2026,10 @@ pub fn cdgetdisklabel(
     lp.d_magic2 = DISKMAGIC;
     lp.d_checksum = dkcksum(lp);
 
-    let mut toc = CdToc::new();
+    let mut tocbuf = DmaBuf::new(size_of::<CdToc>(), PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
+    let toc = tocbuf.wire::<CdToc>();
     let mut audioonly = true;
-    if cd_load_toc(sc, &mut toc, CD_LBA_FORMAT).is_err() {
+    if cd_load_toc(sc, toc, CD_LBA_FORMAT).is_err() {
         audioonly = false; // No valid TOC found == not an audio CD.
     } else {
         let th = toc.header();
@@ -2054,25 +2061,30 @@ pub fn cdgetdisklabel(
     readdisklabel(disklabeldev(dev), cdstrategy, lp, spoofonly)
 }
 
-/// Senses the audio mode page `pg_code` (`AUDIO_PAGE`, possibly with a page control):
-/// the mode sense buffer, the page's offset in it and whether the reply is the big format.
-/// `EIO` when the device has no such page (the C's `error == 0 && audio == NULL`).
+/// The mode sense buffer of the audio page functions: `dma_alloc(sizeof(*data), PR_NOWAIT)`,
+/// `ENOMEM` without it.
+fn cd_audio_buf() -> Result<DmaBuf, Errno> {
+    DmaBuf::new(size_of::<ScsiModeSenseBuf>(), PR_NOWAIT).ok_or(ENOMEM)
+}
+
+/// Senses the audio mode page `pg_code` (`AUDIO_PAGE`, possibly with a page control) into
+/// `data`: the page's offset in it and whether the reply is the big format. `EIO` when the
+/// device has no such page (the C's `error == 0 && audio == NULL`).
 fn cd_sense_audio(
     sc: &CdSoftc,
+    data: &mut ScsiModeSenseBuf,
     pg_code: i32,
     flags: i32,
-) -> Result<(ScsiModeSenseBuf, usize, bool), Errno> {
-    let mut data = ScsiModeSenseBuf::new();
-
+) -> Result<(usize, bool), Errno> {
     let (audio, big) = scsi_do_mode_sense(
         sc.link(),
         pg_code,
-        &mut data,
+        data,
         size_of::<CdAudioPage>() as i32,
         flags,
     )?;
     let audio = audio.ok_or(EIO)?;
-    Ok((data, audio, big))
+    Ok((audio, big))
 }
 
 /// `scsi_mode_select(_big)(link, SMS_PF, &data->hdr(_big), flags, 20000)`.
@@ -2091,20 +2103,24 @@ fn cd_mode_select(
 
 /// `cd_setchan`: routes the audio channels of the four ports.
 pub fn cd_setchan(sc: &CdSoftc, p0: u8, p1: u8, p2: u8, p3: u8, flags: i32) -> Result<(), Errno> {
-    let (mut data, off, big) = cd_sense_audio(sc, i32::from(AUDIO_PAGE), flags)?;
+    let mut databuf = cd_audio_buf()?;
+    let data = databuf.wire::<ScsiModeSenseBuf>();
+    let (off, big) = cd_sense_audio(sc, data, i32::from(AUDIO_PAGE), flags)?;
 
     let audio: &mut CdAudioPage = wire_mut(&mut data.buf[off..]);
     audio.port[LEFT_PORT].channels = p0;
     audio.port[RIGHT_PORT].channels = p1;
     audio.port[2].channels = p2;
     audio.port[3].channels = p3;
-    cd_mode_select(sc, &mut data, big, flags)
+    cd_mode_select(sc, data, big, flags)
 }
 
 /// `cd_getvol`: the volume of the four ports. As the C, it returns success even when the
 /// mode sense failed (and leaves `arg` alone).
 pub fn cd_getvol(sc: &CdSoftc, arg: &mut IocVol, flags: i32) -> Result<(), Errno> {
-    if let Ok((data, off, _big)) = cd_sense_audio(sc, i32::from(AUDIO_PAGE), flags) {
+    let mut databuf = cd_audio_buf()?;
+    let data = databuf.wire::<ScsiModeSenseBuf>();
+    if let Ok((off, _big)) = cd_sense_audio(sc, data, i32::from(AUDIO_PAGE), flags) {
         let audio = *crate::scsi::scsi_all::wire_ref::<CdAudioPage>(&data.buf[off..]);
         arg.vol[0] = audio.port[0].volume;
         arg.vol[1] = audio.port[1].volume;
@@ -2117,8 +2133,14 @@ pub fn cd_getvol(sc: &CdSoftc, arg: &mut IocVol, flags: i32) -> Result<(), Errno
 
 /// `cd_setvol`: sets the volume of the four ports, as far as the device lets it change.
 pub fn cd_setvol(sc: &CdSoftc, arg: &IocVol, flags: i32) -> Result<(), Errno> {
-    let (data, off, _big) =
-        cd_sense_audio(sc, i32::from(AUDIO_PAGE | SMS_PAGE_CTRL_CHANGEABLE), flags)?;
+    let mut databuf = cd_audio_buf()?;
+    let data = databuf.wire::<ScsiModeSenseBuf>();
+    let (off, _big) = cd_sense_audio(
+        sc,
+        data,
+        i32::from(AUDIO_PAGE | SMS_PAGE_CTRL_CHANGEABLE),
+        flags,
+    )?;
 
     let audio = *crate::scsi::scsi_all::wire_ref::<CdAudioPage>(&data.buf[off..]);
     let mask_volume = [
@@ -2128,7 +2150,7 @@ pub fn cd_setvol(sc: &CdSoftc, arg: &IocVol, flags: i32) -> Result<(), Errno> {
         audio.port[3].volume,
     ];
 
-    let (mut data, off, big) = cd_sense_audio(sc, i32::from(AUDIO_PAGE), flags)?;
+    let (off, big) = cd_sense_audio(sc, data, i32::from(AUDIO_PAGE), flags)?;
 
     let audio: &mut CdAudioPage = wire_mut(&mut data.buf[off..]);
     audio.port[0].volume = arg.vol[0] & mask_volume[0];
@@ -2136,7 +2158,7 @@ pub fn cd_setvol(sc: &CdSoftc, arg: &IocVol, flags: i32) -> Result<(), Errno> {
     audio.port[2].volume = arg.vol[2] & mask_volume[2];
     audio.port[3].volume = arg.vol[3] & mask_volume[3];
 
-    cd_mode_select(sc, &mut data, big, flags)
+    cd_mode_select(sc, data, big, flags)
 }
 
 /// `cd_load_unload`: LOAD/UNLOAD MEDIUM.
@@ -2165,14 +2187,16 @@ pub fn cd_set_pa_immed(sc: &CdSoftc, flags: i32) -> Result<(), Errno> {
         return Ok(());
     }
 
-    let (mut data, off, big) = cd_sense_audio(sc, i32::from(AUDIO_PAGE), flags)?;
+    let mut databuf = cd_audio_buf()?;
+    let data = databuf.wire::<ScsiModeSenseBuf>();
+    let (off, big) = cd_sense_audio(sc, data, i32::from(AUDIO_PAGE), flags)?;
 
     let audio: &mut CdAudioPage = wire_mut(&mut data.buf[off..]);
     let oflags = audio.flags;
     audio.flags &= !CD_PA_SOTC;
     audio.flags |= CD_PA_IMMED;
     if audio.flags != oflags {
-        return cd_mode_select(sc, &mut data, big, flags);
+        return cd_mode_select(sc, data, big, flags);
     }
     Ok(())
 }
@@ -2233,9 +2257,10 @@ pub fn cd_play_tracks(
         return Err(EINVAL);
     }
 
-    let mut toc = CdToc::new();
+    let mut tocbuf = DmaBuf::new(size_of::<CdToc>(), PR_WAITOK | PR_ZERO).ok_or(ENOMEM)?;
+    let toc = tocbuf.wire::<CdToc>();
 
-    cd_load_toc(sc, &mut toc, CD_MSF_FORMAT)?;
+    cd_load_toc(sc, toc, CD_MSF_FORMAT)?;
     let th = toc.header();
 
     etrack += 1;
@@ -2901,22 +2926,37 @@ pub fn cd_size(link: &'static ScsiLink, flags: i32, mut blksize: Option<&mut u32
     let flags = flags & !SCSI_IGNORE_ILLEGAL_REQUEST;
 
     // Start with a READ CAPACITY(10).
-    let mut rdcap = ScsiReadCapData::zeroed();
-    if scsi_read_cap_10(link, &mut rdcap, flags).is_err() {
-        return 0;
-    }
+    let prflags = (if flags & SCSI_NOSLEEP != 0 {
+        PR_NOWAIT
+    } else {
+        PR_WAITOK
+    }) | PR_ZERO;
+    let mut max_addr = {
+        let Some(mut rdbuf) = DmaBuf::new(size_of::<ScsiReadCapData>(), prflags) else {
+            return 0;
+        };
+        let rdcap = rdbuf.wire::<ScsiReadCapData>();
+        if scsi_read_cap_10(link, rdcap, flags).is_err() {
+            return 0;
+        }
 
-    let mut max_addr = u64::from(_4btol(&rdcap.addr));
-    if let Some(b) = blksize.as_deref_mut() {
-        *b = _4btol(&rdcap.length);
-    }
+        if let Some(b) = blksize.as_deref_mut() {
+            *b = _4btol(&rdcap.length);
+        }
+        u64::from(_4btol(&rdcap.addr))
+    };
 
     // pre-SPC (i.e. pre-SCSI-3) devices reporting less than 2^32-1 sectors can stop here.
     let stop = sid_ansii_rev(&link.inqdata.get()) < SCSI_REV_SPC && max_addr != 0xffff_ffff;
 
-    if !stop {
-        let mut rdcap16 = ScsiReadCapData16::zeroed();
-        if scsi_read_cap_16(link, &mut rdcap16, flags).is_ok() {
+    let rdbuf16 = if stop {
+        None
+    } else {
+        DmaBuf::new(size_of::<ScsiReadCapData16>(), prflags)
+    };
+    if let Some(mut rdbuf16) = rdbuf16 {
+        let rdcap16 = rdbuf16.wire::<ScsiReadCapData16>();
+        if scsi_read_cap_16(link, rdcap16, flags).is_ok() {
             max_addr = _8btol(&rdcap16.addr);
             if let Some(b) = blksize.as_deref_mut() {
                 *b = _4btol(&rdcap16.length);
@@ -3494,7 +3534,7 @@ mod tests {
 
         let xs: &'static ScsiXfer = Box::leak(Box::new(ScsiXfer::new()));
         xs.sc_link.set(Some(link));
-        xs.flags.set(crate::scsi::scsiconf::SCSI_NOSLEEP);
+        xs.flags.set(SCSI_NOSLEEP);
         xs.retries.set(2);
         xs.sense.set(ScsiSenseData {
             error_code: SSD_ERRCODE_CURRENT,
