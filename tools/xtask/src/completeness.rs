@@ -636,16 +636,210 @@ pub fn stub_sites(src: &str) -> Vec<usize> {
     lines
 }
 
+/// One preprocessor directive: its word (`if`, `define`, `include`, ...) and the rest of
+/// its line, continuation lines joined.
+type Directive = (String, String);
+
+/// The directives of a C file or header, comments and strings blanked.
+fn directives(src: &[u8]) -> Vec<Directive> {
+    let text = blank_c(src);
+    // The blanking keeps every byte's offset, so an `#include`'s file name, a string the
+    // blanking emptied, is read back from the source at the same place.
+    let raw = String::from_utf8_lossy(src);
+    let mut out = Vec::new();
+    let mut lines = text.lines().zip(raw.lines());
+    while let Some((line, raw_line)) = lines.next() {
+        let Some(d) = line.trim_start().strip_prefix('#') else {
+            continue;
+        };
+        let mut full = d.trim_end().to_string();
+        while full.ends_with('\\') {
+            full.pop();
+            match lines.next() {
+                Some((next, _)) => {
+                    full.push(' ');
+                    full.push_str(next.trim());
+                }
+                None => break,
+            }
+        }
+        let full = full.trim_start();
+        let word: String = full
+            .chars()
+            .take_while(|c| c.is_ascii_alphabetic())
+            .collect();
+        let rest = if word == "include" {
+            let r = raw_line.trim_start().trim_start_matches('#').trim_start();
+            r.strip_prefix("include").unwrap_or(r).trim().to_string()
+        } else {
+            full[word.len()..].trim().to_string()
+        };
+        out.push((word, rest));
+    }
+    out
+}
+
+/// The object-like macros a C file has defined by its end on one machine: its own
+/// `#define`s and `#undef`s and those of the headers of the reference tree it includes
+/// (`<a/b.h>` is `sys/a/b.h`, `<machine/x.h>` the machine's `include/x.h`, `"x.h"` the
+/// including file's directory first), each applied only in a branch that is taken under
+/// `env`. A `#define` in a branch the evaluation cannot decide is kept, so that no
+/// function becomes "not configured" by a guess. The user's finding of 2026-11-19: the
+/// earlier list took every `#define` of the file, whatever its branch (`crc32.c`'s
+/// `DYNAMIC_CRC_TABLE` under `MAKECRCH`), and none of its headers (`wscons_features.h`'s
+/// `HAVE_JUMP_SCROLL`, `zutil.h`'s `HAVE_MEMCPY`).
+pub struct Preprocessor<'a> {
+    reference: &'a Path,
+    cache: std::cell::RefCell<HashMap<std::path::PathBuf, std::rc::Rc<Vec<Directive>>>>,
+}
+
+impl<'a> Preprocessor<'a> {
+    /// A pass over the reference tree at `reference`.
+    pub fn new(reference: &'a Path) -> Self {
+        Preprocessor {
+            reference,
+            cache: std::cell::RefCell::new(HashMap::new()),
+        }
+    }
+
+    fn load(&self, path: &Path) -> Option<std::rc::Rc<Vec<Directive>>> {
+        if let Some(d) = self.cache.borrow().get(path) {
+            return Some(d.clone());
+        }
+        let src = fs::read(path).ok()?;
+        let d = std::rc::Rc::new(directives(&src));
+        self.cache
+            .borrow_mut()
+            .insert(path.to_path_buf(), d.clone());
+        Some(d)
+    }
+
+    /// The defines at the end of the C file `c` (a path under the reference tree, `sys/...`)
+    /// on `arch`, evaluated under `env`.
+    pub fn defines(&self, env: &Env, arch: &str, c: &str) -> Vec<(String, i64)> {
+        let mut defs = Vec::new();
+        let mut seen = HashSet::new();
+        let path = self.reference.join(c);
+        self.run(env, arch, &path, &mut defs, &mut seen, 0);
+        defs
+    }
+
+    fn resolve(&self, arch: &str, from: &Path, rest: &str) -> Option<std::path::PathBuf> {
+        let rest = rest.trim();
+        let (name, quoted) = match rest.strip_prefix('<') {
+            Some(r) => (r.split('>').next()?, false),
+            None => (rest.strip_prefix('"')?.split('"').next()?, true),
+        };
+        if quoted
+            && let Some(dir) = from.parent()
+            && dir.join(name).is_file()
+        {
+            return Some(dir.join(name));
+        }
+        let p = match name.strip_prefix("machine/") {
+            Some(m) => self.reference.join(format!("sys/arch/{arch}/include/{m}")),
+            None => self.reference.join("sys").join(name),
+        };
+        p.is_file().then_some(p)
+    }
+
+    fn run(
+        &self,
+        env: &Env,
+        arch: &str,
+        path: &Path,
+        defs: &mut Vec<(String, i64)>,
+        seen: &mut HashSet<std::path::PathBuf>,
+        depth: usize,
+    ) {
+        if depth > 24 || !seen.insert(path.to_path_buf()) {
+            return;
+        }
+        let Some(dirs) = self.load(path) else { return };
+        // Each frame: (the enclosing branch is live, this branch is live, a branch of this
+        // `#if` was already taken, this `#if` is undecided so far).
+        let mut stack: Vec<(bool, bool, bool, bool)> = Vec::new();
+        let live = |stack: &[(bool, bool, bool, bool)]| stack.last().is_none_or(|f| f.0 && f.1);
+        let test = |expr: &str, defs: &[(String, i64)]| -> Option<bool> {
+            env.eval(expr, defs).map(|v| v != 0)
+        };
+        for (word, rest) in dirs.iter() {
+            match word.as_str() {
+                "if" | "ifdef" | "ifndef" => {
+                    let outer = live(&stack);
+                    let expr = match word.as_str() {
+                        "ifdef" => format!("defined({rest})"),
+                        "ifndef" => format!("!defined({rest})"),
+                        _ => rest.clone(),
+                    };
+                    let v = if outer {
+                        test(&expr, defs)
+                    } else {
+                        Some(false)
+                    };
+                    // Undecided: live, so that its defines are kept.
+                    stack.push((outer, v != Some(false), v == Some(true), v.is_none()));
+                }
+                "elif" => {
+                    if let Some(f) = stack.last_mut() {
+                        if f.2 && !f.3 {
+                            f.1 = false;
+                        } else {
+                            let v = if f.0 { test(rest, defs) } else { Some(false) };
+                            f.1 = v != Some(false);
+                            f.2 |= v == Some(true);
+                            f.3 |= v.is_none();
+                        }
+                    }
+                }
+                "else" => {
+                    if let Some(f) = stack.last_mut() {
+                        f.1 = !f.2 || f.3;
+                    }
+                }
+                "endif" => {
+                    stack.pop();
+                }
+                "define" if live(&stack) => {
+                    let name: String = rest
+                        .chars()
+                        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                        .collect();
+                    let after = &rest[name.len()..];
+                    if !name.is_empty() && !after.starts_with('(') {
+                        let value = parse_int(after.trim()).unwrap_or(1);
+                        defs.push((name, value));
+                    }
+                }
+                "undef" if live(&stack) => {
+                    let name = rest.split_whitespace().next().unwrap_or("");
+                    defs.retain(|(n, _)| n != name);
+                }
+                "include" if live(&stack) => {
+                    if let Some(h) = self.resolve(arch, path, rest) {
+                        self.run(env, arch, &h, defs, seen, depth + 1);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 /// A C integer literal (decimal, hex or octal, with `U`/`L` suffixes).
 fn parse_int(s: &str) -> Option<i64> {
     let s = s.trim_end_matches(['u', 'U', 'l', 'L']);
     let s = s.trim_start_matches('(').trim_end_matches(')');
+    // A literal past i64 (ULONG_MAX's 0xffffffffffffffff) keeps its 64 bits, as the C's
+    // unsigned arithmetic of `#if` compares them.
     if let Some(h) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
-        i64::from_str_radix(h, 16).ok()
+        u64::from_str_radix(h, 16).ok().map(|v| v as i64)
     } else if s.len() > 1 && s.starts_with('0') {
-        i64::from_str_radix(&s[1..], 8).ok()
+        u64::from_str_radix(&s[1..], 8).ok().map(|v| v as i64)
     } else {
-        s.parse().ok()
+        s.parse::<i64>()
+            .ok()
+            .or_else(|| s.parse::<u64>().ok().map(|v| v as i64))
     }
 }
 
@@ -779,7 +973,7 @@ impl Env {
         all
     }
 
-    fn eval(&self, expr: &str, local: &[(String, i64)]) -> Option<i64> {
+    pub fn eval(&self, expr: &str, local: &[(String, i64)]) -> Option<i64> {
         let toks = tokenize(expr);
         let mut p = Parser {
             toks: &toks,
@@ -1184,6 +1378,7 @@ pub fn check<'a>(
         checked_c_rows: 0,
     };
     let reference = root.join(REFERENCE_DIR);
+    let pre = Preprocessor::new(&reference);
     let envs = if have_reference {
         Some([
             Env::generic_mp(&reference, "amd64")?,
@@ -1232,7 +1427,11 @@ pub fn check<'a>(
         if e.status == Status::Ported {
             report.checked_c_rows += 1;
         }
-        let (funcs, local) = c_functions(&c_src);
+        let (funcs, _) = c_functions(&c_src);
+        let locals = [
+            pre.defines(&envs[0], "amd64", &e.c),
+            pre.defines(&envs[1], "arm64", &e.c),
+        ];
         let have = fns_by_file.get(&e.rust).cloned().unwrap_or_default();
         let mut unexcepted = Vec::new();
         for func in funcs {
@@ -1251,7 +1450,7 @@ pub fn check<'a>(
                 used_exceptions.insert((x.c.as_str(), x.function.as_str()));
                 continue;
             }
-            let configured = configured_on(&e.c, |i| envs[i].eval_all(&func.conds, &local));
+            let configured = configured_on(&e.c, |i| envs[i].eval_all(&func.conds, &locals[i]));
             let elsewhere = fns_by_file
                 .iter()
                 .filter(|(f, set)| **f != e.rust && set.contains(&func.name))
@@ -1498,6 +1697,33 @@ f(void)
                 .map(|(k, v)| ((*k).to_string(), Some(*v)))
                 .collect(),
         }
+    }
+
+    #[test]
+    fn the_preprocessor_follows_branches_undefs_and_headers() {
+        let root = std::env::temp_dir().join(format!("emibsd-pre-{}", std::process::id()));
+        let dir = root.join("sys/dev");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("feat.h"),
+            "#ifndef SMALL\n#define FROM_HEADER\n#endif\n#define BIG 0xffffffffffffffffUL\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.join("x.c"),
+            "#include <dev/feat.h>\n#ifdef NEVER\n#define IN_DEAD_BRANCH\n#endif\n\
+             #define GONE\n#undef GONE\n#if BIG == 0xffffffffffffffff\n#define BIG_OK\n#endif\n",
+        )
+        .unwrap();
+        let env = env(&[]);
+        let pre = Preprocessor::new(&root);
+        let d = pre.defines(&env, "amd64", "sys/dev/x.c");
+        let has = |n: &str| d.iter().any(|(k, _)| k == n);
+        assert!(has("FROM_HEADER"));
+        assert!(!has("IN_DEAD_BRANCH"));
+        assert!(!has("GONE"));
+        assert!(has("BIG_OK"));
+        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

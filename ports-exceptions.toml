@@ -42,18 +42,6 @@ reason = "not configured: `defined(DYNAMIC_CRC_TABLE) && defined(MAKECRCH)` is f
 approved = "2026-11-19"
 
 [[exception]]
-c = "sys/lib/libz/crc32.c"
-function = "crc_word"
-reason = "not configured: `!(defined(ARMCRC32)) && defined(W)` is false on amd64 and arm64 GENERIC.MP"
-approved = "2026-11-19"
-
-[[exception]]
-c = "sys/lib/libz/crc32.c"
-function = "crc_word_big"
-reason = "not configured: `!(defined(ARMCRC32)) && defined(W)` is false on amd64 and arm64 GENERIC.MP"
-approved = "2026-11-19"
-
-[[exception]]
 c = "sys/lib/libz/zutil.c"
 function = "z_error"
 reason = "not configured: `defined(ZLIB_DEBUG)` is false on amd64 and arm64 GENERIC.MP"
