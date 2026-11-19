@@ -58,9 +58,8 @@
 //! `uvm_anon_dropswap`, `uvm_anon_release`, `uvm_anon_pagein`.
 //!
 //! ## Deviations
-//! - Swap is not here (M7): `uvm_anon_dropswap` reports `uvm_swap_free` when an anon has a
-//!   slot, which nothing assigns yet.
-//! - `uvm_anon_pagein` needs `uvmfault_anonget` (M7a part 3) and reports it.
+//! - Swap is not here (TD3): `uvm_anon_dropswap` and `uvm_anon_pagein` report
+//!   `uvm_swap_free` when an anon has a slot, which nothing assigns yet.
 //! - M11a: `MULTIPROCESSOR`'s `unused` padding and `pool_cache_init` are in (the per-CPU
 //!   pool caches need items of at least a `pool_cache_item`).
 
@@ -73,13 +72,17 @@ use crate::kern::kern_rwlock::{rw_exit, rw_obj_free, rw_obj_hold};
 use crate::kern::subr_pool::{pool_get, pool_init, pool_put, pool_sethiwat};
 use crate::machine::intr::IPL_MPFLOOR;
 use crate::machine::pmap::pmap_page_protect;
+use crate::sys::errno::Errno;
 use crate::sys::mman::PROT_NONE;
 use crate::sys::pool::{PR_NOWAIT, PR_WAITOK, Pool};
 use crate::sys::rwlock::{Rwlock, rw_lock_held, rw_write_held};
 use crate::unported;
 use crate::uvm::uvm_amap::VmAmap;
+use crate::uvm::uvm_fault::uvmfault_anonget;
 use crate::uvm::uvm_init::UVMEXP;
-use crate::uvm::uvm_page::{PG_BUSY, PG_RELEASED, VmPage, uvm_pagefree};
+use crate::uvm::uvm_page::{
+    PG_BUSY, PG_CLEAN, PG_RELEASED, VmPage, uvm_pagedeactivate, uvm_pagefree,
+};
 
 /// `struct vm_anon`.
 pub struct VmAnon {
@@ -262,9 +265,39 @@ pub fn uvm_anon_pagein(amap: &VmAmap, anon: &VmAnon) -> bool {
     kassert!(anon.an_lock().is_some_and(rw_write_held));
     kassert!(ptr::eq(anon.an_lock.get(), amap.am_lock.get()));
 
-    // Get the page of the anon: uvmfault_anonget (uvm_fault.c, M7a part 3); until then
-    // nothing is paged out, so there is nothing to fetch.
-    let _ = unported!("uvm_anon_pagein: uvmfault_anonget (M7a-3)");
+    // Get the page of the anon.
+    match uvmfault_anonget(None, amap, anon) {
+        Ok(()) => {
+            // Success - we have the page.
+            kassert!(anon.an_lock().is_some_and(rw_write_held));
+        }
+        Err(Errno::EACCES | Errno::ERESTART) => {
+            // Nothing more to do on errors. ERESTART means that the anon was freed.
+            return false;
+        }
+        Err(e) => {
+            // ENOLCK should not be possible.
+            if cfg!(feature = "diagnostic") {
+                crate::kern::subr_prf::panic(format_args!(
+                    "anon_pagein: uvmfault_anonget -> {}",
+                    e as i32
+                ));
+            }
+            return false;
+        }
+    }
+
+    // Mark the page as dirty and clear its swslot.
+    if anon.an_swslot.get() > 0 {
+        let _ = unported!("uvm_anon_pagein: uvm_swap_free (uvm_swap.c)");
+    }
+    anon.an_swslot.set(0);
+    if let Some(pg) = anon.page() {
+        pg.clear_bits(PG_CLEAN);
+
+        // Deactivate the page (to put it on a page queue).
+        uvm_pagedeactivate(pg);
+    }
     if let Some(lock) = anon.an_lock() {
         rw_exit(lock);
     }

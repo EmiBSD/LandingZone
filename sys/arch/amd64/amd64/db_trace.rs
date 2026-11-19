@@ -50,8 +50,9 @@
 //! Status: `wip`. Milestone M2 ports `db_stack_trace_print` for the "trace from this frame"
 //! case `db_stack_dump` needs; M4 adds the trace from `ddb_regs` (a trap frame) with
 //! `db_reg_args[]` and the breakpoint-before-the-frame case; M11c `db_regs[]` (the `$rdi`
-//! variables of the command loop). The `/t` thread trace (`tfind`), `stacktrace_save_at` and
-//! `stacktrace_save_utrace` arrive with the scheduler (M5).
+//! variables of the command loop); TD1 the `/t` trace of another thread (`tfind`, its saved
+//! frame pointer). `stacktrace_save_at`, `stacktrace_save_utrace`, `db_get_pc` and
+//! `db_get_probe_addr` are not here yet.
 //!
 //! ## Deviations
 //! - No symbol table in memory yet (`db_search_symbol`, `db_ctf_func_numargs`, `db_printsym`):
@@ -71,8 +72,9 @@ use crate::arch::amd64::include::frame::{Callframe, Trapframe};
 use crate::arch::amd64::include::vmparam::VM_MIN_KERNEL_ADDRESS;
 use crate::db_reg_var;
 use crate::ddb::db_variables::DbVariable;
+use crate::kern::kern_proc::tfind;
 use crate::machine::db_machdep::PrFn;
-use crate::unported;
+use crate::sys::types::Pid;
 
 /// `db_regs[]`: the registers of `ddb_regs` as debugger variables. Each reads and writes its
 /// field of the trap frame (`db_reg_var!`) where C points `valuep` at it.
@@ -140,10 +142,13 @@ pub fn db_stack_trace_print(addr: usize, have_addr: bool, count: usize, modif: &
         }
     }
 
+    let mut p = None;
     if trace_proc {
-        let _ = unported!("tfind (trace /t)");
-        pr(format_args!("not found\n"));
-        return;
+        p = tfind(addr as Pid);
+        if p.is_none() {
+            pr(format_args!("not found\n"));
+            return;
+        }
     }
 
     // cr4save = rcr4(); if (cr4save & CR4_SMAP) lcr4(cr4save & ~CR4_SMAP): SMAP is not
@@ -158,6 +163,10 @@ pub fn db_stack_trace_print(addr: usize, have_addr: bool, count: usize, modif: &
         frame = regs.tf_rbp as usize;
         callpc = regs.tf_rip as usize;
         tf_rsp = regs.tf_rsp as usize;
+    } else if let Some(p) = p {
+        frame = p.pcb().pcb_rbp.get() as usize;
+        callpc = db_get_value(frame + offset_of!(Callframe, f_retaddr));
+        frame = db_get_value(frame + offset_of!(Callframe, f_frame));
     } else {
         frame = addr;
         callpc = db_get_value(frame + offset_of!(Callframe, f_retaddr));

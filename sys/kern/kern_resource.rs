@@ -57,7 +57,7 @@
 //!
 //! Upstream: sys/kern/kern_resource.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M5 (part b2) ports the thread usage aggregation the scheduler
+//! Status: `ported`. Milestone M5 (part b2) ports the thread usage aggregation the scheduler
 //! needs: `tuagg_sumup`, `tuagg_get_proc`, `tuagg_get_process`, `tuagg_add_process` and
 //! `tuagg_add_runtime`; M6-b adds `calctsru`, `calcru` and `ruadd` for `exit1`. M7a adds the
 //! `plimit` management (`lim_startup`, `lim_copy`, `lim_free`, `lim_fork`,

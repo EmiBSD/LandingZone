@@ -73,15 +73,13 @@
 //! - `ffs_hashalloc`'s allocator is a `fn` pointer of the C's type.
 //! - The `static struct timeval` rate limits of the "file system full" messages are
 //!   `StaticCell`s changed under the kernel lock.
-//! - `uprintf` (a message on the process's terminal, `tty.c`) is reported: the console
-//!   message of `ffs_fserr` (`log(LOG_ERR, ...)`) remains.
 //! - The quota calls are `quota.rs`'s: `ufs_quota.rs`'s with feature `quota` (`option QUOTA`),
 //!   the no-quota answers of `ufs_quota_stub.c` without it.
 
 use crate::dev::rnd::{arc4random, arc4random_uniform};
 use crate::kern::kern_tc::nanotime;
 use crate::kern::kern_time::ratecheck;
-use crate::kern::subr_prf::panic;
+use crate::kern::subr_prf::{panic, uprintf};
 use crate::kern::vfs_bio::{bawrite, bdwrite, bread, brelse, buf_adjcnt, getblk};
 use crate::kprintf;
 use crate::log;
@@ -141,11 +139,6 @@ fn fserr_ratecheck(last: &StaticCell<Timeval>) -> bool {
 /// `ffs_fserr(fs, uid, cp)`: report a file system error.
 fn ffs_fserr(fs: &Fs, uid: Uid, cp: &str) {
     log!(LOG_ERR, "uid {} on {}: {}\n", uid, fs.fsmnt(), cp);
-}
-
-/// `uprintf(fmt, ...)` on the thread's terminal (`tty.c`, not ported).
-fn uprintf_unported() {
-    let _ = crate::unported!("uprintf (tty.c)");
 }
 
 /// The uid of a credential the allocator is handed (`NOCRED` is a caller's bug, which
@@ -236,8 +229,10 @@ pub fn ffs_alloc(
     // nospace:
     if fserr_ratecheck(&FFS_ALLOC_FSFULL_LAST) {
         ffs_fserr(fs, uid, "file system full");
-        // uprintf("\n%s: write failed, file system is full\n", fs->fs_fsmnt)
-        uprintf_unported();
+        uprintf(format_args!(
+            "\n{}: write failed, file system is full\n",
+            fs.fsmnt()
+        ));
     }
     Err(Errno::ENOSPC)
 }
@@ -424,8 +419,10 @@ pub fn ffs_realloccg(
         // nospace:
         if fserr_ratecheck(&FFS_REALLOCCG_FSFULL_LAST) {
             ffs_fserr(fs, uid, "file system full");
-            // uprintf("\n%s: write failed, file system is full\n", fs->fs_fsmnt)
-            uprintf_unported();
+            uprintf(format_args!(
+                "\n{}: write failed, file system is full\n",
+                fs.fsmnt()
+            ));
         }
         Errno::ENOSPC
     };
@@ -544,8 +541,10 @@ pub fn ffs_inode_alloc(
     // noinodes:
     if fserr_ratecheck(&FFS_INODE_ALLOC_FSNOINODES_LAST) {
         ffs_fserr(fs, cred_uid(cred, "ffs_inode_alloc"), "out of inodes");
-        // uprintf("\n%s: create/symlink failed, no inodes free\n", fs->fs_fsmnt)
-        uprintf_unported();
+        uprintf(format_args!(
+            "\n{}: create/symlink failed, no inodes free\n",
+            fs.fsmnt()
+        ));
     }
     Err(Errno::ENOSPC)
 }

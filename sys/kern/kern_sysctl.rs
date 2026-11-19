@@ -89,7 +89,7 @@
 //!   `setperf`/`perfpolicy` (`sched_bsd.c`). The top-level `machdep` tree is the machine's
 //!   `cpu_sysctl` (`machine::cpu::cpu_sysctl`). `kern.proc_cwd` of a process
 //!   without a current directory (none has one before a root file system is mounted) is
-//!   `ENOENT`. `resettodr` after a new `kern.utc_offset` is reported and skipped.
+//!   `ENOENT`.
 //! - Options this kernel does not configure are compiled out as in C: `DEBUG_SYSCTL`
 //!   (`debug_sysctl`, `CTL_DEBUG` is `EOPNOTSUPP`), `SYSVMSG`/`SYSVSEM`/`SYSVSHM`
 //!   (`sysctl_sysvipc`), `NAUDIO`/`NVIDEO`/`NDT` (0; `NUCOM` is configured: `hw.ucomnames` is `sysctl_ucominit`), `GPROF`, `WITNESS`,
@@ -159,6 +159,7 @@ use crate::kern::kern_sensors::{sensor_find, sensordev_get};
 use crate::kern::kern_sig::NOSUIDCOREDUMP;
 use crate::kern::kern_synch::{refcnt_rele_wake, refcnt_take};
 use crate::kern::kern_tc::{microboottime, nanoboottime, nanotime, sysctl_tc, tc_setrealtimeclock};
+use crate::kern::kern_time::resettodr;
 use crate::kern::kern_timeout::timeout_sysctl;
 use crate::kern::kern_watchdog::sysctl_wdog;
 use crate::kern::sched_bsd;
@@ -3209,7 +3210,7 @@ pub fn sysctl_utc_offset(
     let mut adjusted = now;
     adjusted.tv_sec -= i64::from(adjustment_seconds);
     tc_setrealtimeclock(&adjusted);
-    let _ = unported!("kern.utc_offset: resettodr (kern_time.c)");
+    resettodr();
 
     Ok(())
 }

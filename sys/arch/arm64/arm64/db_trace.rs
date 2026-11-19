@@ -51,9 +51,9 @@
 //! Upstream: sys/arch/arm64/arm64/db_trace.c @ 3ce1f3f79392
 //!
 //! Status: `wip`. Milestone M2 ports `db_stack_trace_print` for the "trace from this frame"
-//! case `db_stack_dump` needs; M4 adds the trace from `ddb_regs` (a trap frame). The `/t`
-//! thread trace (`tfind`, `switchframe`), `stacktrace_save_at` and `stacktrace_save_utrace`
-//! arrive with the scheduler (M5).
+//! case `db_stack_dump` needs; M4 adds the trace from `ddb_regs` (a trap frame); TD1 the `/t`
+//! trace of another thread (`tfind`, its switch frame). `stacktrace_save_at` and
+//! `stacktrace_save_utrace` are not here yet.
 //!
 //! ## Deviations
 //! - No symbol table in memory yet (`db_search_symbol`, `db_printsym`): every frame prints
@@ -65,11 +65,14 @@
 //! - The C decrements `count` twice per frame (`while (count--)` and `--count`); so does
 //!   this, on a signed counter, so the two behave alike at the limit.
 
+use core::mem::offset_of;
 use core::ptr;
 
 use crate::arch::arm64::arm64::db_interface::DDB_REGS;
+use crate::arch::arm64::include::frame::Switchframe;
+use crate::kern::kern_proc::tfind;
 use crate::machine::db_machdep::PrFn;
-use crate::unported;
+use crate::sys::types::Pid;
 
 /// `INKERNEL(va)`.
 fn inkernel(va: usize) -> bool {
@@ -97,10 +100,13 @@ pub fn db_stack_trace_print(addr: usize, have_addr: bool, count: usize, modif: &
         }
     }
 
+    let mut p = None;
     if trace_thread {
-        let _ = unported!("tfind (trace /t)");
-        pr(format_args!("not found\n"));
-        return;
+        p = tfind(addr as Pid);
+        if p.is_none() {
+            pr(format_args!("not found\n"));
+            return;
+        }
     }
 
     let mut frame;
@@ -110,6 +116,12 @@ pub fn db_stack_trace_print(addr: usize, have_addr: bool, count: usize, modif: &
         let regs = unsafe { DDB_REGS.get() };
         frame = regs.tf_x[29] as usize;
         lr = regs.tf_elr as usize;
+    } else if let Some(p) = p {
+        // db_read_bytes(p->p_addr->u_pcb.pcb_sp, sizeof(sf), &sf): the switch frame a
+        // thread that is not running left on its kernel stack.
+        let sf = p.pcb().pcb_sp.get() as usize;
+        frame = db_get_value(sf + offset_of!(Switchframe, sf_x29));
+        lr = db_get_value(sf + offset_of!(Switchframe, sf_lr));
     } else {
         frame = db_get_value(addr);
         lr = db_get_value(addr + 8);

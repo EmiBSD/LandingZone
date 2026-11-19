@@ -581,7 +581,12 @@ pub fn main() -> ! {
     }
 
     // Now can look at time, having had a chance to verify the time from the file system.
-    let _ = unported!("nanouptime (process start times)");
+    for pr in ALLPROCESS.0.iter() {
+        pr.ps_start.set(crate::kern::kern_tc::nanouptime());
+    }
+    Machine::ci_schedstate(curcpu())
+        .spc_runtime
+        .set(crate::kern::kern_tc::nanouptime());
 
     let _ = unported!("uvm_swap_init");
 
