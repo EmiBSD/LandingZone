@@ -65,8 +65,7 @@
 //! - `pci_mapreg_map` returns `bus_space_map`'s error where the C returns 1.
 //! - `pci_mapreg_assign` places a BAR the firmware left at 0 in the bus's extent (M16b),
 //!   bounded by the machine's `PCI_IO_START`..`PCI_MEM_END` (`<machine/pci_machdep.h>`,
-//!   the C's `#ifndef` defaults on arm64); amd64's buses have no extents yet, so it never
-//!   gets here (`EINVAL`, as the C without an extent).
+//!   the C's `#ifndef` defaults on arm64); a bus without an extent gets `EINVAL`, as the C.
 //! - The "bad request" panics happen with or without `DIAGNOSTIC`, as in C; the `DEBUG`
 //!   printfs are compiled under feature `debug`.
 

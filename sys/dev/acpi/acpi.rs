@@ -90,8 +90,6 @@
 //!   the three lists, `acpi_batcount` and `acpi_apminfo` (whose callers are `acpibat.c` and
 //!   `acpi_apm.c`, with `<machine/apmvar.h>`) come with them. `acpi_record_event` returns 1
 //!   while `SCFLAG_OPEN` is never set (no `acpiopen`); its `knote_locked` is reported.
-//! - `acpi_pciroots_attach` cannot reserve the bus numbers (`extent_alloc_region` on
-//!   `pba_busex`: `subr_extent.c` is not ported) and reports it.
 //! - `aml_intlen` stays 64: `acpi.c` at the pin never sets it to 32 for a revision-1 DSDT.
 //! - The callbacks of `aml_find_node`, `aml_walknodes` and `aml_parse_resource` are
 //!   closures; the C's `void *arg` (the softc, a bus number) is captured.
@@ -161,6 +159,7 @@ use crate::kern::kern_synch::{tsleep_nsec, wakeup};
 use crate::kern::kern_timeout::timeout_set;
 use crate::kern::kern_xxx::powerbutton_event;
 use crate::kern::subr_autoconf::{config_found, config_found_sm};
+use crate::kern::subr_extent::extent_alloc_region;
 use crate::kern::subr_prf::{Str, panic};
 use crate::machine::acpi_machdep::{
     ACPI_PRT, ACPI_SECTWO, acpi_attach_machdep, acpi_bus_space_map, acpi_bus_space_unmap,
@@ -180,6 +179,7 @@ use crate::sys::device::{
     CD_COCOVM, CfMatch, Cfdriver, CfprintT, DV_DULL, Device, QUIET, SLEEP_SUSPEND, UNCONF,
 };
 use crate::sys::errno::Errno;
+use crate::sys::extent::EX_NOWAIT;
 use crate::sys::param::PWAIT;
 use crate::sys::reboot::RB_POWERDOWN;
 use crate::sys::systm::{COLD, INFSLP};
@@ -1033,12 +1033,15 @@ fn acpi_pci_notify(_node: &AmlNodeRef, ntype: i32, arg: *mut c_void) -> i32 {
 /// `acpi_pciroots_attach(dev, pba, pr)`: attaches a `pci` bus below `dev` for every host
 /// bridge the namespace describes.
 pub fn acpi_pciroots_attach(dev: &Device, pba: &mut PcibusAttachArgs, pr: CfprintT) {
-    // KASSERT(pba->pba_busex != NULL): extents (subr_extent.c) are not ported, so the bus
-    // numbers cannot be reserved with extent_alloc_region.
-    let _ = unported!("acpi_pciroots_attach: extent_alloc_region (pba_busex, subr_extent.c)");
+    kassert!(pba.pba_busex.is_some());
 
     let roots: Vec<&'static AcpiPci> = ACPI_PCIROOTDEVS.get().borrow().clone();
     for pdev in roots {
+        if let Some(busex) = pba.pba_busex
+            && extent_alloc_region(busex, pdev.bus.get() as u64, 1, EX_NOWAIT).is_err()
+        {
+            continue;
+        }
         pba.pba_bus = pdev.bus.get();
         let _ = config_found(dev, ptr::from_mut(pba).cast(), Some(pr));
     }

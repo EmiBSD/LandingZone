@@ -45,15 +45,12 @@
 //! bridge is not a VIA or SiS one and whose bus is not HyperTransport.
 //!
 //! ## Deviations
-//! - The bus, I/O and memory extents (`sys/extent.h`, `subr_extent.c`) are not ported:
-//!   `extent_create`, `extent_free` and `extent_destroy` are reported once, the softc keeps
-//!   no extents and `pba_busex`/`pba_ioex`/`pba_memex`/`pba_pmemex` are `None`
-//!   (`pcivar.rs`). `acpipci_parse_resources` still lets the `_CRS` bus range override
-//!   `_BBN`, as the C does.
+//! - The softc keeps the extents' names in byte arrays the attach formats once (the C's
+//!   `char[32]`s).
 //! - `_OSC`'s UUID and capabilities buffers are built as byte buffers (`AmlValue::buffer`).
 //! - `ACPIPCI_DEBUG`'s `extent_print`s are not configured.
 
-use core::cell::{Cell, RefCell};
+use core::cell::{Cell, RefCell, UnsafeCell};
 use core::ffi::c_void;
 use core::ptr;
 use core::sync::atomic::Ordering;
@@ -63,7 +60,7 @@ use crate::arch::amd64::amd64::cpu::CPU_ECXFEATURE;
 use crate::arch::amd64::include::pci_machdep::PciChipsetTag;
 use crate::arch::amd64::include::specialreg::CPUIDECX_HV;
 use crate::arch::amd64::pci::pci_machdep::{
-    PCI_BUS_DMA_TAG, pci_conf_read, pci_init_extents, pci_make_tag,
+    PCI_BUS_DMA_TAG, pci_conf_read, pci_init_extents, pci_make_tag, pcibus_ex, pciio_ex, pcimem_ex,
 };
 use crate::dev::acpi::acpi::{ACPI_HASPCI, acpi_matchhids};
 use crate::dev::acpi::acpireg::FADT_NO_MSI;
@@ -84,9 +81,12 @@ use crate::dev::pci::pcireg::{
 };
 use crate::dev::pci::pcivar::{PCI_FLAGS_MSI_ENABLED, PcibusAttachArgs};
 use crate::kern::subr_autoconf::config_found;
-use crate::kern::subr_prf::Str;
+use crate::kern::subr_extent::{extent_create, extent_destroy, extent_free};
+use crate::kern::subr_prf::{Str, snprintf};
+use crate::kprintf;
 use crate::sys::device::{CD_COCOVM, CfMatch, Cfattach, Cfdriver, DV_DULL, Device, Softc, UNCONF};
-use crate::{kprintf, unported};
+use crate::sys::extent::{EX_CONFLICTOK, EX_FILLED, EX_WAITOK, Extent};
+use crate::sys::malloc::M_DEVBUF;
 
 /// `ACPI_PCI_UUID`: 33DB4D5B-1FF7-401C-9657-7441C03DD766.
 const ACPI_PCI_UUID: [u8; 16] = [
@@ -126,10 +126,36 @@ pub struct AcpipciSoftc {
     pub sc_seg: Cell<u32>,
     /// `sc_domain`: assigned when the PCI bus attaches.
     pub sc_domain: Cell<i32>,
+    /// `sc_busex`.
+    pub sc_busex: Cell<Option<&'static Extent>>,
+    /// `sc_memex`.
+    pub sc_memex: Cell<Option<&'static Extent>>,
+    /// `sc_ioex`.
+    pub sc_ioex: Cell<Option<&'static Extent>>,
+    /// `sc_busex_name[32]`, written once by the attach.
+    pub sc_busex_name: UnsafeCell<[u8; 32]>,
+    /// `sc_ioex_name[32]`.
+    pub sc_ioex_name: UnsafeCell<[u8; 32]>,
+    /// `sc_memex_name[32]`.
+    pub sc_memex_name: UnsafeCell<[u8; 32]>,
+}
+
+impl AcpipciSoftc {
+    /// One of the extent names, formatted once into its buffer.
+    fn exname(
+        cell: &'static UnsafeCell<[u8; 32]>,
+        args: core::fmt::Arguments<'_>,
+    ) -> &'static [u8] {
+        // SAFETY: the attach formats each name once, before the extent that keeps it exists;
+        // nothing writes it afterwards.
+        let buf = unsafe { &mut *cell.get() };
+        let n = snprintf(buf, args).min(buf.len() - 1);
+        &buf[..n]
+    }
 }
 
 // SAFETY: `#[repr(C)]` with the device first; zeroes are a null pointer, an unborrowed
-// `RefCell` holding `None` and 0.
+// `RefCell` holding `None`, `None` extents, zeroed byte arrays and 0.
 unsafe impl Softc for AcpipciSoftc {}
 
 /// `acpipci_ca`.
@@ -177,8 +203,9 @@ pub fn acpipci_match(_parent: Option<&Device>, _match: &CfMatch, aux: *mut c_voi
 pub fn acpipci_attach(parent: Option<&Device>, self_: &Device, aux: *mut c_void) {
     // SAFETY: acpi0 hands its children `struct acpi_attach_args`.
     let aaa = unsafe { &*aux.cast_const().cast::<AcpiAttachArgs>() };
-    // SAFETY: `self_` was made for `acpipci_ca`.
-    let sc = unsafe { self_.softc::<AcpipciSoftc>() };
+    // SAFETY: `acpipci_ca` made the device, as an `AcpipciSoftc`; never detached, so the
+    // softc lives as long as the kernel (its extent names must).
+    let sc: &'static AcpipciSoftc = unsafe { &*ptr::from_ref(self_.softc::<AcpipciSoftc>()) };
     let mut bbn: i64 = 0;
     let mut seg: i64 = 0;
 
@@ -214,27 +241,59 @@ pub fn acpipci_attach(parent: Option<&Device>, self_: &Device, aux: *mut c_void)
         kprintf!(": can't find resources\n");
 
         pci_init_extents();
-        // sc_busex = pcibus_ex, sc_ioex = pciio_ex, sc_memex = pcimem_ex: no extents.
+        sc.sc_busex.set(pcibus_ex());
+        sc.sc_ioex.set(pciio_ex());
+        sc.sc_memex.set(pcimem_ex());
+
         return;
     }
 
-    // Create extents for our address spaces: extent_create of sc_busex, sc_ioex and
-    // sc_memex (reported below, after the line: see the deviations).
+    // Create extents for our address spaces.
+    let xname = sc.sc_dev.xname();
+    let busex_name = AcpipciSoftc::exname(&sc.sc_busex_name, format_args!("{} pcibus", xname));
+    let ioex_name = AcpipciSoftc::exname(&sc.sc_ioex_name, format_args!("{} pciio", xname));
+    let memex_name = AcpipciSoftc::exname(&sc.sc_memex_name, format_args!("{} pcimem", xname));
+    sc.sc_busex.set(extent_create(
+        busex_name,
+        0,
+        255,
+        M_DEVBUF,
+        None,
+        EX_WAITOK | EX_FILLED,
+    ));
+    sc.sc_ioex.set(extent_create(
+        ioex_name,
+        0,
+        0xffff_ffff,
+        M_DEVBUF,
+        None,
+        EX_WAITOK | EX_FILLED,
+    ));
+    sc.sc_memex.set(extent_create(
+        memex_name,
+        0,
+        u64::MAX,
+        M_DEVBUF,
+        None,
+        EX_WAITOK | EX_FILLED,
+    ));
 
     aml_parse_resource(&res, &mut |i, crs| acpipci_parse_resources(i, crs, sc));
 
     if acpi.sc_major.get() < 5 && CPU_ECXFEATURE.load(Ordering::Relaxed) & CPUIDECX_HV == 0 {
-        // extent_destroy(sc_ioex), extent_destroy(sc_memex): no extents.
+        for ex in [sc.sc_ioex.get(), sc.sc_memex.get()].into_iter().flatten() {
+            // SAFETY: the attach made these extents above and handed them to nobody yet.
+            unsafe { extent_destroy(ex) };
+        }
+
         pci_init_extents();
-        // sc_ioex = pciio_ex, sc_memex = pcimem_ex.
+        sc.sc_ioex.set(pciio_ex());
+        sc.sc_memex.set(pcimem_ex());
     }
 
     kprintf!("\n");
-    let _ = unported!(
-        "acpipci: the bus, I/O and memory extents (extent_create, extent_free, subr_extent.c)"
-    );
 
-    // ACPIPCI_DEBUG: extent_print of the three extents.
+    // ACPIPCI_DEBUG (not defined): extent_print of the three extents.
 }
 
 /// `acpipci_attach_bus(parent, sc)`: attaches the `pci` bus behind host bridge `sc`.
@@ -296,11 +355,10 @@ pub fn acpipci_attach_bus(parent: &Device, sc: &AcpipciSoftc) {
         pba_dmat: &PCI_BUS_DMA_TAG,
         pba_pc: None,
         pba_flags: flags,
-        // pba_busex, pba_ioex, pba_memex, pba_pmemex: no extents (see the deviations).
-        pba_ioex: None,
-        pba_memex: None,
-        pba_pmemex: None,
-        pba_busex: None,
+        pba_ioex: sc.sc_ioex.get(),
+        pba_memex: sc.sc_memex.get(),
+        pba_pmemex: sc.sc_memex.get(),
+        pba_busex: sc.sc_busex.get(),
         pba_domain: domain,
         pba_bus: sc.sc_bus.get(),
         pba_bridgetag: None,
@@ -379,16 +437,22 @@ pub fn acpipci_parse_resources(_crsidx: i32, crs: &AcpiResource<'_>, sc: &Acpipc
             if tflags & LR_MEMORY_TTP != 0 {
                 return 0;
             }
-            // extent_free(sc->sc_memex, min, len, EX_WAITOK | EX_CONFLICTOK)
+            if let Some(ex) = sc.sc_memex.get() {
+                let _ = extent_free(ex, min, len, EX_WAITOK | EX_CONFLICTOK);
+            }
         }
         LR_TYPE_IO => {
             if tflags & LR_IO_TTP != 0 {
                 return 0;
             }
-            // extent_free(sc->sc_ioex, min, len, EX_WAITOK | EX_CONFLICTOK)
+            if let Some(ex) = sc.sc_ioex.get() {
+                let _ = extent_free(ex, min, len, EX_WAITOK | EX_CONFLICTOK);
+            }
         }
         LR_TYPE_BUS => {
-            // extent_free(sc->sc_busex, min, len, EX_WAITOK)
+            if let Some(ex) = sc.sc_busex.get() {
+                let _ = extent_free(ex, min, len, EX_WAITOK);
+            }
             // Let _CRS minimum bus number override _BBN.
             sc.sc_bus.set(min as i32);
         }

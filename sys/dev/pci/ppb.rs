@@ -61,13 +61,8 @@
 //! configuration registers.
 //!
 //! ## Deviations
-//! - The extents come down from the host bridge as in C (`pa_*ex`, `pba_*ex`, M16b): on
-//!   amd64 mainbus and acpipci still hand down none (`pci_init_extents` is not ported), so
-//!   there `ppb_alloc_busrange` is never called (a bridge the firmware left without bus
-//!   numbers prints `not configured by system firmware`, as the C does without a bus extent)
-//!   and `ppb_alloc_resources` returns at its `pa_memex == NULL` test; arm64's acpipci and
-//!   pciecam give theirs. The bridge's softc holds the names of its extents (the C `malloc`s
-//!   `PPB_EXNAMLEN` bytes).
+//! - The bridge's softc holds the names of its extents (the C `malloc`s `PPB_EXNAMLEN`
+//!   bytes).
 //! - `sc_ih` holds `Option`s: `None` is a pin `pci_intr_map` could not map, which the C marks
 //!   inside the handle (`pcivar.rs`).
 //! - `ppbattach` writes the interrupt pins into its own copy of the attach arguments; the C

@@ -60,8 +60,8 @@
 //! - `pci_chipset_tag_t` keeps the C's `void *` as `Option<NonNull<c_void>>`; it is always NULL
 //!   on amd64 (`pci_lookup_segment` returns NULL for the only segment it accepts).
 //! - The `pci_intr_line(pc, ih)` macro is a function of the handle.
-//! - The extent pointers (`pciio_ex`, `pcimem_ex`, `pcibus_ex`) and `pci_init_extents` wait
-//!   for `sys/extent.h` (`pci_machdep.rs` reports the call).
+//! - The extent pointers (`pciio_ex`, `pcimem_ex`, `pcibus_ex`) are in `pci_machdep.rs`,
+//!   beside `pci_init_extents`, read through functions of the same names.
 
 use core::ffi::c_void;
 use core::ptr::NonNull;

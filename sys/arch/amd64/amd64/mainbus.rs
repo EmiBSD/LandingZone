@@ -78,8 +78,6 @@
 //!   attach at mainbus too). Since M13 this stand-in runs only without a MADT: `acpimadt0`
 //!   attaches the processors from the table (`acpimadt.rs`). A uniprocessor kernel, or an
 //!   MP kernel that found one processor, attaches the boot CPU alone as `CPU_ROLE_SP`.
-//! - `pci0`'s attach arguments carry no extents (`sys/extent.h` is not ported, so
-//!   `pci_init_extents` is reported and `pciio_ex`, `pcimem_ex`, `pcibus_ex` are NULL).
 //! - `union mainbus_attach_args` has the members that exist (`mba_busname`, `mba_caa`,
 //!   `mba_pba`, `mba_iba`, `mba_eaa`, `mba_bios`, `mba_iaa`); the I/O APICs' `struct apic_attach_args` is handed
 //!   to `config_found` directly by `acpimadt` (`mp_attach_ioapic`); the others come with
@@ -104,7 +102,9 @@ use crate::arch::amd64::include::cpuvar::{CPU_ROLE_SP, CpuAttachArgs};
 use crate::arch::amd64::include::efifbvar::EfifbAttachArgs;
 use crate::arch::amd64::include::i82489reg::LAPIC_BASE;
 use crate::arch::amd64::isa::isa_machdep::ISA_BUS_DMA_TAG;
-use crate::arch::amd64::pci::pci_machdep::{PCI_BUS_DMA_TAG, pci_init_extents};
+use crate::arch::amd64::pci::pci_machdep::{
+    PCI_BUS_DMA_TAG, pci_init_extents, pcibus_ex, pciio_ex, pcimem_ex,
+};
 use crate::dev::ipmi::ipmi_probe;
 use crate::dev::ipmivar::IpmiAttachArgs;
 use crate::dev::isa::isavar::IsabusAttachArgs;
@@ -264,12 +264,10 @@ pub fn mainbus_attach(_parent: Option<&Device>, self_: &Device, _aux: *mut c_voi
                 pba_dmat: &PCI_BUS_DMA_TAG,
                 pba_pc: None,
                 pba_flags: 0,
-                // pba_ioex = pciio_ex, pba_memex = pcimem_ex, pba_busex = pcibus_ex: NULL
-                // (pci_init_extents makes none).
-                pba_ioex: None,
-                pba_memex: None,
+                pba_ioex: pciio_ex(),
+                pba_memex: pcimem_ex(),
                 pba_pmemex: None,
-                pba_busex: None,
+                pba_busex: pcibus_ex(),
                 pba_domain: PCI_NDOMAINS.fetch_add(1, Ordering::Relaxed),
                 pba_bus: 0,
                 pba_bridgetag: None,

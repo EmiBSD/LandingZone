@@ -98,7 +98,10 @@
 //! - ECAM: `pci_mcfg_init` records the window; `pci_mcfg_map_bus` maps it through
 //!   `bus_space_map` and panics as the C does when the map fails; no caller sets a window
 //!   until ACPI's MCFG table is read (`acpimcfg`).
-//! - `pci_init_extents` (extents and `bios_memmap`) is reported. `pci_probe_device_hook`
+//! - `pciio_ex`, `pcimem_ex` and `pcibus_ex` are `AtomicPtr`s, null until
+//!   `pci_init_extents` makes them (read through `pciio_ex()`, `pcimem_ex()`,
+//!   `pcibus_ex()`); under Limine `bios_memmap` is empty, so `pcimem_ex` keeps the RAM below
+//!   4 GB free (`machdep.rs`'s deviations). `pci_probe_device_hook`
 //!   calls acpidmar(4)'s `acpidmar_pci_hook` (M16e), which does nothing unless acpidmar0
 //!   attached (GENERIC has it `disable`d). Since M13
 //!   `pci_dev_postattach`, `pci_min_powerstate` and `pci_set_powerstate_md` take their
@@ -110,7 +113,7 @@
 
 use core::ffi::c_void;
 use core::ptr::{self, NonNull};
-use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering};
 
 use libkern::StaticCell;
 
@@ -121,13 +124,13 @@ use crate::arch::amd64::amd64::bus_dma::{
     _bus_dmamem_mmap, _bus_dmamem_unmap,
 };
 use crate::arch::amd64::amd64::bus_space::{
-    BusSpaceHandle, X86_BUS_SPACE_MEM, X86BusSpace, bus_space_barrier, bus_space_map,
-    bus_space_read_4, bus_space_unmap, bus_space_write_4,
+    _bus_space_map, BusSpaceHandle, X86_BUS_SPACE_MEM, X86BusSpace, bus_space_barrier,
+    bus_space_map, bus_space_read_4, bus_space_unmap, bus_space_write_4,
 };
 use crate::arch::amd64::amd64::i8259::I8259_PIC;
 use crate::arch::amd64::amd64::intr::{intr_disestablish, intr_establish};
 use crate::arch::amd64::amd64::ioapic::{ioapic_edge_stubs_table, ioapic_find};
-use crate::arch::amd64::amd64::machdep::idt_vec_alloc_range;
+use crate::arch::amd64::amd64::machdep::{bios_memmap, idt_vec_alloc_range};
 use crate::arch::amd64::amd64::mainbus::{mp_busses, mp_eisa_bus, mp_isa_bus};
 use crate::arch::amd64::include::bus::BusDmaTag;
 use crate::arch::amd64::include::cpu::CpuInfo;
@@ -143,6 +146,7 @@ use crate::arch::amd64::include::pci_machdep::{
 use crate::arch::amd64::include::pic::{PIC_MSI, Pic};
 use crate::arch::amd64::include::pio::{inl, outl};
 use crate::dev::acpi::acpiprt::acpiprt_route_interrupt;
+use crate::dev::isa::isareg::{IOM_BEGIN, IOM_SIZE};
 use crate::dev::pci::pci::pci_get_capability;
 use crate::dev::pci::pci_map::{pci_mapreg_info, pci_mapreg_type};
 use crate::dev::pci::pcireg::*;
@@ -150,14 +154,16 @@ use crate::dev::pci::pcivar::{PCI_FLAGS_MSI_ENABLED, PciAttachArgs, PcibusAttach
 use crate::dev::pci::ppbreg::ppb_interrupt_swizzle;
 use crate::kassert;
 use crate::kern::kern_lock::{mtx_enter, mtx_leave};
+use crate::kern::subr_extent::{extent_alloc_region, extent_create, extent_free};
 use crate::kern::subr_prf::{panic, printf};
 use crate::machine::bus::{BUS_SPACE_BARRIER_WRITE, BusAddr};
 use crate::machine::intr::IPL_HIGH;
 use crate::machine::pci_machdep::PciIntrStr;
 use crate::sys::device::Device;
 use crate::sys::errno::Errno;
+use crate::sys::extent::{EX_CONFLICTOK, EX_FILLED, EX_NOWAIT, Extent};
+use crate::sys::malloc::M_DEVBUF;
 use crate::sys::mutex::Mutex;
-use crate::unported;
 
 /// `PCI_MODE1_ENABLE`: configuration mechanism #1's enable bit.
 pub const PCI_MODE1_ENABLE: u32 = 0x8000_0000;
@@ -417,9 +423,8 @@ pub fn pci_msix_table_map(
     let bir = PCI_MAPREG_START + bir as i32 * 4;
     let type_ = pci_mapreg_type(pc, tag, bir);
     let (base, _, _) = pci_mapreg_info(pc, tag, bir, type_)?;
-    // _bus_space_map: without extent checking, which bus_space_map does not do yet either.
     // SAFETY: the table lives in the device's own BAR, as its MSI-X capability says.
-    unsafe { bus_space_map(memt, base + offset, tblsz * 16, 0) }
+    unsafe { _bus_space_map(memt, base + offset, tblsz * 16, 0) }
 }
 
 /// `pci_msix_table_unmap`.
@@ -955,10 +960,106 @@ pub unsafe fn pci_intr_disestablish(_pc: PciChipsetTag, cookie: NonNull<Intrhand
     unsafe { intr_disestablish(cookie) }
 }
 
+/// `pciio_ex`: made by `pci_init_extents`.
+static PCIIO_EX: AtomicPtr<Extent> = AtomicPtr::new(ptr::null_mut());
+/// `pcimem_ex`: made by `pci_init_extents`.
+static PCIMEM_EX: AtomicPtr<Extent> = AtomicPtr::new(ptr::null_mut());
+/// `pcibus_ex`: made by `pci_init_extents`.
+static PCIBUS_EX: AtomicPtr<Extent> = AtomicPtr::new(ptr::null_mut());
+
+/// The extent behind one of the pointers below; extents made here are never destroyed.
+fn ex_get(p: &AtomicPtr<Extent>) -> Option<&'static Extent> {
+    // SAFETY: the pointer is null or an `extent_create` result, which lives for ever.
+    unsafe { p.load(Ordering::Acquire).as_ref() }
+}
+
+/// `pciio_ex`: the PCI I/O space, `None` until `pci_init_extents`.
+pub fn pciio_ex() -> Option<&'static Extent> {
+    ex_get(&PCIIO_EX)
+}
+
+/// `pcimem_ex`: the PCI memory space, `None` until `pci_init_extents`.
+pub fn pcimem_ex() -> Option<&'static Extent> {
+    ex_get(&PCIMEM_EX)
+}
+
+/// `pcibus_ex`: the PCI bus numbers, `None` until `pci_init_extents`.
+pub fn pcibus_ex() -> Option<&'static Extent> {
+    ex_get(&PCIBUS_EX)
+}
+
 /// `pci_init_extents`: the extents of the PCI I/O space, memory space (without the BIOS
-/// memory map's RAM and the ISA hole) and bus numbers (see the module's deviations).
+/// memory map's RAM and the ISA hole) and bus numbers, each made once.
 pub fn pci_init_extents() {
-    let _ = unported!("pci_init_extents (subr_extent.c, bios_memmap)");
+    if PCIIO_EX.load(Ordering::Acquire).is_null() {
+        // We only have 64K of addressable I/O space. However, since BARs may contain
+        // garbage, we cover the full 32-bit address space defined by PCI of which we only
+        // make the first 64K available.
+        let Some(ex) = extent_create(
+            b"pciio",
+            0,
+            0xffff_ffff,
+            M_DEVBUF,
+            None,
+            EX_NOWAIT | EX_FILLED,
+        ) else {
+            return;
+        };
+        PCIIO_EX.store(ptr::from_ref(ex).cast_mut(), Ordering::Release);
+        let _ = extent_free(ex, 0, 0x10000, EX_NOWAIT);
+    }
+
+    if PCIMEM_EX.load(Ordering::Acquire).is_null() {
+        // Cover the 36-bit address space addressable by PAE here. As long as vendors continue
+        // to support 32-bit operating systems, we should never see BARs outside that region.
+        //
+        // Dell 13G servers have important devices outside the 36-bit address space. Until we
+        // can extract the address ranges from ACPI, expand the allowed range to suit.
+        let Some(ex) = extent_create(b"pcimem", 0, u64::MAX, M_DEVBUF, None, EX_NOWAIT) else {
+            return;
+        };
+        PCIMEM_EX.store(ptr::from_ref(ex).cast_mut(), Ordering::Release);
+        let _ = extent_alloc_region(ex, 0x400_0000_0000, 0xffff_fc00_0000_0000, EX_NOWAIT);
+
+        for bmp in bios_memmap() {
+            let (addr, bsize) = (bmp.addr, bmp.size);
+
+            // Ignore address space beyond 4G.
+            if addr >= 0x1_0000_0000 {
+                continue;
+            }
+            let mut size = bsize;
+            if addr.wrapping_add(size) >= 0x1_0000_0000 {
+                size = 0x1_0000_0000 - addr;
+            }
+
+            // Ignore zero-sized regions.
+            if size == 0 {
+                continue;
+            }
+
+            if extent_alloc_region(ex, addr, size, EX_NOWAIT).is_err() {
+                printf(format_args!(
+                    "memory map conflict 0x{:x}/0x{:x}\n",
+                    addr, bsize
+                ));
+            }
+        }
+
+        // Take out the video buffer area and BIOS areas.
+        let _ = extent_alloc_region(
+            ex,
+            IOM_BEGIN as u64,
+            IOM_SIZE as u64,
+            EX_CONFLICTOK | EX_NOWAIT,
+        );
+    }
+
+    if PCIBUS_EX.load(Ordering::Acquire).is_null()
+        && let Some(ex) = extent_create(b"pcibus", 0, 0xff, M_DEVBUF, None, EX_NOWAIT)
+    {
+        PCIBUS_EX.store(ptr::from_ref(ex).cast_mut(), Ordering::Release);
+    }
 }
 
 /// `pci_probe_device_hook`: lets the IOMMU (acpidmar(4)) see the device and give it its
