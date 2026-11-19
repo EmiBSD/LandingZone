@@ -310,6 +310,11 @@ impl<T> ListEntry<T> {
         !self.le_prev.get().is_null()
     }
 
+    /// `elm->field.le_next` and `elm->field.le_prev` as addresses, for a debugger's printer.
+    pub fn link_addrs(&self) -> (usize, usize) {
+        (self.le_next.get() as usize, self.le_prev.get() as usize)
+    }
+
     /// `elm->field.le_prev = NULL` after a `LIST_REMOVE`.
     ///
     /// # Safety
@@ -922,6 +927,11 @@ impl<T> TailqEntry<T> {
     /// after every removal ([`clear_prev`](Self::clear_prev)), as pf does with its rules.
     pub fn is_linked(&self) -> bool {
         !self.tqe_prev.get().is_null()
+    }
+
+    /// `TAILQ_NEXT(elm, field)` as an address, for a debugger's printer.
+    pub fn next_addr(&self) -> usize {
+        self.tqe_next.get() as usize
     }
 
     /// `elm->field.tqe_prev = NULL` after a `TAILQ_REMOVE`.

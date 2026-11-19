@@ -97,12 +97,13 @@
 //! - Commands whose code is not ported stay in the tables as visible stubs: they say so,
 //!   report the gap once (`unported!`) and flush the line: the `db_examine.c` ones (`print`,
 //!   `examine`, `search`), breakpoints and watchpoints (`db_break.c`, `db_watch.c`),
-//!   `pprint` and `show struct` (`db_ctf.c`), `hangman` (`db_hangman.c`), `kill`, `stop`,
-//!   `ps`/`show all procs` and `proc_printit` (`kern_proc.c`), the `vfs_subr.c` printers
+//!   `pprint` and `show struct` (`db_ctf.c`), `hangman` (`db_hangman.c`), the `vfs_subr.c`
+//!   printers
 //!   (`show buf`, `vnode`, `mount`,
 //!   `all mounts`, `all vnodes`, `all bufs`), the `uvm` ones (`map`, `object`, `page`,
 //!   `swap`), `extents`, `bcstats`. `show mbuf`, `socket`, `route`, `all routes`, `tdb`,
-//!   `all tdbs`, `uvmexp`, `malloc`, `pool`, `all pools`, `all clockintr`, `callout`, `nfsreq`,
+//!   `all tdbs`, `uvmexp`, `malloc`, `pool`, `all pools`, `all clockintr`, `callout`, `proc`,
+//!   `ps`/`all procs`, `kill`, `stop`, `nfsreq`,
 //!   `nfsnode`, `all nfsreqs` and `all nfsnodes` call the ported printers. `WITNESS` is not configured: its commands are
 //!   left out, as the C's `#ifdef` does.
 //! - `db_access.c`, `db_sym.c` and `db_examine.c` are not ported: [`db_get_value`],
@@ -135,7 +136,7 @@ use crate::ddb::db_variables::{DB_MAXOFF, db_read_variable, db_set_cmd};
 use crate::kern::init_main::PROC0;
 use crate::kern::kern_clockintr::db_show_all_clockintr;
 use crate::kern::kern_malloc::malloc_printit;
-use crate::kern::kern_proc::tfind;
+use crate::kern::kern_proc::{db_kill_cmd, db_show_all_procs, db_stop_cmd, proc_printit, tfind};
 use crate::kern::kern_timeout::db_show_callout;
 use crate::kern::kern_xxx::reboot;
 use crate::kern::subr_log::msgbufp;
@@ -158,6 +159,7 @@ use crate::nfs::nfs_debug::{
 use crate::sys::mbuf::Mbuf;
 use crate::sys::msgbuf::MSG_MAGIC;
 use crate::sys::pool::Pool;
+use crate::sys::proc::Proc;
 use crate::sys::reboot::{
     RB_AUTOBOOT, RB_DUMP, RB_HALT, RB_NOSYNC, RB_POWERDOWN, RB_RESET, RB_TIMEBAD, RB_USERREQ,
 };
@@ -639,7 +641,12 @@ fn db_proc_print_cmd(addr: DbExpr, have_addr: bool, _count: DbExpr, modif: &[u8]
         }
     }
 
-    db_stub!("proc_printit (kern_proc.c)")
+    // SAFETY: the user named a thread (db_addr_as).
+    let p: Option<&Proc> = unsafe { db_addr_as(addr) };
+    if let Some(p) = p {
+        proc_printit(p, modif, db_pr);
+    }
+    Ok(())
 }
 
 /// `db_tdb_print_cmd`: `show tdb[/f] addr`.
@@ -662,11 +669,6 @@ fn db_uvmexp_print_cmd(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]
 /// `db_bcstats_print_cmd`: `show bcstats`.
 fn db_bcstats_print_cmd(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
     db_stub!("bcstats_print (vfs_bio.c)")
-}
-
-/// `db_show_all_procs` (`kern_proc.c`): `ps[/anowt]`, `show all procs`.
-pub fn db_show_all_procs(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
-    db_stub!("db_show_all_procs (kern_proc.c)")
 }
 
 /// `db_listbreak_cmd` (`db_break.c`): `show breaks`.
@@ -741,16 +743,6 @@ const DB_BOOT_CMDS: &[DbCommand] = &[
     DbCommand::new("reboot", Some(db_boot_reboot_cmd), 0, None),
     DbCommand::new("poweroff", Some(db_boot_poweroff_cmd), 0, None),
 ];
-
-/// `db_kill_cmd` (`kern_proc.c`): `kill pid`.
-fn db_kill_cmd(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
-    db_stub!("db_kill_cmd (kern_proc.c)")
-}
-
-/// `db_stop_cmd` (`kern_proc.c`): `stop pid`.
-fn db_stop_cmd(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
-    db_stub!("db_stop_cmd (kern_proc.c)")
-}
 
 /// `db_print_cmd` (`db_examine.c`): `print[/axzodurc] expr`.
 fn db_print_cmd(_addr: DbExpr, _have: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {

@@ -172,6 +172,23 @@ impl fmt::Display for Str<'_> {
     }
 }
 
+/// `%#x`: `0` for zero, `0x` and the hexadecimal digits otherwise (the `#` flag adds no
+/// prefix to a zero, where Rust's `{:#x}` prints `0x0`). A width and an alignment apply to
+/// the whole, as in `{:>10}` for `%#10x`.
+pub struct AltHex(pub u64);
+
+impl fmt::Display for AltHex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.0 == 0 {
+            return f.pad("0");
+        }
+        // "0x", at most sixteen digits and snprintf's NUL.
+        let mut buf = [0u8; 19];
+        let l = snprintf(&mut buf, format_args!("{:#x}", self.0));
+        f.pad(core::str::from_utf8(&buf[..l.min(buf.len() - 1)]).unwrap_or("?"))
+    }
+}
+
 /// `%b`: a value followed by the set bits' names, from a descriptor string of the form
 /// `"\x10\x01FLAG1\x02FLAG2..."`: the first byte is the base (8, 10 or 16) the value is printed
 /// in, then each bit's number (either a byte below `' '`, counted from 1, or a byte with the
@@ -798,6 +815,16 @@ mod tests {
             "unknown base prints nothing"
         );
         assert_eq!(Bitmask(0x7, b"").to_string(), "");
+    }
+
+    #[test]
+    fn alt_hex_has_no_prefix_on_zero_and_pads_the_whole() {
+        assert_eq!(AltHex(0).to_string(), "0");
+        assert_eq!(AltHex(0x2a).to_string(), "0x2a");
+        assert_eq!(format!("{:>10}|", AltHex(0)), "         0|");
+        assert_eq!(format!("{:>10}|", AltHex(0x1000_0202)), "0x10000202|");
+        assert_eq!(format!("{:<6}|", AltHex(0xf)), "0xf   |");
+        assert_eq!(AltHex(u64::MAX).to_string(), "0xffffffffffffffff");
     }
 
     #[test]

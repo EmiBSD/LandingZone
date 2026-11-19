@@ -52,12 +52,12 @@
 //!
 //! Upstream: sys/kern/kern_proc.c @ 3ce1f3f79392
 //!
-//! Status: `wip`. Milestone M5 ports the lists, the hash tables and the pools (`procinit`),
+//! Status: `ported`. Milestone M5 ports the lists, the hash tables and the pools (`procinit`),
 //! `uid_find`/`uid_release`/`chgproccnt`, `inferior`, `tfind`, `tfind_user`, `prfind`,
 //! `pgfind` and `zombiefind`; the tty layer (M8) brings the process group management
 //! (`enternewpgrp`, `enterthispgrp`, `leavepgrp`, `pgdelete`, `zapverauth`, `fixjobc`,
-//! `killjobc`, `orphanpg`). `proc_printit` and the `ddb` commands come with the real ddb;
-//! `pgrpdump` is `DEBUG`.
+//! `killjobc`, `orphanpg`); TD1 `proc_printit` and the ddb commands (`db_kill_cmd`,
+//! `db_stop_cmd`, `db_show_all_procs`). `pgrpdump` is `DEBUG`, which is not configured.
 //!
 //! ## Deviations
 //! - `enternewpgrp` takes the raw `pgrp_pool`/`session_pool` items its callers got (the C
@@ -76,29 +76,33 @@ use core::ptr::{self, NonNull};
 use libkern::StaticCell;
 
 use crate::conf::param::{MAXPROCESS, MAXTHREAD};
+use crate::ddb::db_command::DbResult;
 use crate::kern::kern_lock::{mtx_enter, mtx_leave};
 use crate::kern::kern_malloc::{free, malloc};
 use crate::kern::kern_rwlock::{rw_enter_write, rw_exit_write, rw_init};
-use crate::kern::kern_sig::{pgsignal, prsignal, sigio_freelist};
+use crate::kern::kern_sig::{pgsignal, prsignal, sigabort, sigio_freelist};
 use crate::kern::kern_subr::hashinit;
 use crate::kern::kern_timeout::timeout_set;
 use crate::kern::subr_pool::{pool_init, pool_put};
-use crate::kern::subr_prf::panic;
+use crate::kern::subr_prf::{AltHex, Bitmask, Str, db_printf, panic, snprintf};
 use crate::kern::tty::ttywait;
 use crate::kern::vfs_subr::vrele;
 use crate::kern::vfs_vops::VOP_REVOKE;
+use crate::machine::Machine;
+use crate::machine::cpu::{Cpu, CpuInfo, curproc};
+use crate::machine::db_machdep::{DbExpr, PrFn};
 use crate::machine::intr::{IPL_MPFLOOR, IPL_NONE};
 use crate::sys::malloc::{M_NOWAIT, M_PROC, M_WAITOK, M_ZERO};
 use crate::sys::pool::{PR_WAITOK, Pool};
 use crate::sys::proc::{
-    PS_CONTROLT, PS_STOPPED, PS_ZOMBIE, Pgrp, PgrpHash, Proc, ProcHash, ProcList, Process,
-    ProcessHash, ProcessList, ProcessPglist, Session, THREAD_PID_OFFSET, Uidinfo, UidinfoHash,
-    sess_leader, sessrele,
+    P_BITS, PS_BITS, PS_CONTROLT, PS_STOPPED, PS_ZOMBIE, Pgrp, PgrpHash, Proc, ProcHash, ProcList,
+    Process, ProcessHash, ProcessList, ProcessPglist, SONPROC, Session, THREAD_PID_OFFSET,
+    TU_ITICKS, TU_STICKS, TU_UTICKS, Uidinfo, UidinfoHash, sess_leader, sessrele,
 };
 use crate::sys::queue::ListHead;
 use crate::sys::resource::Rusage;
 use crate::sys::rwlock::Rwlock;
-use crate::sys::signal::{SIGCONT, SIGHUP};
+use crate::sys::signal::{SIGCONT, SIGHUP, SIGSTOP};
 use crate::sys::types::{Pid, Uid};
 use crate::sys::ucred::Ucred;
 use crate::sys::vnode::REVOKEALL;
@@ -626,4 +630,337 @@ fn orphanpg(pg: &Pgrp) {
 }
 
 // proc_printit, db_kill_cmd, db_stop_cmd, db_show_all_procs: the real ddb. pgrpdump: DEBUG.
+/// `proc_printit(p, modif, pr)` (`DDB`): `show proc`: what a thread is and does.
+pub fn proc_printit(p: &Proc, _modif: &[u8], pr: PrFn) {
+    const PSTAT: [&str; 7] = ["idle", "run", "sleep", "stop", "zombie", "dead", "onproc"];
+    let mut pstbuf = [0u8; 5];
+
+    let stat = p.p_stat.get();
+    let pst = if stat < 1 || usize::from(stat) > PSTAT.len() {
+        let l = snprintf(&mut pstbuf, format_args!("{}", stat));
+        core::str::from_utf8(&pstbuf[..l.min(4)]).unwrap_or("?")
+    } else {
+        PSTAT[usize::from(stat) - 1]
+    };
+    let ps = p.process();
+
+    pr(format_args!(
+        "PROC ({}) tid={} pid={} tcnt={} stat={}\n",
+        Str(ps.comm()),
+        p.p_tid.get(),
+        ps.ps_pid.get(),
+        ps.ps_threadcnt.get(),
+        pst
+    ));
+    pr(format_args!(
+        "    flags process={} proc={}\n",
+        Bitmask(u64::from(ps.ps_flags.load(Ordering::Relaxed)), PS_BITS),
+        Bitmask(u64::from(p.p_flag.load(Ordering::Relaxed) as u32), P_BITS)
+    ));
+    pr(format_args!(
+        "    runpri={}, usrpri={}, slppri={}, nice={}\n",
+        p.p_runpri.get(),
+        p.p_usrpri.get(),
+        p.p_slppri.get(),
+        ps.ps_nice.get()
+    ));
+    pr(format_args!(
+        "    wchan={:p}, wmesg={}, ps_single={:p} scnt={} ecnt={}\n",
+        p.p_wchan.get(),
+        if p.p_wchan.get().is_null() {
+            ""
+        } else {
+            p.p_wmesg.get().unwrap_or("")
+        },
+        ps.ps_single.get(),
+        ps.ps_suspendcnt.get(),
+        ps.ps_exitcnt.get()
+    ));
+    let (le_next, le_prev) = p.p_list.link_addrs();
+    pr(format_args!(
+        "    forw={:#x}, list={:#x},{:#x}\n",
+        p.p_runq.next_addr(),
+        le_next,
+        le_prev
+    ));
+    pr(format_args!(
+        "    process={:p} user={:p}, vmspace={:p}\n",
+        ps,
+        p.p_addr.get(),
+        p.p_vmspace.get()
+    ));
+    let pctcpu = p.p_pctcpu.load(Ordering::Relaxed);
+    pr(format_args!(
+        "    estcpu={}, cpticks={}, pctcpu={}.{}, user={}, sys={}, intr={}\n",
+        p.p_estcpu.get(),
+        p.p_cpticks.get(),
+        pctcpu / 100,
+        pctcpu % 100,
+        p.p_tu.tu_ticks[TU_UTICKS].get(),
+        p.p_tu.tu_ticks[TU_STICKS].get(),
+        p.p_tu.tu_ticks[TU_ITICKS].get()
+    ));
+}
+
+/// `db_kill_cmd` (`DDB`): `kill pid`: the process gets an uncatchable `SIGABRT`, for a
+/// core dump.
+pub fn db_kill_cmd(addr: DbExpr, _have_addr: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
+    let Some(pr) = prfind(addr as Pid) else {
+        db_printf(format_args!("{}: No such process", addr));
+        return Ok(());
+    };
+
+    // Send uncatchable SIGABRT for coredump
+    if let Some(p) = pr.ps_threads.first() {
+        sigabort(p);
+    }
+    Ok(())
+}
+
+/// `db_stop_cmd` (`DDB`): `stop pid`: the process gets an uncatchable `SIGSTOP`.
+pub fn db_stop_cmd(addr: DbExpr, _have_addr: bool, _count: DbExpr, _modif: &[u8]) -> DbResult {
+    let Some(pr) = prfind(addr as Pid) else {
+        db_printf(format_args!("{}: No such process", addr));
+        return Ok(());
+    };
+
+    // Send uncatchable SIGSTOP
+    prsignal(pr, SIGSTOP);
+    Ok(())
+}
+
+/// `db_show_all_procs` (`DDB`): `ps` and `show all procs`, in one of four layouts: `/n` the
+/// normal one, `/a` addresses, `/w` what each thread waits for, `/o` the threads on a CPU
+/// that are not its idle thread.
+pub fn db_show_all_procs(_addr: DbExpr, _haddr: bool, _count: DbExpr, modif: &[u8]) -> DbResult {
+    // default == normal mode
+    let mode = modif.first().copied().filter(|c| *c != 0).unwrap_or(b'n');
+    if !b"awno".contains(&mode) {
+        db_printf(format_args!("usage: show all procs [/a] [/n] [/w]\n"));
+        db_printf(format_args!("\t/a == show process address info\n"));
+        db_printf(format_args!("\t/n == show normal process info [default]\n"));
+        db_printf(format_args!("\t/w == show process pgrp/wait info\n"));
+        db_printf(format_args!(
+            "\t/o == show normal info for non-idle SONPROC\n"
+        ));
+        return Ok(());
+    }
+
+    let mut skipzomb = false;
+    match mode {
+        b'a' => {
+            db_printf(format_args!(
+                "    TID  {:<9}  {:>18}  {:>18}  {:>18}\n",
+                "COMMAND", "STRUCT PROC *", "UAREA *", "VMSPACE/VM_MAP"
+            ));
+        }
+        b'n' => {
+            db_printf(format_args!(
+                "   PID  {:>6}  {:>5} {:>5}  S  {:>10} {:>10} {:<9} {:<15}\n",
+                "TID", "PPID", "UID", "PRLAGS", "PFLAGS", "WAIT", "COMMAND"
+            ));
+        }
+        b'w' => {
+            db_printf(format_args!(
+                "    TID  {:<15}  {:<5}  {:>18}  {}\n",
+                "COMMAND", "PGRP", "WAIT-CHANNEL", "WAIT-MSG"
+            ));
+        }
+        _ => {
+            skipzomb = true;
+            db_printf(format_args!(
+                "    TID  {:>5}  {:>5}  {:>10} {:>10}  {:>3}  {:<30}\n",
+                "PID", "UID", "PRFLAGS", "PFLAGS", "CPU", "COMMAND"
+            ));
+        }
+    }
+
+    let cur = curproc().map_or(ptr::null(), ptr::from_ref);
+    let mut pr = ALLPROCESS.0.first();
+    while let Some(ps) = pr {
+        // SAFETY: a process's parent, when it has one, outlives it.
+        let ppr = unsafe { ps.ps_pptr.get().as_ref() };
+        // SAFETY: a live process's credentials are valid.
+        let ruid = unsafe { ps.ps_ucred.get().as_ref() }.map_or(0, |c| c.cr_ruid.get()) as i32;
+        let flags = ps.ps_flags.load(Ordering::Relaxed);
+        // The name as a string, so that the columns' widths apply.
+        let comm = ps.comm();
+        let comm = &comm[..comm.iter().position(|b| *b == 0).unwrap_or(comm.len())];
+        let comm = core::str::from_utf8(comm).unwrap_or("?");
+
+        for p in ps.ps_threads.iter() {
+            // SAFETY: `p_cpu` is null or one of the static `cpu_info`s.
+            let ci = unsafe { p.p_cpu.get().as_ref() };
+            let has_kernel_lock = ci.is_some_and(db_has_kernel_lock);
+            let stat = p.p_stat.get();
+            if stat == 0 {
+                continue;
+            }
+            if mode == b'o' {
+                if stat != SONPROC {
+                    continue;
+                }
+                if ci.is_some_and(|ci| ptr::eq(Machine::ci_schedstate(ci).spc_idleproc.get(), p)) {
+                    continue;
+                }
+            }
+
+            let star = if ptr::eq(p, cur) { '*' } else { ' ' };
+            if mode == b'n' {
+                db_printf(format_args!("{}{:>5}  ", star, ps.ps_pid.get()));
+            } else {
+                db_printf(format_args!("{}{:>6}  ", star, p.p_tid.get()));
+            }
+
+            // `%#10x` of an int: its bits.
+            let pflag = p.p_flag.load(Ordering::Relaxed) as u32;
+            let wmesg = if p.p_wchan.get().is_null() {
+                ""
+            } else {
+                p.p_wmesg.get().unwrap_or("")
+            };
+            match mode {
+                b'a' => {
+                    db_printf(format_args!(
+                        "{:<9.9}  {:>18p}  {:>18p}  {:>18p}\n",
+                        comm,
+                        p,
+                        p.p_addr.get(),
+                        p.p_vmspace.get()
+                    ));
+                }
+                b'n' => {
+                    db_printf(format_args!(
+                        "{:>6}  {:>5} {:>5}  {}  {:>10} {:>10} {:<9.9} {:<15}\n",
+                        p.p_tid.get(),
+                        ppr.map_or(-1, |ppr| ppr.ps_pid.get()),
+                        ruid,
+                        stat,
+                        AltHex(u64::from(flags)),
+                        AltHex(u64::from(pflag)),
+                        wmesg,
+                        comm
+                    ));
+                }
+                b'w' => {
+                    // SAFETY: a process's group, when it has one, outlives its membership.
+                    let pgid = unsafe { ps.ps_pgrp.get().as_ref() }.map_or(-1, |pg| pg.pg_id.get());
+                    db_printf(format_args!(
+                        "{:<15}  {:<5}  {:>18p}  {}\n",
+                        comm,
+                        pgid,
+                        p.p_wchan.get(),
+                        wmesg
+                    ));
+                }
+                _ => {
+                    db_printf(format_args!(
+                        "{:>5}  {:>5}  {:>10} {:>10}  {:>3}{} {:<31}\n",
+                        ps.ps_pid.get(),
+                        ruid,
+                        AltHex(u64::from(flags)),
+                        AltHex(u64::from(pflag)),
+                        ci.map_or(0, Machine::cpu_info_unit),
+                        if has_kernel_lock { 'K' } else { ' ' },
+                        comm
+                    ));
+                }
+            }
+        }
+        pr = ListHead::<ProcessList>::next(ps);
+        if pr.is_none() && !skipzomb {
+            skipzomb = true;
+            pr = ZOMBPROCESS.0.first();
+        }
+    }
+    Ok(())
+}
+
+/// Whether the CPU `ci` holds the kernel lock (`MULTIPROCESSOR`; never without it).
+fn db_has_kernel_lock(ci: &CpuInfo) -> bool {
+    #[cfg(feature = "multiprocessor")]
+    {
+        crate::kern::kern_lock::__mp_lock_held(&crate::kern::kern_lock::KERNEL_LOCK, ci)
+    }
+    #[cfg(not(feature = "multiprocessor"))]
+    {
+        let _ = ci;
+        false
+    }
+}
 /* </CODE> */
+
+/* <TESTS> */
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sys::proc::{P_SYSTEM, PS_EXEC, SSLEEP};
+    use std::format;
+
+    std::thread_local! {
+        /// What `proc_printit` printed through `print_collect`.
+        static PRINTED: core::cell::RefCell<std::string::String> =
+            const { core::cell::RefCell::new(std::string::String::new()) };
+    }
+
+    fn print_collect(args: core::fmt::Arguments<'_>) {
+        use std::fmt::Write;
+        PRINTED.with(|p| {
+            let _ = p.borrow_mut().write_fmt(args);
+        });
+    }
+
+    #[test]
+    fn proc_printit_names_the_state_the_flags_and_the_wait() {
+        let pr: &'static Process = std::boxed::Box::leak(std::boxed::Box::new(Process::new()));
+        let p: &'static Proc = std::boxed::Box::leak(std::boxed::Box::new(Proc::new()));
+        p.p_p.set(pr);
+        pr.set_comm(b"sleeper");
+        pr.ps_pid.set(42);
+        pr.ps_threadcnt.set(1);
+        pr.ps_flags.store(PS_EXEC, Ordering::Relaxed);
+        p.p_tid.set(42 + THREAD_PID_OFFSET);
+        p.p_flag.store(P_SYSTEM, Ordering::Relaxed);
+        p.p_stat.set(SSLEEP);
+        p.p_pctcpu.store(1234, Ordering::Relaxed);
+
+        let printed = || {
+            PRINTED.with(|s| s.borrow_mut().clear());
+            proc_printit(p, b"", print_collect);
+            PRINTED.with(|s| s.borrow().clone())
+        };
+
+        // Not asleep on a channel: the message is not shown even if one is left over.
+        p.p_wmesg.set(Some("stale"));
+        let out = printed();
+        let mut lines = out.lines();
+        assert_eq!(
+            lines.next(),
+            Some(&*format!(
+                "PROC (sleeper) tid={} pid=42 tcnt=1 stat=sleep",
+                42 + THREAD_PID_OFFSET
+            ))
+        );
+        assert_eq!(
+            lines.next(),
+            Some("    flags process=2<EXEC> proc=200<SYSTEM>")
+        );
+        assert!(out.contains("\n    wchan=0x0, wmesg=, ps_single=0x0 scnt=0 ecnt=0\n"));
+        assert!(out.contains("\n    forw=0x0, list=0x0,0x0\n"));
+        assert!(out.contains(", pctcpu=12.34, user=0, sys=0, intr=0\n"));
+        assert_eq!(out.lines().count(), 7);
+
+        // Asleep on a channel.
+        let chan = 0x1000usize as *const c_void;
+        p.p_wchan.set(chan);
+        p.p_wmesg.set(Some("pause"));
+        assert!(printed().contains("\n    wchan=0x1000, wmesg=pause, ps_single="));
+
+        // A state outside the table is printed as its number.
+        p.p_stat.set(9);
+        assert!(printed().contains(" tcnt=1 stat=9\n"));
+        p.p_stat.set(0);
+        assert!(printed().contains(" tcnt=1 stat=0\n"));
+    }
+}
+/* </TESTS> */

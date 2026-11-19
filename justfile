@@ -2380,8 +2380,10 @@ smoke-mp: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feature
 # asked to switch to itself says `Invalid cpu` and stays) then `machine ddbcpu 1` always ends
 # in a switch to CPU 1, where `machine cpuinfo` shows the others stopped. After `continue` a
 # second trigger, `ddbcpu <last>` (3 or 1), `ddbcpu 0` and `cpuinfo` show CPU 1 stopped again
-# (it resumed and took the new IPI), and after the second `continue` the shell answers. Needs
-# `just userland`. Part of `smoke`.
+# (it resumed and took the new IPI), and after the second `continue` the shell answers. TD1:
+# on CPU 1 `ps` lists every thread (`init` and `swapper` are checked, with their flags and
+# what they wait for), `show all procs /o` the ones on a CPU, and `show proc` the current
+# one. Needs `just userland`. Part of `smoke`.
 smoke-ddbmp: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--features qemu,multiprocessor") build-init-amd64 build-init-arm64
     @{{ramdisks}} || \
         { echo "smoke-ddbmp: no ramdisk image; run just userland first"; exit 1; }
@@ -2394,6 +2396,10 @@ smoke-ddbmp: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feat
         --send-after "ddb{" --send 'machine ddbcpu {{ddbmp_via1}}\n' \
         --send-after "{{ddbmp_via1_prompt}}" --send 'machine ddbcpu 1\n' \
         --send-after "ddb{1}> " --send 'machine cpuinfo\n' \
+        --send-after "ddb{1}> " --send 'set $lines = 0\n' \
+        --send-after "ddb{1}> " --send 'ps\n' \
+        --send-after "ddb{1}> " --send 'show all procs /o\n' \
+        --send-after "ddb{1}> " --send 'show proc\n' \
         --send-after "ddb{1}> " --send 'continue\n' \
         --send-after "# " --send 'sysctl ddb.trigger=1\n' \
         --send-after "ddb{" --send 'machine ddbcpu {{aps}}\n' \
@@ -2404,6 +2410,11 @@ smoke-ddbmp: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feat
         --expect "bsd: {{ncpu}} processors" --expect "Stopped at" \
         --expect "    0: stopped" --expect "*   1: ddb" {{ddbmp_others}} \
         --expect "*   0: ddb" --expect "    1: stopped" \
+        --expect "PID     TID   PPID   UID  S      PRLAGS     PFLAGS WAIT      COMMAND" \
+        --expect "0x2       0x80 wait      init" \
+        --expect "0x10000      0x200 scheduler swapper" \
+        --expect "PID    UID     PRFLAGS     PFLAGS  CPU  COMMAND" \
+        --expect " stat=onproc" --expect "    flags process=" \
         --expect "cpus-4-resumed"
     {{xtask}} smoke {{reject}} {{smp}} --arch arm64 --kernel target/{{arm64}}/debug/bsd --cmdline "-ds" \
         --expect-ramdisk --until-seen \
@@ -2414,6 +2425,10 @@ smoke-ddbmp: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feat
         --send-after "ddb{" --send 'machine ddbcpu {{ddbmp_via1}}\n' \
         --send-after "{{ddbmp_via1_prompt}}" --send 'machine ddbcpu 1\n' \
         --send-after "ddb{1}> " --send 'machine cpuinfo\n' \
+        --send-after "ddb{1}> " --send 'set $lines = 0\n' \
+        --send-after "ddb{1}> " --send 'ps\n' \
+        --send-after "ddb{1}> " --send 'show all procs /o\n' \
+        --send-after "ddb{1}> " --send 'show proc\n' \
         --send-after "ddb{1}> " --send 'continue\n' \
         --send-after "# " --send 'sysctl ddb.trigger=1\n' \
         --send-after "ddb{" --send 'machine ddbcpu {{aps}}\n' \
@@ -2424,6 +2439,11 @@ smoke-ddbmp: (build-amd64 "--features qemu,multiprocessor") (build-arm64 "--feat
         --expect "bsd: {{ncpu}} processors" --expect "Stopped at" \
         --expect "    0: stopped" --expect "*   1: ddb" {{ddbmp_others}} \
         --expect "*   0: ddb" --expect "    1: stopped" \
+        --expect "PID     TID   PPID   UID  S      PRLAGS     PFLAGS WAIT      COMMAND" \
+        --expect "0x2       0x80 wait      init" \
+        --expect "0x10000      0x200 scheduler swapper" \
+        --expect "PID    UID     PRFLAGS     PFLAGS  CPU  COMMAND" \
+        --expect " stat=onproc" --expect "    flags process=" \
         --expect "cpus-4-resumed"
 
 # `smoke-ddbmp`'s CPU-count dependent parts: the CPU the first trigger goes through on its way

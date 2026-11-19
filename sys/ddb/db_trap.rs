@@ -57,16 +57,16 @@
 //!
 //! ## Deviations
 //! - `db_print_loc_and_inst` (`db_examine.c`, the symbol table and the disassembler) prints
-//!   the address (`db_command.rs`'s stand-in). `db_show_all_procs(0, 0, 0, "o")`, which lists
-//!   the threads on a CPU after a panic, is `kern_proc.c`'s and a visible stub.
+//!   the address (`db_command.rs`'s stand-in).
 //! - The "ddb.html" notice, which asks for an OpenBSD bug report, is not printed by this
 //!   kernel; `ddb_msg_shown` is still set, so the thread list prints once.
 
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::ddb::db_command::{DB_DOT, db_command_loop, db_print_loc_and_inst, db_show_all_procs};
+use crate::ddb::db_command::{DB_DOT, db_command_loop, db_print_loc_and_inst};
 use crate::ddb::db_output::db_print_position;
 use crate::ddb::db_run::{DB_INST_COUNT, db_restart_at_pc, db_stop_at_pc};
+use crate::kern::kern_proc::db_show_all_procs;
 use crate::kern::subr_prf::{db_printf, panicstr};
 use crate::machine::db_machdep::{
     db_stack_trace_print, is_breakpoint_trap, is_watchpoint_trap, pc_regs,
