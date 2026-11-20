@@ -1849,7 +1849,7 @@ status = "ported"
 upstream_commit = "3ce1f3f79392ae4d60ce67bea5835d517caaa2ca"
 upstream_blob = "33720d5148b41a5a76eb52990d55e63d06bd1b31"
 deps = ["sys/arch/amd64/include/i8259.h", "sys/arch/amd64/include/pic.h", "sys/dev/isa/isareg.h"]
-notes = "i8259_imen (AtomicU32 under its C name: vector.S reads its bytes), i8259_pic, i8259_default_setup, i8259_hwmask/hwunmask, i8259_reinit_irqs, i8259_setup; i8259_stubs_table wraps vector.S's table; M10f integration: deviation: the add-route hook i8259_addroute sets the ELCR (0x4d0/0x4d1) level bit for IST_LEVEL pins (not 0,1,2,8,13) before i8259_setup: OpenBSD/amd64 routes PCI INTx through the I/O APIC (ioapic.c not ported) and OVMF leaves the ELCR edge, so a completion on a shared line (vioblk1+vioblk2 on IRQ 10) was lost and the disk hung; TODO(M13) with the I/O APIC"
+notes = "i8259_imen (AtomicU32 under its C name: vector.S reads its bytes), i8259_pic, i8259_default_setup, i8259_hwmask/hwunmask, i8259_reinit_irqs, i8259_setup; i8259_stubs_table wraps vector.S's table; M10f integration had an add-route hook that set the ELCR level bit for PCI pins, while PCI INTx went through the 8259; TD1 (2026-11-19): ioapic.c routes PCI INTx through the I/O APIC, as the C, so the hook is the C's i8259_setup again; TODO(M13) with the I/O APIC"
 
 [[file]]
 c = "sys/arch/amd64/amd64/intr.c"
