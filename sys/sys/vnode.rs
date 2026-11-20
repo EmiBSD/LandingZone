@@ -92,7 +92,8 @@
 //! - `IFTOVT`, `VTTOIF` and `MAKEIMODE` are functions over the tables `vfs_subr.rs` defines.
 //! - The macro `VN_KNOTE` is the function [`VN_KNOTE`]; the prototypes are their functions
 //!   in `vfs_subr.rs`, `vfs_vnops.rs`, `vfs_default.rs`, `vfs_getcwd.rs` and
-//!   `vfs_syscalls.rs`; `vfs_sync.c`'s and the uvm ones are not ported (stage 2).
+//!   `vfs_syscalls.rs`, `vfs_sync.c`'s in `vfs_sync.rs` and the uvm ones in
+//!   `uvm/uvm_vnode.rs`.
 
 use core::cell::Cell;
 use core::ffi::c_void;
