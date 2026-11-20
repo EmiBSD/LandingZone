@@ -131,7 +131,10 @@
 //!   highest usable region (M16a: the ISA DMA tag reads it).
 //! - `cpu_startup` prints the memory sizes and fills the boot CPU's TSS (`cpu_enter_pages`):
 //!   `version` (generated `vers.c`, M5-b), the exec and physio maps and `bufinit` are;
-//!   `cpu_init_extents` and `cpu_boot_mode` (M4-b) are not there yet.
+//!   `cpu_boot_mode` (M4-b) is not there yet.
+//! - `cpu_init_extents` claims the RAM from `iomem_ex` as runs of the bootloader's memory map
+//!   (usable memory, the kernel and modules, the bootloader's reclaimable data), adjacent
+//!   regions merged, the C's `mem_clusters[]`; it is called from `init_x86_64` only.
 //! - The IDT is a static page (`IDT`) instead of the early page `locore0.S` reserves and the
 //!   page `init_x86_64` maps at `idt_vaddr`; `idt_allocmap` is an array of atomics.
 //!   `cpu_init_msrs` and the `cpu_info_full_primary` initialiser are the first lines of
@@ -189,6 +192,7 @@ use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicUsize, Ordering
 use libkern::StaticCell;
 
 use crate::arch::amd64::amd64::autoconf::COLD;
+use crate::arch::amd64::amd64::bus_space::{iomem_ex, x86_bus_space_init, x86_bus_space_mallocok};
 use crate::arch::amd64::amd64::consinit::consinit;
 use crate::arch::amd64::amd64::cpu::{
     CPU_EBXFEATURE, CPU_ECXFEATURE, CPU_FEATURE, CPU_ID, CPU_INFO_FULL_PRIMARY, CPU_SEV_GUESTMODE,
@@ -255,6 +259,7 @@ use crate::kern::kern_sysctl::{
     sysctl_bounded_arr, sysctl_int, sysctl_rdint, sysctl_rdquad, sysctl_rdstring, sysctl_rdstruct,
     sysctl_securelevel_int,
 };
+use crate::kern::subr_extent::extent_alloc_region;
 use crate::kern::subr_log::init_static_msgbuf;
 use crate::kern::subr_prf::DB_CONSOLE;
 use crate::kern::subr_prf::splassert_fail;
@@ -270,6 +275,7 @@ use crate::machine::db_machdep::{db_enter, db_machine_init};
 use crate::machine::{Cpu, Machine};
 use crate::sys::errno::Errno;
 use crate::sys::exec::{ExecPackage, PsStrings};
+use crate::sys::extent::EX_NOWAIT;
 use crate::sys::param::{NCARGS, NODEV, roundup};
 use crate::sys::proc::Proc;
 use crate::sys::reboot::{
@@ -547,6 +553,8 @@ pub unsafe fn init_x86_64(boot: &BootInfo) -> Result<(), &'static str> {
     // SAFETY: written just above, read on the same CPU.
     cpu_set_vendor(ci, level, unsafe { CPU_VENDOR.get() });
 
+    x86_bus_space_init();
+
     // The direct map is the bootloader's (see the module's deviations); the C derives
     // pmap_direct_base from L4_SLOT_DIRECT here.
     let regions = boot.memmap.regions();
@@ -595,6 +603,8 @@ pub unsafe fn init_x86_64(boot: &BootInfo) -> Result<(), &'static str> {
         };
         AVAIL_START.store(next.as_usize(), Ordering::Relaxed);
     }
+
+    cpu_init_extents(regions);
 
     // Now, load the memory clusters (which have already been flensed) into the VM system.
     for r in regions.iter().filter(|r| r.kind == MemKind::Usable) {
@@ -1386,8 +1396,6 @@ pub fn cpu_startup() {
     );
     PHYS_MAP.store(ptr::from_ref(phys_map).cast_mut(), Ordering::Release);
 
-    // cpu_init_extents: with the extents.
-
     let free = UVMEXP.free.load(Ordering::Relaxed).max(0) as usize;
     kprintf!(
         "avail mem = {} ({}MB)\n",
@@ -1408,6 +1416,9 @@ pub fn cpu_startup() {
         kprintf!("kernel does not support -c; continuing..\n");
     }
 
+    // Safe for i/o port / memory space allocation to use malloc now.
+    x86_bus_space_mallocok();
+
     // cpu_boot_mode, the ISA DMA bounce pages, the microcode and TSX setup,
     // enter_shared_special_pages (the u-k maps): M4-b and M6.
 
@@ -1415,6 +1426,54 @@ pub fn cpu_startup() {
     // SAFETY: once, on the boot CPU, for its own pages (the TSS is loaded; the CPU reads it
     // on the next privilege or stack switch).
     unsafe { cpu_enter_pages(&CPU_INFO_FULL_PRIMARY) };
+}
+
+/// `cpu_init_extents`: allocates the physical addresses used by RAM from the iomem extent
+/// map (see the module's deviations for the clusters).
+fn cpu_init_extents(regions: &[MemRegion]) {
+    static ALREADY_DONE: AtomicBool = AtomicBool::new(false);
+
+    // We get called for each CPU, only first should do this
+    if ALREADY_DONE.load(Ordering::Relaxed) {
+        return;
+    }
+    let Some(iomem_ex) = iomem_ex() else {
+        return;
+    };
+
+    let ram = |r: &&MemRegion| {
+        matches!(
+            r.kind,
+            MemKind::Usable | MemKind::KernelAndModules | MemKind::BootloaderReclaimable
+        )
+    };
+    let mut cluster: Option<(usize, usize)> = None;
+    let claim = |start: usize, size: usize| {
+        if extent_alloc_region(iomem_ex, start as u64, size as u64, EX_NOWAIT).is_err() {
+            // XXX What should we do?
+            kprintf!(
+                "WARNING: CAN'T ALLOCATE RAM ({:x}-{:x}) FROM IOMEM EXTENT MAP!\n",
+                start,
+                start + size - 1
+            );
+        }
+    };
+    for r in regions.iter().filter(ram) {
+        let (base, end) = (r.base.as_usize(), r.base.as_usize() + r.length.as_usize());
+        cluster = match cluster {
+            Some((s, e)) if e == base => Some((s, end)),
+            Some((s, e)) => {
+                claim(s, e - s);
+                Some((base, end))
+            }
+            None => Some((base, end)),
+        };
+    }
+    if let Some((s, e)) = cluster {
+        claim(s, e - s);
+    }
+
+    ALREADY_DONE.store(true, Ordering::Relaxed);
 }
 
 /// `initialize_thread_xstate`: give the thread a clean FPU state, the user state from now on

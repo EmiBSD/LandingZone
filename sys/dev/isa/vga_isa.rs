@@ -84,10 +84,6 @@
 //! OpenBSD 8.0 snapshot shows on that machine.
 //!
 //! ## Deviations
-//! - Without the `ioport_ex` extent (`subr_extent.c`, not ported; see
-//!   `arch/amd64/amd64/bus_space.rs`) a map does not fail on ports another device holds:
-//!   on a machine where a PCI VGA does attach (a BIOS boot, not how EmiBSD boots), this
-//!   probe would succeed too and attach a second `vga`, where OpenBSD's fails.
 //! - The `#if 0` softc member `sc_vc` is not here, as in C.
 
 use core::ffi::c_void;

@@ -124,8 +124,8 @@ use crate::arch::amd64::amd64::bus_dma::{
     _bus_dmamem_mmap, _bus_dmamem_unmap,
 };
 use crate::arch::amd64::amd64::bus_space::{
-    _bus_space_map, BusSpaceHandle, X86_BUS_SPACE_MEM, X86BusSpace, bus_space_barrier,
-    bus_space_map, bus_space_read_4, bus_space_unmap, bus_space_write_4,
+    _bus_space_map, _bus_space_unmap, BusSpaceHandle, X86_BUS_SPACE_MEM, X86BusSpace,
+    bus_space_barrier, bus_space_map, bus_space_read_4, bus_space_write_4,
 };
 use crate::arch::amd64::amd64::i8259::I8259_PIC;
 use crate::arch::amd64::amd64::intr::{intr_disestablish, intr_establish};
@@ -439,7 +439,7 @@ pub fn pci_msix_table_unmap(
     };
 
     let tblsz = pci_msix_mc_tblsz(reg) as usize + 1;
-    bus_space_unmap(memt, memh, tblsz * 16);
+    let _ = _bus_space_unmap(memt, memh, tblsz * 16);
 }
 
 /// `msi_hwmask`: masks MSI vector `pin` with the per-vector mask bits, if implemented.
